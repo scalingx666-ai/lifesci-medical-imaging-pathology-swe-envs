@@ -1,0 +1,65 @@
+version = "1.0"
+
+[task]
+name = "default/mahmoodlab__HIPT-31"
+description = "Fix attention notebook"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "HIPT",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "mahmoodlab/HIPT"
+ref = "b5f4844f2d8b013d06807375166817eeb939a5aa"
+reference = "https://github.com/mahmoodlab/HIPT/pull/31"
+source_access = "auto"
+built_at = "2026-11-14T07:09:17.633247+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:16125effde13976d5aaccb3b75cdccde8755ad43c30a582104b0f2136a0fbb63"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2023-06-22T22:34:15Z"
+diff_format = "unified"
+context_files = [
+    "HIPT_4K/HIPT_4K Inference + Attention Visualization.ipynb",
+    "HIPT_4K/attention_visualization_utils.py",
+    "HIPT_4K/hipt_heatmap_utils.py",
+    "HIPT_4K/hipt_model_utils.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 428
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,75 @@
+version = "1.0"
+
+[task]
+name = "default/OHIF__Viewers-6415"
+description = "feat(cornerstone): the Ultrasound Directional tool measures an ECG in seconds and mV"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "Viewers",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "OHIF/Viewers"
+ref = "b2ef6ffc18f763364dd501049da90ca95e81547c"
+reference = "https://github.com/OHIF/Viewers/pull/6415"
+source_access = "auto"
+built_at = "2026-11-14T07:04:44.273426+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:742749fc738a89cf65083f38dd4415847140d840bd79cc981f120e545913112e"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-10T18:54:46Z"
+diff_format = "unified"
+context_files = [
+    "extensions/cornerstone-dicom-pmap/package.json",
+    "extensions/cornerstone-dicom-seg/package.json",
+    "extensions/cornerstone-dicom-sr/package.json",
+    "extensions/cornerstone-dynamic-volume/package.json",
+    "extensions/cornerstone/package.json",
+    "extensions/cornerstone/src/customizations/toolbarButtonsCustomization.ts",
+    "extensions/cornerstone/src/getSopClassHandlerModule.js",
+    "extensions/measurement-tracking/package.json",
+    "extensions/usAnnotation/package.json",
+    "modes/usAnnotation/package.json",
+    "platform/app/package.json",
+    "platform/core/package.json",
+    "platform/core/src/classes/MetadataProvider.ts",
+    "pnpm-lock.yaml",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 301
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

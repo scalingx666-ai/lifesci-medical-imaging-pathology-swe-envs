@@ -1,0 +1,2478 @@
+diff --git a/direct_inference/direct_inference.py b/direct_inference/direct_inference.py
+new file mode 100644
+index 0000000..7189e46
+--- /dev/null
++++ b/direct_inference/direct_inference.py
+@@ -0,0 +1,185 @@
++# -*- encoding: utf-8 -*-
++'''
++@File    :   direct_inference.py
++@Time    :   2023/01/29 14:15:45
++@Author  :   Haoyu Wang 
++@Contact :   small_dark@sina.com
++@Brief   :   script for direct infernece of STU-Net, 
++             output is formatted in JSON like nnUNet
++'''
++
++import argparse
++import os
++import os.path as osp
++from tqdm import tqdm
++import nibabel as nib
++import numpy as np
++from batchgenerators.utilities.file_and_folder_operations import subfiles, join, load_json
++from nnunet.inference.predict import predict_cases
++from nnunet.evaluation.evaluator import aggregate_scores
++from label_sys import label_sys_dict, label_mapping, totalseg_cls2idx
++
++def read_nifti(filename):
++    """
++    Read a NIfTI file and return the image object and data array.
++    
++    :param filename: Path to the NIfTI file
++    :return: Tuple of (image object, data array)
++    """
++    img = nib.load(filename)
++    arr = img.get_fdata()
++    return img, arr
++
++def save_nifti(arr, img, output_path):
++    """
++    Save a data array as a NIfTI file, using an original image object for metadata.
++    
++    :param arr: Modified data array
++    :param img: Original image object
++    :param output_path: Path to save the new NIfTI file
++    """
++    if arr.shape != img.shape:
++        raise ValueError("The shape of the modified data array must match the original image shape.")
++    
++    new_img = nib.Nifti1Image(arr, img.affine, img.header)
++    nib.save(new_img, output_path)
++
++def map_all_data(test_ref_pairs, map_out_dir=None, label_info=None):
++    os.makedirs(map_out_dir, exist_ok=True)
++    print("mapping...")
++    mapped_test_ref_pairs = []
++    for test, ref in test_ref_pairs:
++        # load test get arr
++        test_img, test_arr = read_nifti(test)
++        ref_img, ref_arr = read_nifti(ref)
++        mapped_test_arr = np.zeros_like(test_arr, dtype=np.uint8)
++        mapped_ref_arr = np.zeros_like(ref_arr, dtype=np.uint8)
++        labels = dict()
++        for idx, (local_values, local_cls_name) in enumerate(label_info["label_sys"].items()):
++            global_cls_name = label_info["label_mapping"][local_cls_name]
++            labels[idx+1] = local_cls_name
++
++            if(global_cls_name.startswith("agg:")):
++                global_values = [label_info["totalseg_cls2idx"][gcn] for gcn in global_cls_name[4:].split(",")]
++            else:
++                global_values = [label_info["totalseg_cls2idx"][global_cls_name]]
++            # print("map", global_values, "to", local_cls_name, int(idx+1))
++            for v in global_values:
++                mapped_test_arr[test_arr==v] = int(idx+1)
++
++            if(local_values.startswith("agg:")):
++                local_values = [int(v) for v in local_values[4:].split(",")]
++            else:
++                local_values = [int(local_values)]
++            # print("map", local_values, "to", local_cls_name, int(idx+1))
++            for v in local_values:
++                mapped_ref_arr[ref_arr==v] = int(idx+1)
++
++        mapped_test_path = join(map_out_dir, "test_"+osp.basename(test))
++        mapped_ref_path = join(map_out_dir, "ref_"+osp.basename(ref))
++        mapped_test_ref_pairs.append((mapped_test_path, mapped_ref_path))
++        save_nifti(mapped_test_arr, test_img, mapped_test_path)
++        save_nifti(mapped_ref_arr, ref_img, mapped_ref_path)
++
++    return mapped_test_ref_pairs, labels
++
++
++
++if __name__ == '__main__':
++    parser = argparse.ArgumentParser(description='Process some integers.')
++    parser.add_argument('trainer', type=str, help='Trainer name')
++    parser.add_argument('test_dir', type=str, help='dir to test data, should contains `imagesTr`, `labelsTr` and `dataset.json`')
++    parser.add_argument('output_dir', type=str, help='dir to save inference results for further metric computation')
++    parser.add_argument('--mode', type=str, default='default', choices=['default', 'test', 'metric', 'split'], help='Mode of operation')
++    parser.add_argument('--src_dataset', type=str, default='Task101_TotalSegmentator', help='Src Dataset name')
++    parser.add_argument('--num_parts', type=int, default=1, help='Number of parts for split mode')
++    parser.add_argument('--part_id', type=int, default=0, help='Part ID for split mode')
++
++    args = parser.parse_args()
++
++    args.target_dataset = osp.basename(args.test_dir)
++    model = f"{args.trainer}__nnUNetPlansv2.1"
++    val_fold = "all"
++    test = args.mode == 'test'
++    assert args.mode in ("default", "test", "metric", "split"), f"unknown mode '{args.mode}'"
++    if args.mode == "split":
++        part_id = args.part_id
++        num_parts = args.num_parts
++    else:
++        part_id, num_parts = 0, 1
++    results_folder = os.getenv('RESULTS_FOLDER')
++    if results_folder is None:
++        raise EnvironmentError("The environment variable 'RESULTS_FOLDER' is not set")
++
++    parameter_folder = f'{results_folder}/nnUNet/3d_fullres/{args.src_dataset}'
++    input_folder = f'{args.test_dir}/imagesTr'
++    gt_folder = f'{args.test_dir}/labelsTr'
++    pred_output_folder = f'{args.output_dir}/pred/{args.target_dataset}'
++    json_output_folder = f'{args.output_dir}/json/{args.target_dataset}'
++    mapped_data_folder = f'{args.output_dir}/mapped_pred/{args.target_dataset}'
++    print(f"compute metrics of fold {val_fold}")
++
++    test_files = subfiles(input_folder, suffix='.nii.gz', join=False)
++    if (test): test_files = test_files[:2]
++
++    input_files = [join(input_folder, tf) for tf in test_files]
++    output_files = [join(pred_output_folder, model, tf) for tf in test_files]
++
++    # handle data slicing
++    if (num_parts > 1):
++        input_files = input_files[part_id::num_parts]
++        output_files = output_files[part_id::num_parts]
++        print(f"split data into {num_parts} parts({part_id}), number:", len(input_files))
++
++    # custom num_thread to avoid memory error
++    num_threads = 4
++    if (args.target_dataset in ["Task003_Liver"]):
++        num_threads = 2
++
++    # ----------- direct inference ------------------
++    if (args.mode != "metric"):
++        predict_cases(join(parameter_folder, model), [[i] for i in input_files], output_files, 
++                      folds=0, save_npz=False, checkpoint_name=args.trainer.split("_")[-1]+"_ep4k",
++                      num_threads_preprocessing=num_threads, num_threads_nifti_save=num_threads, 
++                      segs_from_prev_stage=None, do_tta=False,
++                      mixed_precision=True, overwrite_existing=False, all_in_gpu=False, step_size=0.5,)
++
++    # ----------- compute metric --------------------
++    print("start to compute metrics")
++    json_output_dir = f"{json_output_folder}/{model}"
++    if (test):
++        json_output_dir = osp.join(osp.dirname(json_output_dir), "test_" + osp.basename(json_output_dir))
++    os.makedirs(json_output_dir, exist_ok=True)
++    data_list = output_files 
++    label_sys = label_sys_dict[args.target_dataset]
++    print("labels:", label_sys)
++    pbar = tqdm(data_list)
++
++    dataset_json_content = load_json(f"{args.test_dir}/dataset.json")
++    image2label = dict()
++    for image_label_pair in dataset_json_content["training"]:
++        image2label[osp.basename(image_label_pair["image"])] = osp.basename(image_label_pair["label"])
++
++    test_ref_pairs = []
++    for data in pbar:
++        image_key = osp.basename(data).replace("_0000.nii.gz", ".nii.gz") 
++        label_fname = image2label[image_key]
++        label_path = osp.join(gt_folder, label_fname)
++        test_ref_pairs.append((data, label_path))
++    print("all data", test_ref_pairs)
++
++    mapped_test_ref_pairs, labels = map_all_data(
++        test_ref_pairs,
++        map_out_dir=join(mapped_data_folder, model),
++        label_info={
++            "label_sys": label_sys, 
++            "label_mapping": label_mapping,
++            "totalseg_cls2idx": totalseg_cls2idx,
++        })
++
++    aggregate_scores(
++        mapped_test_ref_pairs, 
++        json_output_file=join(json_output_dir, "summary.json"),
++        num_threads=8, 
++        labels=labels)
++    print("finish computing metrics")
+diff --git a/direct_inference/example/Task032_AMOS22_Task1/dataset.json b/direct_inference/example/Task032_AMOS22_Task1/dataset.json
+new file mode 100644
+index 0000000..174f354
+--- /dev/null
++++ b/direct_inference/example/Task032_AMOS22_Task1/dataset.json
+@@ -0,0 +1,1839 @@
++{
++    "author": "Yuanfeng Ji",
++    "description": "MICCAI2022 Multi-Modality Abdominal Multi-Organ Segmentation Task 1",
++    "labels": {
++        "0": "background",
++        "1": "spleen",
++        "10": "pancreas",
++        "11": "adrenal_gland_right",
++        "12": "adrenal_gland_left",
++        "13": "duodenum",
++        "14": "bladder",
++        "15": "prostate_and_uterus",
++        "2": "kidney_right",
++        "3": "kidney_left",
++        "4": "gallbladder",
++        "5": "esophagus",
++        "6": "liver",
++        "7": "stomach",
++        "8": "aorta",
++        "9": "inferior_vena_cava"
++    },
++    "licence": "CC-BY-SA 4.0",
++    "modality": {
++        "0": "ct"
++    },
++    "name": "AMOS",
++    "numTest": 200,
++    "numTraining": 200,
++    "numValidation": 100,
++    "reference": "SRIDB x CUHKSZ x HKU x SYSU x LGCHSZ x LGPHSZ",
++    "release": "1.0 01/05/2022",
++    "tensorImageSize": "3D",
++    "test": [
++        {
++            "image": "imagesTs/amos_0002.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0003.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0012.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0020.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0026.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0028.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0031.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0037.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0039.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0046.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0053.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0055.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0062.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0065.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0068.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0074.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0080.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0082.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0091.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0093.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0095.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0096.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0100.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0101.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0107.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0114.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0122.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0130.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0139.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0145.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0146.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0148.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0151.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0163.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0164.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0165.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0168.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0169.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0178.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0182.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0183.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0187.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0201.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0205.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0209.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0210.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0211.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0213.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0220.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0221.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0222.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0227.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0229.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0232.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0234.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0236.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0240.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0241.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0243.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0246.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0251.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0252.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0253.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0256.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0260.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0261.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0262.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0265.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0266.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0267.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0269.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0270.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0271.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0275.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0277.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0285.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0291.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0295.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0298.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0300.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0303.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0305.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0306.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0312.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0314.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0315.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0319.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0322.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0324.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0327.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0329.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0331.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0335.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0338.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0340.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0343.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0345.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0347.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0354.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0355.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0359.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0360.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0369.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0375.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0382.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0386.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0389.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0393.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0394.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0407.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0411.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0412.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0413.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0414.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0415.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0416.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0417.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0418.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0419.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0420.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0421.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0422.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0423.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0424.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0425.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0426.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0427.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0428.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0429.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0430.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0431.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0432.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0433.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0434.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0435.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0436.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0437.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0438.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0439.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0440.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0441.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0442.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0443.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0444.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0445.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0446.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0447.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0448.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0449.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0450.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0451.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0452.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0453.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0454.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0455.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0456.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0457.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0458.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0459.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0460.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0461.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0462.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0463.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0464.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0465.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0466.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0467.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0468.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0469.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0470.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0471.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0472.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0473.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0474.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0475.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0476.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0477.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0478.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0479.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0480.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0481.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0482.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0483.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0484.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0485.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0486.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0487.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0488.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0489.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0490.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0491.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0492.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0493.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0494.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0495.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0496.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0497.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0498.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0499.nii.gz"
++        },
++        {
++            "image": "imagesTs/amos_0500.nii.gz"
++        }
++    ],
++    "training": [
++        {
++            "image": "imagesTr/amos_0001.nii.gz",
++            "label": "labelsTr/amos_0001.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0004.nii.gz",
++            "label": "labelsTr/amos_0004.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0005.nii.gz",
++            "label": "labelsTr/amos_0005.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0006.nii.gz",
++            "label": "labelsTr/amos_0006.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0007.nii.gz",
++            "label": "labelsTr/amos_0007.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0009.nii.gz",
++            "label": "labelsTr/amos_0009.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0010.nii.gz",
++            "label": "labelsTr/amos_0010.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0011.nii.gz",
++            "label": "labelsTr/amos_0011.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0014.nii.gz",
++            "label": "labelsTr/amos_0014.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0015.nii.gz",
++            "label": "labelsTr/amos_0015.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0016.nii.gz",
++            "label": "labelsTr/amos_0016.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0017.nii.gz",
++            "label": "labelsTr/amos_0017.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0019.nii.gz",
++            "label": "labelsTr/amos_0019.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0021.nii.gz",
++            "label": "labelsTr/amos_0021.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0023.nii.gz",
++            "label": "labelsTr/amos_0023.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0024.nii.gz",
++            "label": "labelsTr/amos_0024.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0025.nii.gz",
++            "label": "labelsTr/amos_0025.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0027.nii.gz",
++            "label": "labelsTr/amos_0027.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0030.nii.gz",
++            "label": "labelsTr/amos_0030.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0033.nii.gz",
++            "label": "labelsTr/amos_0033.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0035.nii.gz",
++            "label": "labelsTr/amos_0035.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0036.nii.gz",
++            "label": "labelsTr/amos_0036.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0038.nii.gz",
++            "label": "labelsTr/amos_0038.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0042.nii.gz",
++            "label": "labelsTr/amos_0042.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0043.nii.gz",
++            "label": "labelsTr/amos_0043.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0044.nii.gz",
++            "label": "labelsTr/amos_0044.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0045.nii.gz",
++            "label": "labelsTr/amos_0045.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0047.nii.gz",
++            "label": "labelsTr/amos_0047.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0048.nii.gz",
++            "label": "labelsTr/amos_0048.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0049.nii.gz",
++            "label": "labelsTr/amos_0049.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0050.nii.gz",
++            "label": "labelsTr/amos_0050.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0052.nii.gz",
++            "label": "labelsTr/amos_0052.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0054.nii.gz",
++            "label": "labelsTr/amos_0054.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0057.nii.gz",
++            "label": "labelsTr/amos_0057.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0058.nii.gz",
++            "label": "labelsTr/amos_0058.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0059.nii.gz",
++            "label": "labelsTr/amos_0059.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0060.nii.gz",
++            "label": "labelsTr/amos_0060.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0064.nii.gz",
++            "label": "labelsTr/amos_0064.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0066.nii.gz",
++            "label": "labelsTr/amos_0066.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0067.nii.gz",
++            "label": "labelsTr/amos_0067.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0069.nii.gz",
++            "label": "labelsTr/amos_0069.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0071.nii.gz",
++            "label": "labelsTr/amos_0071.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0072.nii.gz",
++            "label": "labelsTr/amos_0072.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0075.nii.gz",
++            "label": "labelsTr/amos_0075.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0076.nii.gz",
++            "label": "labelsTr/amos_0076.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0077.nii.gz",
++            "label": "labelsTr/amos_0077.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0078.nii.gz",
++            "label": "labelsTr/amos_0078.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0079.nii.gz",
++            "label": "labelsTr/amos_0079.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0081.nii.gz",
++            "label": "labelsTr/amos_0081.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0083.nii.gz",
++            "label": "labelsTr/amos_0083.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0084.nii.gz",
++            "label": "labelsTr/amos_0084.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0086.nii.gz",
++            "label": "labelsTr/amos_0086.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0088.nii.gz",
++            "label": "labelsTr/amos_0088.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0089.nii.gz",
++            "label": "labelsTr/amos_0089.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0092.nii.gz",
++            "label": "labelsTr/amos_0092.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0094.nii.gz",
++            "label": "labelsTr/amos_0094.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0097.nii.gz",
++            "label": "labelsTr/amos_0097.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0098.nii.gz",
++            "label": "labelsTr/amos_0098.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0099.nii.gz",
++            "label": "labelsTr/amos_0099.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0102.nii.gz",
++            "label": "labelsTr/amos_0102.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0103.nii.gz",
++            "label": "labelsTr/amos_0103.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0104.nii.gz",
++            "label": "labelsTr/amos_0104.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0105.nii.gz",
++            "label": "labelsTr/amos_0105.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0109.nii.gz",
++            "label": "labelsTr/amos_0109.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0110.nii.gz",
++            "label": "labelsTr/amos_0110.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0111.nii.gz",
++            "label": "labelsTr/amos_0111.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0113.nii.gz",
++            "label": "labelsTr/amos_0113.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0115.nii.gz",
++            "label": "labelsTr/amos_0115.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0116.nii.gz",
++            "label": "labelsTr/amos_0116.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0118.nii.gz",
++            "label": "labelsTr/amos_0118.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0119.nii.gz",
++            "label": "labelsTr/amos_0119.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0121.nii.gz",
++            "label": "labelsTr/amos_0121.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0124.nii.gz",
++            "label": "labelsTr/amos_0124.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0125.nii.gz",
++            "label": "labelsTr/amos_0125.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0126.nii.gz",
++            "label": "labelsTr/amos_0126.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0127.nii.gz",
++            "label": "labelsTr/amos_0127.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0129.nii.gz",
++            "label": "labelsTr/amos_0129.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0131.nii.gz",
++            "label": "labelsTr/amos_0131.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0133.nii.gz",
++            "label": "labelsTr/amos_0133.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0134.nii.gz",
++            "label": "labelsTr/amos_0134.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0135.nii.gz",
++            "label": "labelsTr/amos_0135.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0137.nii.gz",
++            "label": "labelsTr/amos_0137.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0138.nii.gz",
++            "label": "labelsTr/amos_0138.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0141.nii.gz",
++            "label": "labelsTr/amos_0141.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0142.nii.gz",
++            "label": "labelsTr/amos_0142.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0143.nii.gz",
++            "label": "labelsTr/amos_0143.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0147.nii.gz",
++            "label": "labelsTr/amos_0147.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0149.nii.gz",
++            "label": "labelsTr/amos_0149.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0152.nii.gz",
++            "label": "labelsTr/amos_0152.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0153.nii.gz",
++            "label": "labelsTr/amos_0153.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0154.nii.gz",
++            "label": "labelsTr/amos_0154.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0156.nii.gz",
++            "label": "labelsTr/amos_0156.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0158.nii.gz",
++            "label": "labelsTr/amos_0158.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0159.nii.gz",
++            "label": "labelsTr/amos_0159.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0160.nii.gz",
++            "label": "labelsTr/amos_0160.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0161.nii.gz",
++            "label": "labelsTr/amos_0161.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0162.nii.gz",
++            "label": "labelsTr/amos_0162.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0166.nii.gz",
++            "label": "labelsTr/amos_0166.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0170.nii.gz",
++            "label": "labelsTr/amos_0170.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0171.nii.gz",
++            "label": "labelsTr/amos_0171.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0172.nii.gz",
++            "label": "labelsTr/amos_0172.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0173.nii.gz",
++            "label": "labelsTr/amos_0173.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0175.nii.gz",
++            "label": "labelsTr/amos_0175.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0177.nii.gz",
++            "label": "labelsTr/amos_0177.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0179.nii.gz",
++            "label": "labelsTr/amos_0179.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0180.nii.gz",
++            "label": "labelsTr/amos_0180.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0181.nii.gz",
++            "label": "labelsTr/amos_0181.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0184.nii.gz",
++            "label": "labelsTr/amos_0184.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0185.nii.gz",
++            "label": "labelsTr/amos_0185.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0186.nii.gz",
++            "label": "labelsTr/amos_0186.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0188.nii.gz",
++            "label": "labelsTr/amos_0188.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0190.nii.gz",
++            "label": "labelsTr/amos_0190.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0192.nii.gz",
++            "label": "labelsTr/amos_0192.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0193.nii.gz",
++            "label": "labelsTr/amos_0193.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0195.nii.gz",
++            "label": "labelsTr/amos_0195.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0196.nii.gz",
++            "label": "labelsTr/amos_0196.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0197.nii.gz",
++            "label": "labelsTr/amos_0197.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0198.nii.gz",
++            "label": "labelsTr/amos_0198.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0199.nii.gz",
++            "label": "labelsTr/amos_0199.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0212.nii.gz",
++            "label": "labelsTr/amos_0212.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0214.nii.gz",
++            "label": "labelsTr/amos_0214.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0215.nii.gz",
++            "label": "labelsTr/amos_0215.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0217.nii.gz",
++            "label": "labelsTr/amos_0217.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0224.nii.gz",
++            "label": "labelsTr/amos_0224.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0225.nii.gz",
++            "label": "labelsTr/amos_0225.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0226.nii.gz",
++            "label": "labelsTr/amos_0226.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0230.nii.gz",
++            "label": "labelsTr/amos_0230.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0231.nii.gz",
++            "label": "labelsTr/amos_0231.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0235.nii.gz",
++            "label": "labelsTr/amos_0235.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0237.nii.gz",
++            "label": "labelsTr/amos_0237.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0239.nii.gz",
++            "label": "labelsTr/amos_0239.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0242.nii.gz",
++            "label": "labelsTr/amos_0242.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0245.nii.gz",
++            "label": "labelsTr/amos_0245.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0248.nii.gz",
++            "label": "labelsTr/amos_0248.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0249.nii.gz",
++            "label": "labelsTr/amos_0249.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0254.nii.gz",
++            "label": "labelsTr/amos_0254.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0259.nii.gz",
++            "label": "labelsTr/amos_0259.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0263.nii.gz",
++            "label": "labelsTr/amos_0263.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0264.nii.gz",
++            "label": "labelsTr/amos_0264.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0268.nii.gz",
++            "label": "labelsTr/amos_0268.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0272.nii.gz",
++            "label": "labelsTr/amos_0272.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0273.nii.gz",
++            "label": "labelsTr/amos_0273.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0274.nii.gz",
++            "label": "labelsTr/amos_0274.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0276.nii.gz",
++            "label": "labelsTr/amos_0276.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0279.nii.gz",
++            "label": "labelsTr/amos_0279.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0281.nii.gz",
++            "label": "labelsTr/amos_0281.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0282.nii.gz",
++            "label": "labelsTr/amos_0282.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0288.nii.gz",
++            "label": "labelsTr/amos_0288.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0294.nii.gz",
++            "label": "labelsTr/amos_0294.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0296.nii.gz",
++            "label": "labelsTr/amos_0296.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0297.nii.gz",
++            "label": "labelsTr/amos_0297.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0299.nii.gz",
++            "label": "labelsTr/amos_0299.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0301.nii.gz",
++            "label": "labelsTr/amos_0301.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0302.nii.gz",
++            "label": "labelsTr/amos_0302.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0307.nii.gz",
++            "label": "labelsTr/amos_0307.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0317.nii.gz",
++            "label": "labelsTr/amos_0317.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0320.nii.gz",
++            "label": "labelsTr/amos_0320.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0321.nii.gz",
++            "label": "labelsTr/amos_0321.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0330.nii.gz",
++            "label": "labelsTr/amos_0330.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0332.nii.gz",
++            "label": "labelsTr/amos_0332.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0336.nii.gz",
++            "label": "labelsTr/amos_0336.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0337.nii.gz",
++            "label": "labelsTr/amos_0337.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0341.nii.gz",
++            "label": "labelsTr/amos_0341.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0348.nii.gz",
++            "label": "labelsTr/amos_0348.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0349.nii.gz",
++            "label": "labelsTr/amos_0349.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0350.nii.gz",
++            "label": "labelsTr/amos_0350.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0351.nii.gz",
++            "label": "labelsTr/amos_0351.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0353.nii.gz",
++            "label": "labelsTr/amos_0353.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0358.nii.gz",
++            "label": "labelsTr/amos_0358.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0361.nii.gz",
++            "label": "labelsTr/amos_0361.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0362.nii.gz",
++            "label": "labelsTr/amos_0362.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0366.nii.gz",
++            "label": "labelsTr/amos_0366.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0367.nii.gz",
++            "label": "labelsTr/amos_0367.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0370.nii.gz",
++            "label": "labelsTr/amos_0370.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0371.nii.gz",
++            "label": "labelsTr/amos_0371.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0374.nii.gz",
++            "label": "labelsTr/amos_0374.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0376.nii.gz",
++            "label": "labelsTr/amos_0376.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0378.nii.gz",
++            "label": "labelsTr/amos_0378.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0379.nii.gz",
++            "label": "labelsTr/amos_0379.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0380.nii.gz",
++            "label": "labelsTr/amos_0380.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0381.nii.gz",
++            "label": "labelsTr/amos_0381.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0383.nii.gz",
++            "label": "labelsTr/amos_0383.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0384.nii.gz",
++            "label": "labelsTr/amos_0384.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0387.nii.gz",
++            "label": "labelsTr/amos_0387.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0388.nii.gz",
++            "label": "labelsTr/amos_0388.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0390.nii.gz",
++            "label": "labelsTr/amos_0390.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0391.nii.gz",
++            "label": "labelsTr/amos_0391.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0392.nii.gz",
++            "label": "labelsTr/amos_0392.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0395.nii.gz",
++            "label": "labelsTr/amos_0395.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0396.nii.gz",
++            "label": "labelsTr/amos_0396.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0398.nii.gz",
++            "label": "labelsTr/amos_0398.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0400.nii.gz",
++            "label": "labelsTr/amos_0400.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0401.nii.gz",
++            "label": "labelsTr/amos_0401.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0402.nii.gz",
++            "label": "labelsTr/amos_0402.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0403.nii.gz",
++            "label": "labelsTr/amos_0403.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0404.nii.gz",
++            "label": "labelsTr/amos_0404.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0405.nii.gz",
++            "label": "labelsTr/amos_0405.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0406.nii.gz",
++            "label": "labelsTr/amos_0406.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0408.nii.gz",
++            "label": "labelsTr/amos_0408.nii.gz"
++        },
++        {
++            "image": "imagesTr/amos_0410.nii.gz",
++            "label": "labelsTr/amos_0410.nii.gz"
++        }
++    ],
++    "validation": [
++        {
++            "image": "imagesVal/amos_0008.nii.gz",
++            "label": "labelsVal/amos_0008.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0013.nii.gz",
++            "label": "labelsVal/amos_0013.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0018.nii.gz",
++            "label": "labelsVal/amos_0018.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0022.nii.gz",
++            "label": "labelsVal/amos_0022.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0029.nii.gz",
++            "label": "labelsVal/amos_0029.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0032.nii.gz",
++            "label": "labelsVal/amos_0032.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0034.nii.gz",
++            "label": "labelsVal/amos_0034.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0040.nii.gz",
++            "label": "labelsVal/amos_0040.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0041.nii.gz",
++            "label": "labelsVal/amos_0041.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0051.nii.gz",
++            "label": "labelsVal/amos_0051.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0056.nii.gz",
++            "label": "labelsVal/amos_0056.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0061.nii.gz",
++            "label": "labelsVal/amos_0061.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0063.nii.gz",
++            "label": "labelsVal/amos_0063.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0070.nii.gz",
++            "label": "labelsVal/amos_0070.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0073.nii.gz",
++            "label": "labelsVal/amos_0073.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0085.nii.gz",
++            "label": "labelsVal/amos_0085.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0087.nii.gz",
++            "label": "labelsVal/amos_0087.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0090.nii.gz",
++            "label": "labelsVal/amos_0090.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0106.nii.gz",
++            "label": "labelsVal/amos_0106.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0108.nii.gz",
++            "label": "labelsVal/amos_0108.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0112.nii.gz",
++            "label": "labelsVal/amos_0112.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0117.nii.gz",
++            "label": "labelsVal/amos_0117.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0120.nii.gz",
++            "label": "labelsVal/amos_0120.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0123.nii.gz",
++            "label": "labelsVal/amos_0123.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0128.nii.gz",
++            "label": "labelsVal/amos_0128.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0132.nii.gz",
++            "label": "labelsVal/amos_0132.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0136.nii.gz",
++            "label": "labelsVal/amos_0136.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0140.nii.gz",
++            "label": "labelsVal/amos_0140.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0144.nii.gz",
++            "label": "labelsVal/amos_0144.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0150.nii.gz",
++            "label": "labelsVal/amos_0150.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0155.nii.gz",
++            "label": "labelsVal/amos_0155.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0157.nii.gz",
++            "label": "labelsVal/amos_0157.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0167.nii.gz",
++            "label": "labelsVal/amos_0167.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0174.nii.gz",
++            "label": "labelsVal/amos_0174.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0176.nii.gz",
++            "label": "labelsVal/amos_0176.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0189.nii.gz",
++            "label": "labelsVal/amos_0189.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0191.nii.gz",
++            "label": "labelsVal/amos_0191.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0194.nii.gz",
++            "label": "labelsVal/amos_0194.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0200.nii.gz",
++            "label": "labelsVal/amos_0200.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0202.nii.gz",
++            "label": "labelsVal/amos_0202.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0203.nii.gz",
++            "label": "labelsVal/amos_0203.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0204.nii.gz",
++            "label": "labelsVal/amos_0204.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0206.nii.gz",
++            "label": "labelsVal/amos_0206.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0207.nii.gz",
++            "label": "labelsVal/amos_0207.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0208.nii.gz",
++            "label": "labelsVal/amos_0208.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0216.nii.gz",
++            "label": "labelsVal/amos_0216.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0218.nii.gz",
++            "label": "labelsVal/amos_0218.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0219.nii.gz",
++            "label": "labelsVal/amos_0219.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0223.nii.gz",
++            "label": "labelsVal/amos_0223.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0228.nii.gz",
++            "label": "labelsVal/amos_0228.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0233.nii.gz",
++            "label": "labelsVal/amos_0233.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0238.nii.gz",
++            "label": "labelsVal/amos_0238.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0244.nii.gz",
++            "label": "labelsVal/amos_0244.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0247.nii.gz",
++            "label": "labelsVal/amos_0247.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0250.nii.gz",
++            "label": "labelsVal/amos_0250.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0255.nii.gz",
++            "label": "labelsVal/amos_0255.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0257.nii.gz",
++            "label": "labelsVal/amos_0257.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0258.nii.gz",
++            "label": "labelsVal/amos_0258.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0278.nii.gz",
++            "label": "labelsVal/amos_0278.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0280.nii.gz",
++            "label": "labelsVal/amos_0280.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0283.nii.gz",
++            "label": "labelsVal/amos_0283.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0284.nii.gz",
++            "label": "labelsVal/amos_0284.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0286.nii.gz",
++            "label": "labelsVal/amos_0286.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0287.nii.gz",
++            "label": "labelsVal/amos_0287.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0289.nii.gz",
++            "label": "labelsVal/amos_0289.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0290.nii.gz",
++            "label": "labelsVal/amos_0290.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0292.nii.gz",
++            "label": "labelsVal/amos_0292.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0293.nii.gz",
++            "label": "labelsVal/amos_0293.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0304.nii.gz",
++            "label": "labelsVal/amos_0304.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0308.nii.gz",
++            "label": "labelsVal/amos_0308.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0309.nii.gz",
++            "label": "labelsVal/amos_0309.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0310.nii.gz",
++            "label": "labelsVal/amos_0310.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0311.nii.gz",
++            "label": "labelsVal/amos_0311.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0313.nii.gz",
++            "label": "labelsVal/amos_0313.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0316.nii.gz",
++            "label": "labelsVal/amos_0316.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0318.nii.gz",
++            "label": "labelsVal/amos_0318.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0323.nii.gz",
++            "label": "labelsVal/amos_0323.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0325.nii.gz",
++            "label": "labelsVal/amos_0325.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0326.nii.gz",
++            "label": "labelsVal/amos_0326.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0328.nii.gz",
++            "label": "labelsVal/amos_0328.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0333.nii.gz",
++            "label": "labelsVal/amos_0333.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0334.nii.gz",
++            "label": "labelsVal/amos_0334.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0339.nii.gz",
++            "label": "labelsVal/amos_0339.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0342.nii.gz",
++            "label": "labelsVal/amos_0342.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0344.nii.gz",
++            "label": "labelsVal/amos_0344.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0346.nii.gz",
++            "label": "labelsVal/amos_0346.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0352.nii.gz",
++            "label": "labelsVal/amos_0352.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0356.nii.gz",
++            "label": "labelsVal/amos_0356.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0357.nii.gz",
++            "label": "labelsVal/amos_0357.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0363.nii.gz",
++            "label": "labelsVal/amos_0363.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0364.nii.gz",
++            "label": "labelsVal/amos_0364.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0365.nii.gz",
++            "label": "labelsVal/amos_0365.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0368.nii.gz",
++            "label": "labelsVal/amos_0368.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0372.nii.gz",
++            "label": "labelsVal/amos_0372.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0373.nii.gz",
++            "label": "labelsVal/amos_0373.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0377.nii.gz",
++            "label": "labelsVal/amos_0377.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0385.nii.gz",
++            "label": "labelsVal/amos_0385.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0397.nii.gz",
++            "label": "labelsVal/amos_0397.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0399.nii.gz",
++            "label": "labelsVal/amos_0399.nii.gz"
++        },
++        {
++            "image": "imagesVal/amos_0409.nii.gz",
++            "label": "labelsVal/amos_0409.nii.gz"
++        }
++    ]
++}
+\ No newline at end of file
+diff --git a/direct_inference/example/Task032_AMOS22_Task1/imagesTr/amos_0001_0000.nii.gz b/direct_inference/example/Task032_AMOS22_Task1/imagesTr/amos_0001_0000.nii.gz
+new file mode 100644
+index 0000000..d56cc95
+Binary files /dev/null and b/direct_inference/example/Task032_AMOS22_Task1/imagesTr/amos_0001_0000.nii.gz differ
+diff --git a/direct_inference/example/Task032_AMOS22_Task1/labelsTr/amos_0001.nii.gz b/direct_inference/example/Task032_AMOS22_Task1/labelsTr/amos_0001.nii.gz
+new file mode 100644
+index 0000000..59bd5d3
+Binary files /dev/null and b/direct_inference/example/Task032_AMOS22_Task1/labelsTr/amos_0001.nii.gz differ
+diff --git a/direct_inference/label_sys.py b/direct_inference/label_sys.py
+new file mode 100644
+index 0000000..fd0c6ce
+--- /dev/null
++++ b/direct_inference/label_sys.py
+@@ -0,0 +1,369 @@
++# -*- encoding: utf-8 -*-
++'''
++@File    :   direct_inference.py
++@Time    :   2023/01/29 14:16:44
++@Author  :   Haoyu Wang 
++@Contact :   small_dark@sina.com
++@Brief   :   dict to map local label of dataset
++             into our global label system
++'''
++
++'''
++to use this script, add your custom local label_sys 
++then, add the mapping into `label_sys_dict`
++
++example:
++Task003_Liver_sys = { 
++   "agg:1,2": "liver", 
++} # map local 1 & 2 to global category: `liver`
++label_sys_dict = {
++    "Task003_Liver": Task003_Liver_sys,
++} # map `Task003_Liver` to label_sys `Task003_Liver_sys`
++'''
++
++
++Task003_Liver_sys = { 
++#    "0": "background", 
++   "agg:1,2": "liver", 
++#    "1": "liver", 
++#    "2": "cancer"
++}
++Task007_Pancreas_sys = {
++#    "0": "background",
++   "agg:1,2": "pancreas",
++#    "1": "pancreas",
++#    "2": "cancer"
++ }
++Task009_Spleen_sys = {
++#    "0": "background",
++   "1": "spleen"
++}
++FLARE22_sys = {
++    # "0":  "background",
++    "1":  "liver",
++    "10": "esophagus",
++    "11": "stomach",
++    "12": "duodenum",
++    "13": "left kidney",
++    "2":  "right kidney",
++    "3":  "spleen",
++    "4":  "pancreas",
++    "5":  "aorta",
++    "6":  "IVC",
++    "7":  "RAG",
++    "8":  "LAG",
++    "9":  "gallbladder"
++}
++AMOS_sys = {
++    # "0": "background", 
++    "1": "spleen", 
++    "2": "right kidney", 
++    "3": "left kidney", 
++    # "4": "gallbladder", 
++    "5": "esophagus", 
++    "6": "liver", 
++    "7": "stomach", 
++    "8": "aorta", 
++    # "9": "postcava",
++    "10": "pancreas", 
++    "11": "RAG", 
++    "12": "LAG", 
++    "13": "duodenum", 
++    "14": "bladder", 
++    # "15": "prostate/uterus"
++}
++Task011_BTCV_sys = {
++    # "00": "background",
++    "1": "spleen",
++    "2": "right kidney",
++    "3": "left kidney",
++    "4": "gallbladder",
++    "5": "esophagus",
++    "6": "liver",
++    "7": "stomach",
++    "8": "aorta",
++    "9": "inferior vena cava",
++    "10": "portal vein and splenic vein",
++    "11": "pancreas",
++    "12": "right adrenal gland",
++    "13": "left adrenal gland"
++}
++Task020_AbdomenCT1K_sys = {
++    # "0": "background",
++    "1": "liver",
++    "2": "kidney",
++    "3": "spleen",
++    "4": "pancreas"
++}
++Task021_KiTS2021_sys = {
++    # "0": "background",
++    "agg:1,2,3": "kidney", 
++    # "1": "kidney",
++    # "2": "tumor",
++    # "3": "cyst"
++}
++Task083_VerSe2020_sys = {
++    # "0": "0",
++    "1":    "C1",
++    "2":    "C2",
++    "3":    "C3",
++    "4":    "C4",
++    "5":    "C5",
++    "6":    "C6",
++    "7":    "C7",
++    "8":    "T1",
++    "9":    "T2",
++    "10":   "T3",
++    "11":   "T4",
++    "12":   "T5",
++    "13":   "T6",
++    "14":   "T7",
++    "15":   "T8",
++    "16":   "T9",
++    "17":   "T10",
++    "18":   "T11",
++    "19":   "T12",
++    "20":   "L1",
++    "21":   "L2",
++    "22":   "L3",
++    "23":   "L4",
++    "24":   "L5",
++    # "25": "L6",
++    # "26": "sacrum",
++    # "27": "cocygis",
++    # "28": "T13"
++}
++Task030_CT_ORG_sys = {
++    # "0": "background",
++    "1": "liver",
++    "2": "bladder",
++    "3": "lung",
++    "4": "kidney",
++    # "5": "bone",
++    "6": "brain"
++}
++Task012_BTCV_Cervix_sys = {
++    # "0": "background",
++    "1": "urinary_bladder",
++    # "2": "uterus",
++    # "3": "rectum",
++    # "4": " small bowel"
++}
++Task040_KiTS_sys = {
++    # "0": 0,
++    "1": "kidney",
++    # "2": "renal_tumor"
++}
++Task036_KiPA22_sys = {
++    # "0": 0,
++    # "1": "kidney_veins",
++    "2": "kidney",
++    # "3": "kidney_arteries",
++    # "4": "renal_tumor"
++}
++Task560_WORD_sys = {
++    # "0": "background",
++    "1": "liver",
++    "10": "colon",
++    # "11": "intestine",
++    # "12": "adrenal",
++    # "13": "rectum",
++    "14": "urinary_bladder",
++    "15": "femur_left",
++    "16": "femur_right",
++    "2": "spleen",
++    "3": "kidney_left",
++    "4": "kidney_right",
++    "5": "stomach",
++    "6": "gallbladder",
++    "7": "esophagus",
++    "8": "pancreas",
++    "9": "duodenum"
++}
++Task605_SegThor_sys = {
++    # "0": "background",
++    "1": "esophagus",
++    # "2": "heart",
++    "3": "trachea",
++    "4": "aorta"
++}
++ 
++label_mapping = {
++    "lung":                         "agg:lung_lower_lobe_left,lung_lower_lobe_right,lung_middle_lobe_right,lung_upper_lobe_left,lung_upper_lobe_right",
++    "liver":                        "liver",
++    "esophagus":                    "esophagus",
++    "stomach":                      "stomach",
++    "duodenum":                     "duodenum", 
++    "kidney":                       "agg:kidney_left,kidney_right",
++    "left kidney":                  "kidney_left",
++    "right kidney":                 "kidney_right",
++    "spleen":                       "spleen",
++    "pancreas":                     "pancreas",
++    "aorta":                        "aorta",
++    "IVC":                          "inferior_vena_cava",
++    "RAG":                          "adrenal_gland_right",
++    "LAG":                          "adrenal_gland_left",
++    "gallbladder":                  "gallbladder",
++    "bladder":                      "urinary_bladder",
++    "LV":                           "heart_ventricle_left",
++    "RV":                           "heart_ventricle_right",
++    "LA":                           "heart_atrium_left",
++    "brain":                        "brain",
++    "inferior vena cava":           "inferior_vena_cava",
++    "portal vein and splenic vein": "portal_vein_and_splenic_vein",
++    "right adrenal gland":          "adrenal_gland_right",
++    "left adrenal gland":           "adrenal_gland_left",
++    "C1":                           "vertebrae_C1",
++    "C2":                           "vertebrae_C2",
++    "C3":                           "vertebrae_C3",
++    "C4":                           "vertebrae_C4",
++    "C5":                           "vertebrae_C5",
++    "C6":                           "vertebrae_C6",
++    "C7":                           "vertebrae_C7",
++    "T1":                           "vertebrae_T1",
++    "T2":                           "vertebrae_T2",
++    "T3":                           "vertebrae_T3",
++    "T4":                           "vertebrae_T4",
++    "T5":                           "vertebrae_T5",
++    "T6":                           "vertebrae_T6",
++    "T7":                           "vertebrae_T7",
++    "T8":                           "vertebrae_T8",
++    "T9":                           "vertebrae_T9",
++    "T10":                          "vertebrae_T10",
++    "T11":                          "vertebrae_T11",
++    "T12":                          "vertebrae_T12",
++    "L1":                           "vertebrae_L1",
++    "L2":                           "vertebrae_L2",
++    "L3":                           "vertebrae_L3",
++    "L4":                           "vertebrae_L4",
++    "L5":                           "vertebrae_L5",
++}
++
++label_sys_dict = {
++    "Task003_Liver":                        Task003_Liver_sys,
++    "Task007_Pancreas":                     Task007_Pancreas_sys,
++    "Task009_Spleen":                       Task009_Spleen_sys,
++    "Task011_BTCV":                         Task011_BTCV_sys,
++    "Task012_BTCV_Cervix":                  Task012_BTCV_Cervix_sys,
++    "Task020_AbdomenCT1K":                  Task020_AbdomenCT1K_sys,
++    "Task021_KiTS2021":                     Task021_KiTS2021_sys,  
++    "Task022_FLARE22":                      FLARE22_sys,
++    "Task030_CT_ORG":                       Task030_CT_ORG_sys,
++    "Task032_AMOS22_Task1":                 AMOS_sys,
++    "Task036_KiPA22":                       Task036_KiPA22_sys,  
++    "Task083_VerSe2020":                    Task083_VerSe2020_sys,   
++    "Task560_WORD":                         Task560_WORD_sys,             
++    "Task605_SegThor":                      Task605_SegThor_sys,        
++}
++
++totalseg_json = {
++    "1": "adrenal_gland_left",
++    "10": "duodenum",
++    "100": "vertebrae_T5",
++    "101": "vertebrae_T6",
++    "102": "vertebrae_T7",
++    "103": "vertebrae_T8",
++    "104": "vertebrae_T9",
++    "11": "esophagus",
++    "12": "face",
++    "13": "femur_left",
++    "14": "femur_right",
++    "15": "gallbladder",
++    "16": "gluteus_maximus_left",
++    "17": "gluteus_maximus_right",
++    "18": "gluteus_medius_left",
++    "19": "gluteus_medius_right",
++    "2": "adrenal_gland_right",
++    "20": "gluteus_minimus_left",
++    "21": "gluteus_minimus_right",
++    "22": "heart_atrium_left",
++    "23": "heart_atrium_right",
++    "24": "heart_myocardium",
++    "25": "heart_ventricle_left",
++    "26": "heart_ventricle_right",
++    "27": "hip_left",
++    "28": "hip_right",
++    "29": "humerus_left",
++    "3": "aorta",
++    "30": "humerus_right",
++    "31": "iliac_artery_left",
++    "32": "iliac_artery_right",
++    "33": "iliac_vena_left",
++    "34": "iliac_vena_right",
++    "35": "iliopsoas_left",
++    "36": "iliopsoas_right",
++    "37": "inferior_vena_cava",
++    "38": "kidney_left",
++    "39": "kidney_right",
++    "4": "autochthon_left",
++    "40": "liver",
++    "41": "lung_lower_lobe_left",
++    "42": "lung_lower_lobe_right",
++    "43": "lung_middle_lobe_right",
++    "44": "lung_upper_lobe_left",
++    "45": "lung_upper_lobe_right",
++    "46": "pancreas",
++    "47": "portal_vein_and_splenic_vein",
++    "48": "pulmonary_artery",
++    "49": "rib_left_1",
++    "5": "autochthon_right",
++    "50": "rib_left_10",
++    "51": "rib_left_11",
++    "52": "rib_left_12",
++    "53": "rib_left_2",
++    "54": "rib_left_3",
++    "55": "rib_left_4",
++    "56": "rib_left_5",
++    "57": "rib_left_6",
++    "58": "rib_left_7",
++    "59": "rib_left_8",
++    "6": "brain",
++    "60": "rib_left_9",
++    "61": "rib_right_1",
++    "62": "rib_right_10",
++    "63": "rib_right_11",
++    "64": "rib_right_12",
++    "65": "rib_right_2",
++    "66": "rib_right_3",
++    "67": "rib_right_4",
++    "68": "rib_right_5",
++    "69": "rib_right_6",
++    "7": "clavicula_left",
++    "70": "rib_right_7",
++    "71": "rib_right_8",
++    "72": "rib_right_9",
++    "73": "sacrum",
++    "74": "scapula_left",
++    "75": "scapula_right",
++    "76": "small_bowel",
++    "77": "spleen",
++    "78": "stomach",
++    "79": "trachea",
++    "8": "clavicula_right",
++    "80": "urinary_bladder",
++    "81": "vertebrae_C1",
++    "82": "vertebrae_C2",
++    "83": "vertebrae_C3",
++    "84": "vertebrae_C4",
++    "85": "vertebrae_C5",
++    "86": "vertebrae_C6",
++    "87": "vertebrae_C7",
++    "88": "vertebrae_L1",
++    "89": "vertebrae_L2",
++    "9": "colon",
++    "90": "vertebrae_L3",
++    "91": "vertebrae_L4",
++    "92": "vertebrae_L5",
++    "93": "vertebrae_T1",
++    "94": "vertebrae_T10",
++    "95": "vertebrae_T11",
++    "96": "vertebrae_T12",
++    "97": "vertebrae_T2",
++    "98": "vertebrae_T3",
++    "99": "vertebrae_T4"
++}
++
++totalseg_cls2idx = dict()
++for k,v in totalseg_json.items():
++    totalseg_cls2idx[v] = int(k)
++# print(totalseg_cls2idx)
+\ No newline at end of file
+diff --git a/direct_inference/readme.md b/direct_inference/readme.md
+new file mode 100644
+index 0000000..23e0d03
+--- /dev/null
++++ b/direct_inference/readme.md
+@@ -0,0 +1,51 @@
++# Direct Inference with STU-Net
++
++This guide provides instructions on how to perform direct inference on external datasets using STU-Net.
++
++## Prerequisites
++
++Before proceeding with the direct inference, ensure you have completed the following steps:
++
++1. **Environment Setup**: Follow the instructions in the [Get Started](https://github.com/blueyo0/STU-Net#get-started) section of the STU-Net repository to set up the necessary environment.
++
++2. **Load Pre-trained Weights**: Download and prepare the pre-trained weights as described in the [Using Our Models for Inference](https://github.com/blueyo0/STU-Net#using-our-models-for-inference) section.
++
++## Usage
++
++Once the prerequisites are met, you can perform direct inference using the `direct_inference.py` script. The general syntax for the script is as follows:
++
++```
++python direct_inference.py <trainer> <test_dir> <output_dir>
++```
++
++- `<trainer>`: Specifies the trainer to be used.
++- `<test_dir>`: The directory containing the external dataset. This directory should include subdirectories `imagesTr`, `labelsTr`, and a `dataset.json` file.
++- `<output_dir>`: The directory where the output will be saved.
++
++### Example
++
++Here is an example of how to use the script:
++
++```
++python direct_inference.py STUNetTrainer_small example/Task032_AMOS22_Task1 results
++```
++
++### Output
++
++After running the script, you can find the `summary.json` file, similar to the nnUNet validation output, at the following path:
++
++```
++<output_dir>/json/<dataset>/<trainer>
++```
++
++This file contains a summary of the inference results.
++
++## Inference on a New Dataset
++
++For datasets not included in the paper, you need to manually modify the label information in `label_sys.py` to ensure the correct mapping of labels and calculation of metric results. Follow these steps:
++
++1. Refer to dictionaries like `AMOS_sys`, and add `<your local label dict>`. The format should be: `<index of local label> to <global label name>` (e.g. *"1":"liver"* or *"agg:1:2":"kidney"*, using 'agg:' to declare combinations of multiple labels).
++2. In `label_sys_dict`, add a mapping from `<dataset name>` to `<your local label dict>`. The `<dataset name>` should correspond to your `<test_dir>` when inference.
++3. **(Optional)** If the global label names in your `<your local label dict>` correspond to combinations of multiple labels in Totalsegmentator label system, add your mapping in `label_mapping` like *"kidney":"agg:kidney_left,kidney_right"*.
++
++Then you can infer on your own dataset.

@@ -1,0 +1,85 @@
+diff --git a/README.md b/README.md
+index 3c037f8..2251a4f 100644
+--- a/README.md
++++ b/README.md
+@@ -7,6 +7,7 @@
+ 
+ - [Introduction](#introduction)
+ - [Working](#working)
++- [Installation](#installation)
+ - [Dataset creation](#dataset-creation)
+ - [Running](#running)
+ - [License](#license)
+@@ -62,6 +63,30 @@ All further image processing is done over a region of interest (ROI) defined at
+ From the previous results we analyze and evaluate the features like the area of the leaf, percentage(%) of the leaf infected, the perimeter of the leaf, etc., for all the leaf images, and pass it to the SVM classifier.
+ 
+ 
++## Installation
++---
++[(Back to top)](#list-of-contents)
++
++These instructions assume you have `git` installed for working with Github from command window.
++
++1. Clone the repository, and navigate to the downloaded folder. Follow below commands.
++```
++git clone https://github.com/johri002/Automatic-leaf-infection-identifier.git
++cd Automatic-leaf-infection-identifier
++```
++
++2. Install few required pip packages, which are specified in the requirements.txt file .
++```
++pip3 install -r requirements.txt
++```
++or
++```
++sudo python3 setup.py install
++```
++
++3. That's it. You are ready to test the application.
++
++
+ ## Dataset creation
+ ---
+ [(Back to top)](#list-of-contents)
+@@ -70,7 +95,7 @@ In `leaf sampler` directory run:
+ ```shell
+ python leafdetectionALLsametype.py -i .
+ ```
+-OR
++or
+ ```shell
+ python leafdetectionALLmix.py -i .
+ ```
+diff --git a/requirements.txt b/requirements.txt
+new file mode 100644
+index 0000000..01000e1
+--- /dev/null
++++ b/requirements.txt
+@@ -0,0 +1,6 @@
++matplotlib==3.0.2
++numpy==1.15.4
++opencv-python==3.4.5.20
++pandas==0.23.4
++scikit-learn==0.20.2
++sklearn==0.0
+diff --git a/setup.py b/setup.py
+index 68f3b3d..d13a702 100644
+--- a/setup.py
++++ b/setup.py
+@@ -8,11 +8,14 @@
+ # Get the long description from the README file
+ with open(path.join(dir_path, 'README.md'), encoding='utf-8') as f:
+ 	long_description = f.read()
++	
++with open(path.join(dir_path, 'requirements.txt'), encoding='utf-8') as f:
++	requirements = f.read().splitlines()
+ 
+-requirements = ['numpy', 'matplotlib', 'pandas', 'sklearn', 'opencv-python', 'argparse']
++#requirements will now be updated as a list which contains all the dependancies to be installed.
+ 
+ setup(
+-	name='Automatic-leaf-infection-identifier ',
++	name='Automatic-leaf-infection-identifier',
+ 	version = '1.0',
+ 	author= 'Shikhar Johri',
+ 	author_email= 'shikharjohri123@gmail.com',

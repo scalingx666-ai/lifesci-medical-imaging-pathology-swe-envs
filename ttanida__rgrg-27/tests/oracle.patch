@@ -1,0 +1,69 @@
+diff --git a/src/full_model/evaluate_full_model/evaluate_language_model.py b/src/full_model/evaluate_full_model/evaluate_language_model.py
+index 2e4a840..8d9d3da 100644
+--- a/src/full_model/evaluate_full_model/evaluate_language_model.py
++++ b/src/full_model/evaluate_full_model/evaluate_language_model.py
+@@ -982,12 +982,19 @@ def update_gen_and_ref_sentences_for_regions(
+             index_gen_ref_sentence += 1
+ 
+ 
+-def get_generated_reports(generated_sentences_for_selected_regions, selected_regions, sentence_tokenizer, bertscore_threshold):
++def get_generated_reports(
++    generated_sentences_for_selected_regions,
++    selected_regions,
++    sentence_tokenizer,
++    bertscore_threshold,
++    bert_score,
++):
+     """
+     Args:
+         generated_sentences_for_selected_regions (List[str]): of length "num_regions_selected_in_batch"
+         selected_regions ([batch_size x 29]): boolean array that has exactly "num_regions_selected_in_batch" True values
+         sentence_tokenizer: used in remove_duplicate_generated_sentences to separate the generated sentences
++        bert_score: instance of the evaluate bert score evaluation module
+ 
+     Return:
+         generated_reports (List[str]): list of length batch_size containing generated reports for every image in batch
+@@ -1055,8 +1062,6 @@ def check_gen_sent_in_sents_to_be_removed(gen_sent, similar_generated_sents_to_b
+ 
+         return gen_report_single_image, similar_generated_sents_to_be_removed
+ 
+-    bert_score = evaluate.load("bertscore")
+-
+     generated_reports = []
+     removed_similar_generated_sentences = []
+     curr_index = 0
+diff --git a/src/full_model/test_set_evaluation.py b/src/full_model/test_set_evaluation.py
+index 57fca3e..2d06605 100644
+--- a/src/full_model/test_set_evaluation.py
++++ b/src/full_model/test_set_evaluation.py
+@@ -11,6 +11,7 @@
+ import pandas as pd
+ import spacy
+ import torch
++import evaluate
+ from torch.utils.data import DataLoader
+ import torchmetrics
+ from tqdm import tqdm
+@@ -268,6 +269,7 @@ def iterate_over_test_loader(test_loader):
+ 
+         # used in function get_generated_reports
+         sentence_tokenizer = spacy.load("en_core_web_trf")
++        bert_score = evaluate.load("bertscore")
+ 
+         with torch.no_grad():
+             for num_batch, batch in tqdm(enumerate(test_loader)):
+@@ -342,6 +344,14 @@ def iterate_over_test_loader(test_loader):
+                     selected_regions,
+                     sentence_tokenizer,
+                     BERTSCORE_SIMILARITY_THRESHOLD
++                generated_reports, removed_similar_generated_sentences = (
++                    get_generated_reports(
++                        generated_sents_for_selected_regions,
++                        selected_regions,
++                        sentence_tokenizer,
++                        BERTSCORE_SIMILARITY_THRESHOLD,
++                        bert_score,
++                    )
+                 )
+ 
+                 gen_and_ref_sentences["generated_sentences"].extend(generated_sents_for_selected_regions)

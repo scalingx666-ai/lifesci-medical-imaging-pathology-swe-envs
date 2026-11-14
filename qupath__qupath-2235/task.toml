@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/qupath__qupath-2235"
+description = "Work around RichTextFX paste bug"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "qupath",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "qupath/qupath"
+ref = "4657a94c5e67054ef99901115ad66448047124df"
+reference = "https://github.com/qupath/qupath/pull/2235"
+source_access = "auto"
+built_at = "2026-11-14T07:06:21.527041+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:5b4517b3376e8c9b8cfec2643c39504c8a76ee95d9ba69655caa248506d5e6b7"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-11T18:26:48Z"
+diff_format = "unified"
+context_files = [
+    "qupath-extension-script-editor/src/main/java/qupath/lib/gui/scripting/richtextfx/CustomCodeArea.java",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 5
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

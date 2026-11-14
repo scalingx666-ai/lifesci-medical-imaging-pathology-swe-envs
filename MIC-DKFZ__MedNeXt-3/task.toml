@@ -1,0 +1,65 @@
+version = "1.0"
+
+[task]
+name = "default/MIC-DKFZ__MedNeXt-3"
+description = "fix several import and entry bugs"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "MedNeXt",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "MIC-DKFZ/MedNeXt"
+ref = "bb4b2b0342f18c8e82f770b4be8ee2dd0615aab3"
+reference = "https://github.com/MIC-DKFZ/MedNeXt/pull/3"
+source_access = "auto"
+built_at = "2026-11-14T07:10:12.555225+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:2f458bf4acf75d203cfdd03d5e7b14844f2b276e3914d1d3341084aea2b07187"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2023-06-20T06:22:00Z"
+diff_format = "unified"
+context_files = [
+    "nnunet_mednext/run/default_configuration.py",
+    "nnunet_mednext/training/network_training/MedNeXt/nnUNetTrainerV2_MedNeXt.py",
+    "nnunet_mednext/utilities/distributed.py",
+    "setup.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 39
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

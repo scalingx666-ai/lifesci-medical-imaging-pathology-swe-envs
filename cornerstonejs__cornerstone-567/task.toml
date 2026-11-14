@@ -1,0 +1,65 @@
+version = "1.0"
+
+[task]
+name = "default/cornerstonejs__cornerstone-567"
+description = "refactor(internal): add commitzen / update jsDocs / cut release"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "cornerstone",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "cornerstonejs/cornerstone"
+ref = "747a0c6bd1a130c2e2f400c5c39b02e859f3531f"
+reference = "https://github.com/cornerstonejs/cornerstone/pull/567"
+source_access = "auto"
+built_at = "2026-11-14T07:05:37.211500+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:1abcb227f82642625e16ff3b1062f63276d30cf70a32830199cd58a07d133baf"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2021-11-19T19:11:52Z"
+diff_format = "unified"
+context_files = [
+    "package-lock.json",
+    "package.json",
+    "src/internal/getDisplayedArea.js",
+    "test/rendering/renderToCanvas_test.js",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 23629
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

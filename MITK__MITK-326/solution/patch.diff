@@ -1,0 +1,17 @@
+diff --git a/Modules/Core/include/mitkImage.h b/Modules/Core/include/mitkImage.h
+index 0debfe880c..2b08a0ec23 100644
+--- a/Modules/Core/include/mitkImage.h
++++ b/Modules/Core/include/mitkImage.h
+@@ -30,12 +30,6 @@ found in the LICENSE file.
+ 
+ class vtkImageData;
+ 
+-namespace itk
+-{
+-  template <class T>
+-  class MutexLockHolder;
+-}
+-
+ namespace mitk
+ {
+   class SubImageSelector;

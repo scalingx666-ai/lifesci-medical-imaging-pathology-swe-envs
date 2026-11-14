@@ -1,0 +1,92 @@
+diff --git a/.github/workflows/build.yaml b/.github/workflows/build.yaml
+index 4c71f3184..5d8b109d7 100644
+--- a/.github/workflows/build.yaml
++++ b/.github/workflows/build.yaml
+@@ -95,7 +95,7 @@ jobs:
+       arch: "${{ matrix.arch }}"
+       branch: ${{ inputs.branch }}
+       build_type: ${{ inputs.build_type || 'branch' }}
+-      container_image: "rapidsai/ci-conda:26.12-cuda${{ matrix.CUDA_VER }}-${{ matrix.LINUX_VER }}-py${{ matrix.PY_VER }}"
++      container_image: "rapidsai/ci-conda:27.02-cuda${{ matrix.CUDA_VER }}-${{ matrix.LINUX_VER }}-py${{ matrix.PY_VER }}"
+       date: ${{ inputs.date }}
+       node_type: "gpu-${{ matrix.GPU }}-${{ matrix.DRIVER }}-1"
+       script: "ci/build_docs.sh"
+diff --git a/.github/workflows/pr.yaml b/.github/workflows/pr.yaml
+index 467bc012d..1af2d8b32 100644
+--- a/.github/workflows/pr.yaml
++++ b/.github/workflows/pr.yaml
+@@ -245,7 +245,7 @@ jobs:
+       build_type: pull-request
+       node_type: "gpu-${{ matrix.GPU }}-${{ matrix.DRIVER }}-1"
+       arch: "${{ matrix.arch }}"
+-      container_image: "rapidsai/ci-conda:26.12-cuda${{ matrix.CUDA_VER }}-${{ matrix.LINUX_VER }}-py${{ matrix.PY_VER }}"
++      container_image: "rapidsai/ci-conda:27.02-cuda${{ matrix.CUDA_VER }}-${{ matrix.LINUX_VER }}-py${{ matrix.PY_VER }}"
+       script: "ci/build_docs.sh"
+   publish-api-docs:
+     needs: [docs-build]
+diff --git a/VERSION b/VERSION
+index 34bc8081d..9a2d632b5 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-26.12.00
++27.02.00
+diff --git a/cucim.code-workspace b/cucim.code-workspace
+index 61854efb9..96784da4e 100644
+--- a/cucim.code-workspace
++++ b/cucim.code-workspace
+@@ -33,7 +33,7 @@
+ 					"CUCIM_TESTDATA_FOLDER": "${workspaceDirectory}/test_data",
+ 					// Add cuslide plugin's library path to LD_LIBRARY_PATH
+ 					"LD_LIBRARY_PATH": "${workspaceDirectory}/build-debug/lib:${workspaceDirectory}/cpp/plugins/cucim.kit.cuslide/build-debug/lib:${workspaceDirectory}/temp/cuda/lib64:${os_env:LD_LIBRARY_PATH}",
+-					"CUCIM_TEST_PLUGIN_PATH": "cucim.kit.cuslide@26.12.00.so"
++					"CUCIM_TEST_PLUGIN_PATH": "cucim.kit.cuslide@27.02.00.so"
+ 				},
+ 				"cwd": "${workspaceDirectory}",
+ 				"catch2": {
+@@ -226,7 +226,7 @@
+ 					},
+ 					{
+ 						"name": "CUCIM_TEST_PLUGIN_PATH",
+-						"value": "cucim.kit.cuslide@26.12.00.so"
++						"value": "cucim.kit.cuslide@27.02.00.so"
+ 					}
+ 				],
+ 				"console": "externalTerminal",
+@@ -254,7 +254,7 @@
+ 					},
+ 					{
+ 						"name": "CUCIM_TEST_PLUGIN_PATH",
+-						"value": "cucim.kit.cuslide@26.12.00.so"
++						"value": "cucim.kit.cuslide@27.02.00.so"
+ 					}
+ 				],
+ 				"console": "externalTerminal",
+@@ -286,7 +286,7 @@
+ 					},
+ 					{
+ 						"name": "CUCIM_TEST_PLUGIN_PATH",
+-						"value": "cucim.kit.cuslide@26.12.00.so"
++						"value": "cucim.kit.cuslide@27.02.00.so"
+ 					}
+ 				],
+ 				"console": "externalTerminal",
+diff --git a/dependencies.yaml b/dependencies.yaml
+index 6ed60d3f5..35d921364 100644
+--- a/dependencies.yaml
++++ b/dependencies.yaml
+@@ -256,12 +256,12 @@ dependencies:
+     common:
+       - output_types: conda
+         packages:
+-          - cucim==26.12.*,>=0.0.0a0
++          - cucim==27.2.*,>=0.0.0a0
+   depends_on_libcucim:
+     common:
+       - output_types: conda
+         packages:
+-          - libcucim==26.12.*,>=0.0.0a0
++          - libcucim==27.2.*,>=0.0.0a0
+   develop:
+     common:
+       - output_types: [conda, requirements, constraints, pyproject]

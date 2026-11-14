@@ -1,0 +1,68 @@
+version = "1.0"
+
+[task]
+name = "default/TorchIO-project__torchio-1515"
+description = "Lock CI dependencies with uv"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "torchio",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "TorchIO-project/torchio"
+ref = "ced7e41bf796f709bfd9ba58abf2d1828c99d7e3"
+reference = "https://github.com/TorchIO-project/torchio/pull/1515"
+source_access = "auto"
+built_at = "2026-11-14T07:05:12.862733+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:f3742b3e317ad61b561659ce2c957375d167f2946bac01d8206f0f4e1dcfd6f9"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-10-16T22:10:25Z"
+diff_format = "unified"
+context_files = [
+    ".github/dependabot.yml",
+    ".github/workflows/code_quality.yml",
+    ".github/workflows/tests.yml",
+    ".gitignore",
+    "pyproject.toml",
+    "tox.ini",
+    "uv.lock",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 6619
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

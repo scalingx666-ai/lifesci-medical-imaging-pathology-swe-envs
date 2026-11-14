@@ -1,0 +1,468 @@
+diff --git a/.github/workflows/mypy-type-check.yml b/.github/workflows/mypy-type-check.yml
+index ab01c76d2..5e86724d4 100644
+--- a/.github/workflows/mypy-type-check.yml
++++ b/.github/workflows/mypy-type-check.yml
+@@ -69,4 +69,10 @@ jobs:
+           tiatoolbox/wsicore/metadata/ \
+           tiatoolbox/wsicore/wsireader/factory.py \
+           tiatoolbox/wsicore/wsireader/detection.py \
+-          tiatoolbox/wsicore/wsireader/types.py
++          tiatoolbox/wsicore/wsireader/types.py \
++          tiatoolbox/wsicore/wsireader/__init__.py \
++          tiatoolbox/wsicore/wsireader/jp2.py \
++          tiatoolbox/wsicore/wsireader/dicom.py \
++          tiatoolbox/wsicore/wsireader/ngff.py \
++          tiatoolbox/wsicore/wsireader/annotation_store.py \
++          tiatoolbox/wsicore/wsireader/transformed.py
+diff --git a/pyproject.toml b/pyproject.toml
+index a2ee38c87..c894e6028 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -73,7 +73,7 @@ dev = [
+   "tiatoolbox[docs]",
+   "coverage>=7.0.0",
+   "docutils>=0.18.1",
+-  "mypy>=2.3",
++  "mypy>=2.4.1",
+   "pip>=22.3",
+   "poetry-bumpversion>=0.3.1",
+   "pre-commit>=2.20.0",
+diff --git a/tests/test_wsireader.py b/tests/test_wsireader.py
+index 04835cc37..5e267ac80 100644
+--- a/tests/test_wsireader.py
++++ b/tests/test_wsireader.py
+@@ -32,7 +32,7 @@
+ from wsidicom import WsiDicom
+ 
+ from tiatoolbox import cli, utils
+-from tiatoolbox.annotation import SQLiteStore
++from tiatoolbox.annotation import DictionaryStore, SQLiteStore
+ from tiatoolbox.utils import env_detection as toolbox_env
+ from tiatoolbox.utils import imread, tiff_to_fsspec
+ from tiatoolbox.utils.exceptions import FileNotSupportedError
+@@ -2328,6 +2328,22 @@ def test_store_reader_no_types(track_tmp_path: Path, remote_sample: Callable) ->
+     assert reader.renderer.score_prop is None
+ 
+ 
++def test_store_reader_rejects_non_sqlite_store() -> None:
++    """Test AnnotationStoreReader rejects metadata lookup on a non-SQLite store."""
++    with pytest.raises(
++        TypeError, match="Metadata is only available on an SQLite annotation store"
++    ):
++        AnnotationStoreReader(DictionaryStore())
++
++
++def test_store_reader_rejects_non_string_wsi_meta(track_tmp_path: Path) -> None:
++    """Test AnnotationStoreReader rejects wsi_meta that is not a JSON string."""
++    store = SQLiteStore(track_tmp_path / "store.db")
++    store.metadata["wsi_meta"] = {"slide_dimensions": [1, 1]}
++    with pytest.raises(TypeError, match="Stored wsi_meta must be a JSON string"):
++        AnnotationStoreReader(store)
++
++
+ def test_store_reader_info_from_base(
+     track_tmp_path: Path, remote_sample: Callable
+ ) -> None:
+@@ -3336,6 +3352,17 @@ def test_read_dicom_with_metadata(remote_sample: Callable) -> None:
+     assert wsi.info.objective_power == 40.0
+ 
+ 
++def test_transformed_reader_df_without_inverse(sample_svs: Path) -> None:
++    """Test displacement lookup before the inverse reader is initialized."""
++    wsi = transformed.TransformedWSIReader(
++        sample_svs, target_img=sample_svs, transform=np.eye(3)
++    )
++    with pytest.raises(
++        ValueError, match="Inverse displacement reader has not been initialized"
++    ):
++        wsi.get_transformed_location_df((0, 0), (1, 1), 0)
++
++
+ def test_read_rect_transformedreader_svs_baseline(
+     sample_svs: Path, remote_sample: Callable, track_tmp_path: Path
+ ) -> None:
+diff --git a/tiatoolbox/models/dataset/dataset_abc.py b/tiatoolbox/models/dataset/dataset_abc.py
+index 9ee9354ca..835357d83 100644
+--- a/tiatoolbox/models/dataset/dataset_abc.py
++++ b/tiatoolbox/models/dataset/dataset_abc.py
+@@ -304,11 +304,7 @@ def __init__(  # skipcq: PY-R1000  # noqa: PLR0913
+         )
+         self.img_path = Path(img_path)
+         wsireader_kwargs = {} if wsireader_kwargs is None else wsireader_kwargs
+-        reader = (
+-            input_img
+-            if isinstance(input_img, WSIReader)
+-            else WSIReader.open(self.img_path, **wsireader_kwargs)
+-        )
++        reader = WSIReader.open(input_img, **wsireader_kwargs)
+         # To support multi-threading
+         # Helps pickle using Path
+         self.reader = None
+diff --git a/tiatoolbox/wsicore/wsireader/annotation_store.py b/tiatoolbox/wsicore/wsireader/annotation_store.py
+index d54fae1cc..bd84734a8 100644
+--- a/tiatoolbox/wsicore/wsireader/annotation_store.py
++++ b/tiatoolbox/wsicore/wsireader/annotation_store.py
+@@ -69,13 +69,18 @@ def __init__(
+         self.store = (
+             SQLiteStore(Path(store)) if isinstance(store, (str, Path)) else store
+         )
+-        self.base_wsi = base_wsi
+-        if isinstance(base_wsi, (str, Path)):
+-            self.base_wsi = WSIReader.open(base_wsi)
++        self.base_wsi = WSIReader.open(base_wsi) if base_wsi is not None else None
+         if info is None:
+             # try to get metadata from store
+             try:
+-                info = WSIMeta(**json.loads(self.store.metadata["wsi_meta"]))
++                if not isinstance(self.store, SQLiteStore):
++                    msg = "Metadata is only available on an SQLite annotation store."
++                    raise TypeError(msg)
++                wsi_meta = self.store.metadata["wsi_meta"]
++                if not isinstance(wsi_meta, str):
++                    msg = "Stored wsi_meta must be a JSON string."
++                    raise TypeError(msg)
++                info = WSIMeta(**json.loads(wsi_meta))
+             except KeyError as exc:
+                 if self.base_wsi is not None:
+                     # get the metadata from the base reader.
+diff --git a/tiatoolbox/wsicore/wsireader/base.py b/tiatoolbox/wsicore/wsireader/base.py
+index 15c06a89a..29bc65ba3 100644
+--- a/tiatoolbox/wsicore/wsireader/base.py
++++ b/tiatoolbox/wsicore/wsireader/base.py
+@@ -8,7 +8,7 @@
+ from datetime import UTC, datetime
+ from numbers import Number
+ from pathlib import Path
+-from typing import TYPE_CHECKING, Unpack
++from typing import TYPE_CHECKING, Unpack, overload
+ 
+ import matplotlib.colors as mcolors
+ import numpy as np
+@@ -44,9 +44,10 @@
+         NumPair,
+         Resolution,
+         Units,
++        WSIPostProc,
+     )
+ 
+-    from .types import WSIReaderParams
++    from .types import WSIReaderExtraParams, WSIReaderInstanceType, WSIReaderParams
+ 
+ pixman_warning()
+ 
+@@ -168,13 +169,43 @@ class WSIReader:
+ 
+     """
+ 
++    @overload
++    @staticmethod
++    def open(  # pragma: no cover
++        input_img: np.ndarray,
++        mpp: tuple[Number, Number] | Number | None = None,
++        power: Number | None = None,
++        post_proc: WSIPostProc = "auto",
++        **kwargs: Unpack[WSIReaderExtraParams],
++    ) -> VirtualWSIReader: ...
++
++    @overload
++    @staticmethod
++    def open(  # pragma: no cover
++        input_img: str | Path,
++        mpp: tuple[Number, Number] | Number | None = None,
++        power: Number | None = None,
++        post_proc: WSIPostProc = "auto",
++        **kwargs: Unpack[WSIReaderExtraParams],
++    ) -> WSIReader: ...
++
++    @overload
++    @staticmethod
++    def open(  # pragma: no cover
++        input_img: WSIReaderInstanceType,
++        mpp: tuple[Number, Number] | Number | None = None,
++        power: Number | None = None,
++        post_proc: WSIPostProc = "auto",
++        **kwargs: Unpack[WSIReaderExtraParams],
++    ) -> WSIReaderInstanceType: ...
++
+     @staticmethod
+     def open(
+         input_img: str | Path | np.ndarray | WSIReader,
+-        mpp: tuple[Number, Number] | None = None,
++        mpp: tuple[Number, Number] | Number | None = None,
+         power: Number | None = None,
+-        post_proc: str | callable | None = "auto",
+-        **kwargs: Unpack[WSIReaderParams],
++        post_proc: WSIPostProc = "auto",
++        **kwargs: Unpack[WSIReaderExtraParams],
+     ) -> WSIReader:
+         """Return an appropriate :class:`.WSIReader` object.
+ 
+@@ -188,8 +219,9 @@ def open(
+                 which is an already created tiatoolbox WSI handler. In
+                 the latter case, the function directly passes the
+                 input_imge to the output.
+-            mpp (tuple):
++            mpp (tuple or Number):
+                 (x, y) tuple of the MPP in the units of the input image.
++                A single number is used for both x and y.
+             power (float):
+                 Objective power of the input image.
+             post_proc (str | callable | None):
+diff --git a/tiatoolbox/wsicore/wsireader/dicom.py b/tiatoolbox/wsicore/wsireader/dicom.py
+index abcaec390..0554f0891 100644
+--- a/tiatoolbox/wsicore/wsireader/dicom.py
++++ b/tiatoolbox/wsicore/wsireader/dicom.py
+@@ -12,10 +12,12 @@
+ from .base import WSIReader
+ 
+ if TYPE_CHECKING:  # pragma: no cover
++    from numbers import Number
+     from pathlib import Path
+ 
+-    from tiatoolbox.type_hints import IntBounds, IntPair, Resolution, Units
+-    from tiatoolbox.wsicore import WSIReaderParams
++    from tiatoolbox.type_hints import IntBounds, IntPair, Resolution, Units, WSIPostProc
++
++    from .types import WSIReaderExtraParams
+ 
+ 
+ class DICOMWSIReader(WSIReader):
+@@ -26,13 +28,21 @@ class DICOMWSIReader(WSIReader):
+     def __init__(
+         self: DICOMWSIReader,
+         input_img: str | Path | np.ndarray,
+-        post_proc: str | callable | None = "auto",
+-        **kwargs: Unpack[WSIReaderParams],
++        mpp: tuple[Number, Number] | None = None,
++        power: Number | None = None,
++        post_proc: WSIPostProc = "auto",
++        **kwargs: Unpack[WSIReaderExtraParams],
+     ) -> None:
+         """Initialize :class:`DICOMWSIReader`."""
+         from wsidicom import WsiDicom  # noqa: PLC0415
+ 
+-        super().__init__(input_img=input_img, post_proc=post_proc, **kwargs)
++        super().__init__(
++            input_img=input_img,
++            mpp=mpp,
++            power=power,
++            post_proc=post_proc,
++            **kwargs,
++        )
+         self.wsi = WsiDicom.open(input_img)
+ 
+     def _info(self: DICOMWSIReader) -> WSIMeta:
+diff --git a/tiatoolbox/wsicore/wsireader/jp2.py b/tiatoolbox/wsicore/wsireader/jp2.py
+index ccdfe07cf..c9db02488 100644
+--- a/tiatoolbox/wsicore/wsireader/jp2.py
++++ b/tiatoolbox/wsicore/wsireader/jp2.py
+@@ -19,7 +19,7 @@
+ 
+     import numpy as np
+ 
+-    from tiatoolbox.type_hints import IntBounds, IntPair, Resolution, Units
++    from tiatoolbox.type_hints import IntBounds, IntPair, Resolution, Units, WSIPostProc
+ 
+ 
+ class JP2WSIReader(WSIReader):
+@@ -39,7 +39,7 @@ def __init__(
+         input_img: str | Path | np.ndarray,
+         mpp: tuple[Number, Number] | None = None,
+         power: Number | None = None,
+-        post_proc: str | callable | None = "auto",
++        post_proc: WSIPostProc = "auto",
+     ) -> None:
+         """Initialize :class:`OmnyxJP2WSIReader`."""
+         super().__init__(input_img=input_img, mpp=mpp, power=power, post_proc=post_proc)
+@@ -548,8 +548,9 @@ def _info(self: JP2WSIReader) -> WSIMeta:
+         # Check capture resolution box
+         if "cres" in boxes:
+             # Get the resolution in pixels per meter
+-            ppm_x = boxes.get("cres").horizontal_resolution
+-            ppm_y = boxes.get("cres").vertical_resolution
++            cres = boxes["cres"]
++            ppm_x = cres.horizontal_resolution
++            ppm_y = cres.vertical_resolution
+             mpp_x = utils.misc.ppu2mpp(ppm_x, "meter")
+             mpp_y = utils.misc.ppu2mpp(ppm_y, "meter")
+             mpp = [mpp_x, mpp_y]
+@@ -557,7 +558,7 @@ def _info(self: JP2WSIReader) -> WSIMeta:
+         # resolution). This XML contains pipe seperated key values e.g.
+         # "AppMag = 40 | ..."" in a <description> tag.
+         if "xml " in boxes:
+-            description = boxes.get("xml ").xml.find("description")
++            description = boxes["xml "].xml.find("description")
+             if description is not None and description.text:
+                 matches = re.search(
+                     r"AppMag\s*=\s*(\d+)",
+diff --git a/tiatoolbox/wsicore/wsireader/ngff.py b/tiatoolbox/wsicore/wsireader/ngff.py
+index ddef25555..dbc557a2d 100644
+--- a/tiatoolbox/wsicore/wsireader/ngff.py
++++ b/tiatoolbox/wsicore/wsireader/ngff.py
+@@ -8,6 +8,7 @@
+ from zarr.storage import FsspecStore
+ 
+ from tiatoolbox import logger, utils
++from tiatoolbox.wsicore.metadata import ngff
+ from tiatoolbox.wsicore.wsimeta import WSIMeta
+ from tiatoolbox.wsicore.wsireader import ArrayView
+ 
+@@ -19,7 +20,8 @@
+     import numpy as np
+ 
+     from tiatoolbox.type_hints import IntBounds, IntPair, Resolution, Units
+-    from tiatoolbox.wsicore import WSIReaderParams
++
++    from .types import WSIReaderParams
+ 
+ 
+ class NGFFWSIReader(WSIReader):
+@@ -37,8 +39,6 @@ def __init__(
+         super().__init__(path, **kwargs)
+         from imagecodecs import numcodecs  # noqa: PLC0415
+ 
+-        from tiatoolbox.wsicore.metadata import ngff  # noqa: PLC0415
+-
+         numcodecs.register_codecs()
+         storage_options = kwargs.get("storage_options", {})
+         store = FsspecStore.from_url(path, storage_options=storage_options)
+@@ -48,24 +48,30 @@ def __init__(
+         axes = multiscales.get("axes")
+         datasets = multiscales.get("datasets")
+         omero = attrs.get("omero")
++        # NGFF stores multiscales as a list. This reader keeps the first entry.
++        self._multiscales = ngff.Multiscales(
++            version=multiscales.get("version"),
++            axes=[ngff.Axis(**axis) for axis in axes],
++            datasets=[
++                ngff.Dataset(
++                    path=dataset["path"],
++                    coordinateTransformations=[
++                        ngff.CoordinateTransform(
++                            type=transform.get("type", "identity"),
++                            scale=transform.get("scale"),
++                        )
++                        for transform in dataset.get("coordinateTransformations") or []
++                    ],
++                )
++                for dataset in datasets
++            ],
++        )
+         self.zattrs = ngff.Zattrs(
+             _creator=ngff.Creator(
+                 name=attrs.get("name"),
+                 version=attrs.get("version"),
+             ),
+-            multiscales=ngff.Multiscales(
+-                version=multiscales.get("version"),
+-                axes=[ngff.Axis(**axis) for axis in axes],
+-                datasets=[
+-                    ngff.Dataset(
+-                        path=dataset["path"],
+-                        coordinateTransformations=dataset.get(
+-                            "coordinateTransformations",
+-                        ),
+-                    )
+-                    for dataset in datasets
+-                ],
+-            ),
++            multiscales=self._multiscales,
+             omero=ngff.Omero(
+                 name=omero.get("name"),
+                 id=omero.get("id"),
+@@ -87,7 +93,7 @@ def _info(self: NGFFWSIReader) -> WSIMeta:
+                 Containing metadata.
+ 
+         """
+-        multiscales = self.zattrs.multiscales
++        multiscales = self._multiscales
+         mpp = self._get_mpp()
+         # This needs to be replaced once an appropriate image is available for test.
+         objective_power = None
+@@ -133,7 +139,7 @@ def _get_mpp(self: NGFFWSIReader) -> tuple[float, float] | None:
+ 
+         """
+         # Check that the required axes are present
+-        multiscales = self.zattrs.multiscales
++        multiscales = self._multiscales
+         axes_dict = {a.name.lower(): a for a in multiscales.axes}
+         if "x" not in axes_dict or "y" not in axes_dict:
+             return None
+@@ -157,13 +163,13 @@ def _get_mpp(self: NGFFWSIReader) -> tuple[float, float] | None:
+         ):
+             return None
+ 
+-        # Currently simply using the first scale transform
+-        transforms = multiscales.datasets[0].coordinateTransformations
+-        for t in transforms:
+-            if "scale" in t and t.get("type") == "scale":
++        # Currently simply using the first scale transform.
++        for transform in multiscales.datasets[0].coordinateTransformations:
++            scale = transform.scale
++            if transform.type == "scale" and scale is not None:
+                 x_index = multiscales.axes.index(x)
+                 y_index = multiscales.axes.index(y)
+-                return (t["scale"][x_index], t["scale"][y_index])
++                return (scale[x_index], scale[y_index])
+         return None
+ 
+     def read_rect(
+diff --git a/tiatoolbox/wsicore/wsireader/transformed.py b/tiatoolbox/wsicore/wsireader/transformed.py
+index c51b6a501..e2d701cce 100644
+--- a/tiatoolbox/wsicore/wsireader/transformed.py
++++ b/tiatoolbox/wsicore/wsireader/transformed.py
+@@ -83,7 +83,7 @@ def __init__(
+         self.target_wsi_reader = WSIReader.open(
+             input_img=target_img, mpp=mpp, power=power
+         )
+-        self.inverse_loc_reader = None
++        self.inverse_loc_reader: VirtualWSIReader | None = None
+         if transform is None:
+             error_message = (
+                 "Transform cannot be None. "
+@@ -364,7 +364,7 @@ def sample_image_opencv(
+         - output: numpy array of shape (M, N, 3), the sampled image.
+         """
+         # Convert b to float32 and split into x and y maps
+-        b_float = b.astype(np.float32)
++        b_float: np.ndarray = b.astype(np.float32)
+         map_x = b_float[..., 0]
+         map_y = b_float[..., 1]
+ 
+@@ -411,6 +411,9 @@ def get_transformed_location_df(
+ 
+         """
+         # read relevant bit of inverse displacement field
++        if self.inverse_loc_reader is None:
++            msg = "Inverse displacement reader has not been initialized."
++            raise ValueError(msg)
+         inv_locs = self.inverse_loc_reader.read_rect(
+             location, size, level, coord_space="resolution", interpolation="lanczos"
+         )
+diff --git a/tiatoolbox/wsicore/wsireader/types.py b/tiatoolbox/wsicore/wsireader/types.py
+index fc05cf6f1..a80d523c1 100644
+--- a/tiatoolbox/wsicore/wsireader/types.py
++++ b/tiatoolbox/wsicore/wsireader/types.py
+@@ -1,8 +1,8 @@
+-"""Define TypedDict for WSIReader input params."""
++"""Define shared types for WSIReader parameters and instances."""
+ 
+ from __future__ import annotations
+ 
+-from typing import TYPE_CHECKING, Any, TypedDict
++from typing import TYPE_CHECKING, Any, TypedDict, TypeVar
+ 
+ if TYPE_CHECKING:  # pragma: no cover
+     from collections.abc import Callable
+@@ -10,6 +10,11 @@
+ 
+     from tiatoolbox.wsicore.wsimeta import WSIMeta
+ 
++    from .base import WSIReader
++
++# Preserves the concrete reader class passed to WSIReader.open.
++WSIReaderInstanceType = TypeVar("WSIReaderInstanceType", bound="WSIReader")
++
+ 
+ class WSIReaderParams(TypedDict, total=False):
+     """Parameters for reading whole slide images."""

@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/dicoogle__dicoogle-754"
+description = "Update access control requirements for deprecated Web endpoints"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "dicoogle",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "dicoogle/dicoogle"
+ref = "1ed8c3ad1a6c22ac941265b178cb66e993ab5b87"
+reference = "https://github.com/dicoogle/dicoogle/pull/754"
+source_access = "auto"
+built_at = "2026-11-14T06:29:22.971675+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:c745a29c85d64f307c6f151a53217668b97f69ccca5de5fbd2fe91eae5847ad0"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-10-28T19:10:35Z"
+diff_format = "unified"
+context_files = [
+    "dicoogle/src/main/java/pt/ua/dicoogle/server/web/DicoogleWeb.java",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 4
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

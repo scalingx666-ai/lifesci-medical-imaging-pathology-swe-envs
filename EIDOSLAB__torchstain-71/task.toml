@@ -1,0 +1,67 @@
+version = "1.0"
+
+[task]
+name = "default/EIDOSLAB__torchstain-71"
+description = "Fix device mismatch errors in torchstain color space conversion functions"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "torchstain",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "EIDOSLAB/torchstain"
+ref = "7c2a95f87fd5f61c4647e271af7d0cbcaa80e813"
+reference = "https://github.com/EIDOSLAB/torchstain/pull/71"
+source_access = "auto"
+built_at = "2026-11-14T07:13:21.312312+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:74e85813a43350c7d60a33c9ca51a7b1ce93ed8a1048660d60fb1fa382dc350b"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2025-10-28T18:12:17Z"
+diff_format = "unified"
+context_files = [
+    ".github/workflows/build.yaml",
+    ".github/workflows/tests_full.yml",
+    ".github/workflows/tests_quick.yml",
+    "setup.py",
+    "torchstain/torch/utils/lab2rgb.py",
+    "torchstain/torch/utils/rgb2lab.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 77
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

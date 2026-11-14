@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/ivmartel__dwv-2381"
+description = "Bump eslint from 10.13.0 to 10.14.0"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "dwv",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "ivmartel/dwv"
+ref = "c90cf65dd3fdf70646bc0b53defa832e6f2cf0a2"
+reference = "https://github.com/ivmartel/dwv/pull/2381"
+source_access = "auto"
+built_at = "2026-11-14T07:05:49.813822+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:6a688ca3a02b081ba4537e938ba0d1fcbdd0249b6f2786c4ef272c9067a35e96"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-09T08:38:05Z"
+diff_format = "unified"
+context_files = [
+    "yarn.lock",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 32
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

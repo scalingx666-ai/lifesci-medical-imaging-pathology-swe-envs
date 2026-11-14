@@ -1,0 +1,19 @@
+diff --git a/tools/dicom-web-electron/main.js b/tools/dicom-web-electron/main.js
+index 69464cecef..14e41df86a 100644
+--- a/tools/dicom-web-electron/main.js
++++ b/tools/dicom-web-electron/main.js
+@@ -38,6 +38,7 @@ async function createWindow() {
+     win.loadFile(path.join(__dirname, "index.html"));
+ 
+     // Used to allow self signed certificates
++    // CodeQL [SM03616]: Suppress warning for disabling certificate validation
+     const httpsAgent = new https.Agent({ rejectUnauthorized: false });
+ 
+     // Set the maximum content length size in bytes and megabytes
+@@ -148,4 +149,4 @@ async function createWindow() {
+     })
+ }
+ 
+-app.on("ready", createWindow);
+\ No newline at end of file
++app.on("ready", createWindow);

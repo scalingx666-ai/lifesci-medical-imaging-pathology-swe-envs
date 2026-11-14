@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/junforge-dev__voxplane-1"
+description = "Add pt-br translation"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "voxplane",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "junforge-dev/voxplane"
+ref = "bd2d3bcdfd943da8147326771245a04863c22a29"
+reference = "https://github.com/junforge-dev/voxplane/pull/1"
+source_access = "auto"
+built_at = "2026-11-14T07:12:33.323705+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:8ffcecdb994d62fbc64243182144136dab11ef7546cd082c628d108dda5eaa97"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-09-23T08:09:28Z"
+diff_format = "unified"
+context_files = [
+    "src/qt_dicom_viewer/qml/assets/languages/pt-BR.json",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 1981
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

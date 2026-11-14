@@ -1,0 +1,85 @@
+diff --git a/lib/AppInfo/Application.php b/lib/AppInfo/Application.php
+index 3d84056..4ddc9b3 100755
+--- a/lib/AppInfo/Application.php
++++ b/lib/AppInfo/Application.php
+@@ -4,6 +4,7 @@
+ 
+ namespace OCA\DICOMViewer\AppInfo;
+ 
++use OCA\DICOMViewer\Listeners\BeforeZipCreatedListener;
+ use OCA\DICOMViewer\Listeners\CSPListener;
+ use OCA\DICOMViewer\Listeners\LoadPublicViewerListener;
+ use OCA\DICOMViewer\Listeners\LoadSidebarListener;
+@@ -17,6 +18,7 @@
+ use OCP\AppFramework\Bootstrap\IBootstrap;
+ use OCP\AppFramework\Bootstrap\IRegistrationContext;
+ use OCP\AppFramework\Http\Events\BeforeTemplateRenderedEvent;
++use OCP\Files\Events\BeforeZipCreatedEvent;
+ use OCP\Security\CSP\AddContentSecurityPolicyEvent;
+ 
+ class Application extends App implements IBootstrap {
+@@ -31,6 +33,7 @@ public function register(IRegistrationContext $context): void {
+ 		$context->registerEventListener(LoadSidebar::class, LoadSidebarListener::class);
+ 		$context->registerEventListener(BeforeTemplateRenderedEvent::class, LoadPublicViewerListener::class);
+ 		$context->registerEventListener(AddContentSecurityPolicyEvent::class, CSPListener::class);
++		$context->registerEventListener(BeforeZipCreatedEvent::class, BeforeZipCreatedListener::class);
+ 	}
+ 
+ 	public function boot(IBootContext $context): void {
+diff --git a/lib/Listeners/BeforeZipCreatedListener.php b/lib/Listeners/BeforeZipCreatedListener.php
+new file mode 100644
+index 0000000..7dbc080
+--- /dev/null
++++ b/lib/Listeners/BeforeZipCreatedListener.php
+@@ -0,0 +1,51 @@
++<?php
++
++declare(strict_types=1);
++
++namespace OCA\DICOMViewer\Listeners;
++
++use OCA\DICOMViewer\AppInfo\Application;
++use OCP\EventDispatcher\Event;
++use OCP\EventDispatcher\IEventListener;
++use OCP\Files\Cache\IScanner;
++use OCP\Files\Events\BeforeZipCreatedEvent;
++use OCP\Files\Folder;
++use Psr\Log\LoggerInterface;
++
++/**
++ * Index a folder that Nextcloud has seen but not scanned before it is zipped.
++ * Otherwise an external-storage download contains only empty directories.
++ *
++ * @template-implements IEventListener<BeforeZipCreatedEvent|Event>
++ */
++class BeforeZipCreatedListener implements IEventListener {
++	public function __construct(
++		private LoggerInterface $logger,
++	) {
++	}
++
++	public function handle(Event $event): void {
++		if (!$event instanceof BeforeZipCreatedEvent) {
++			return;
++		}
++
++		$folder = $event->getFolder();
++		if (!$folder instanceof Folder || $folder->getSize() >= 0) {
++			return;
++		}
++
++		try {
++			$internalPath = $folder->getInternalPath();
++			$folder->getStorage()->getScanner($internalPath)->scan(
++				$internalPath,
++				IScanner::SCAN_RECURSIVE_INCOMPLETE,
++				IScanner::REUSE_ETAG | IScanner::REUSE_SIZE,
++			);
++		} catch (\Throwable $e) {
++			$this->logger->warning('Failed to index folder before zip download', [
++				'exception' => $e,
++				'app' => Application::APP_ID,
++			]);
++		}
++	}
++}

@@ -1,0 +1,77 @@
+diff --git a/README.md b/README.md
+index 3843377..3954ff2 100644
+--- a/README.md
++++ b/README.md
+@@ -107,6 +107,7 @@ This repo contains the code for our paper **OneFormer: One Transformer to Rule U
+ | OneFormer (Mapillary Vistas-Pretrained) | ConvNeXt-L<sup>&dagger;</sup> | 70.1 | 48.7 | 84.6 | 85.2 | 220M | [config](configs/cityscapes/convnext/mapillary_pretrain_oneformer_convnext_large_bs16_90k.yaml) | [model](https://shi-labs.com/projects/oneformer/cityscapes/mapillary_pretrain_250_16_convnext_l_oneformer_cityscapes_90k.pth) &#124; [pretrained](https://shi-labs.com/projects/oneformer/mapillary/mapillary_pretrain_250_16_convnext_l_oneformer_mapillary_300k.pth) |
+ | OneFormer | DiNAT-L<sup>&dagger;</sup> | 67.6 | 45.6 | 83.1 | 84.0 | 223M | [config](configs/cityscapes/dinat/oneformer_dinat_large_bs16_90k.yaml) | [model](https://shi-labs.com/projects/oneformer/cityscapes/250_16_dinat_l_oneformer_cityscapes_90k.pth) |
+ | OneFormer | ConvNeXt-XL<sup>&dagger;</sup> | 68.4 | 46.7 | 83.6 | 84.6 | 372M | [config](configs/cityscapes/convnext/oneformer_convnext_xlarge_bs16_90k.yaml) | [model](https://shi-labs.com/projects/oneformer/cityscapes/250_16_convnext_xl_oneformer_cityscapes_90k.pth) |
++| OneFormer (Mapillary Vistas-Pretrained) | ConvNeXt-XL<sup>&dagger;</sup> | 69.7 | 48.9 | 84.5 | 85.8 | 372M | [config](configs/cityscapes/convnext/mapillary_pretrain_oneformer_convnext_xlarge_bs16_90k.yaml) | [model](https://shi-labs.com/projects/oneformer/cityscapes/mapillary_pretrain_250_16_convnext_xl_oneformer_cityscapes_90k.pth) &#124; [pretrained](https://shi-labs.com/projects/oneformer/mapillary/mapillary_pretrain_250_16_convnext_xl_oneformer_mapillary_300k.pth) |
+ 
+ ### COCO
+ 
+diff --git a/configs/cityscapes/convnext/mapillary_pretrain_oneformer_convnext_xlarge_bs16_90k.yaml b/configs/cityscapes/convnext/mapillary_pretrain_oneformer_convnext_xlarge_bs16_90k.yaml
+new file mode 100644
+index 0000000..923b198
+--- /dev/null
++++ b/configs/cityscapes/convnext/mapillary_pretrain_oneformer_convnext_xlarge_bs16_90k.yaml
+@@ -0,0 +1,18 @@
++_BASE_: ../oneformer_R50_bs16_90k.yaml
++MODEL:
++  BACKBONE:
++    NAME: "D2ConvNeXt"
++  CONVNEXT:
++    IN_CHANNELS: 3
++    DEPTHS: [3, 3, 27, 3]
++    DIMS: [256, 512, 1024, 2048]
++    DROP_PATH_RATE: 0.4
++    LSIT: 1.0
++    OUT_INDICES: [0, 1, 2, 3]
++  WEIGHTS: "250_16_convnext_xl_oneformer_mapillary_300k.pth"
++  PIXEL_MEAN: [123.675, 116.280, 103.530]
++  PIXEL_STD: [58.395, 57.120, 57.375]
++  ONE_FORMER:
++    NUM_OBJECT_QUERIES: 250
++TEST:
++  DETECTIONS_PER_IMAGE: 250
+diff --git a/configs/coco/Base-COCO-UnifiedSegmentation.yaml b/configs/coco/Base-COCO-UnifiedSegmentation.yaml
+index ccd24f3..6b5274b 100644
+--- a/configs/coco/Base-COCO-UnifiedSegmentation.yaml
++++ b/configs/coco/Base-COCO-UnifiedSegmentation.yaml
+@@ -16,7 +16,7 @@ MODEL:
+ DATASETS:
+   TRAIN: ("coco_2017_train_panoptic_with_sem_seg",)
+   TEST_PANOPTIC: ("coco_2017_val_panoptic_with_sem_seg",)  # to evaluate instance and semantic performance as well
+-  TEST_INSTANCE: ("coco_2017_val",)
++  TEST_INSTANCE: ("coco_2017_val_panoptic2instance",)
+   TEST_SEMANTIC: ("coco_2017_val_panoptic_with_sem_seg",)
+ SOLVER:
+   IMS_PER_BATCH: 16
+diff --git a/configs/mapillary_vistas/convnext/cityscapes_pretrain_oneformer_convnext_xlarge_bs16_300k.yaml b/configs/mapillary_vistas/convnext/cityscapes_pretrain_oneformer_convnext_xlarge_bs16_300k.yaml
+new file mode 100644
+index 0000000..4141991
+--- /dev/null
++++ b/configs/mapillary_vistas/convnext/cityscapes_pretrain_oneformer_convnext_xlarge_bs16_300k.yaml
+@@ -0,0 +1,22 @@
++_BASE_: ../oneformer_R50_bs16_300k.yaml
++MODEL:
++  BACKBONE:
++    NAME: "D2ConvNeXt"
++  CONVNEXT:
++    IN_CHANNELS: 3
++    DEPTHS: [3, 3, 27, 3]
++    DIMS: [256, 512, 1024, 2048]
++    DROP_PATH_RATE: 0.4
++    LSIT: 1.0
++    OUT_INDICES: [0, 1, 2, 3]
++  WEIGHTS: "convnext_xlarge_22k_1k_384_ema.pkl"
++  PIXEL_MEAN: [123.675, 116.280, 103.530]
++  PIXEL_STD: [58.395, 57.120, 57.375]
++  ONE_FORMER:
++    NUM_OBJECT_QUERIES: 250
++INPUT:
++  TASK_PROB: 
++    SEMANTIC: 0.33
++    INSTANCE: 0.66
++TEST:
++  DETECTIONS_PER_IMAGE: 250

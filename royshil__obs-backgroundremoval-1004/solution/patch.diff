@@ -1,0 +1,134 @@
+diff --git a/.github/workflows/build-debian.yml b/.github/workflows/build-debian.yml
+index 45a93cb0..2534dab5 100644
+--- a/.github/workflows/build-debian.yml
++++ b/.github/workflows/build-debian.yml
+@@ -129,14 +129,14 @@ jobs:
+             /home/runner/build/${{ steps.package.outputs.DDEB_ARTIFACT_NAME }}
+ 
+       - name: Upload deb artifact (Debian)
+-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+         with:
+           path: /home/runner/build/${{ steps.package.outputs.DEB_ARTIFACT_NAME }}
+           archive: false
+           if-no-files-found: error
+ 
+       - name: Upload ddeb artifact (Debian)
+-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+         with:
+           path: /home/runner/build/${{ steps.package.outputs.DDEB_ARTIFACT_NAME }}
+           archive: false
+@@ -196,7 +196,7 @@ jobs:
+ 
+       - name: Upload scenario test artifacts (Debian)
+         if: always()
+-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+         with:
+           name: scenario-test-results-debian-forky-${{ inputs.arm64 && 'arm64' || 'amd64' }}
+           path: ${{ github.workspace }}/build_test_reports
+diff --git a/.github/workflows/build-macos.yml b/.github/workflows/build-macos.yml
+index aa327bc2..fbcdc0e9 100644
+--- a/.github/workflows/build-macos.yml
++++ b/.github/workflows/build-macos.yml
+@@ -173,7 +173,7 @@ jobs:
+           subject-path: ${{ steps.archive-dsym.outputs.DSYM_ARTIFACT_NAME }}
+ 
+       - name: Upload dSYM artifact (macOS)
+-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+         with:
+           path: ${{ steps.archive-dsym.outputs.DSYM_ARTIFACT_NAME }}
+           archive: false
+@@ -294,7 +294,7 @@ jobs:
+           subject-path: ${{ steps.package-unsigned.outputs.PKG_ARTIFACT_NAME }}
+ 
+       - name: Upload PKG artifact (macOS)
+-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+         with:
+           path: ${{ steps.package-signed.outputs.PKG_ARTIFACT_NAME || steps.package-unsigned.outputs.PKG_ARTIFACT_NAME }}
+           archive: false
+@@ -339,7 +339,7 @@ jobs:
+ 
+       - name: Upload scenario test results (macOS)
+         if: always()
+-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+         with:
+           name: scenario-test-results-macos
+           path: ${{ runner.temp }}/${{ github.job }}/build_test_reports
+diff --git a/.github/workflows/build-ubuntu.yml b/.github/workflows/build-ubuntu.yml
+index 58ab0d75..0bb882ba 100644
+--- a/.github/workflows/build-ubuntu.yml
++++ b/.github/workflows/build-ubuntu.yml
+@@ -115,14 +115,14 @@ jobs:
+             build/${{ steps.artifact-names.outputs.DDEB_ARTIFACT_NAME }}
+ 
+       - name: Upload deb artifact (Ubuntu)
+-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+         with:
+           path: build/${{ steps.artifact-names.outputs.DEB_ARTIFACT_NAME }}
+           archive: false
+           if-no-files-found: error
+ 
+       - name: Upload ddeb artifact (Ubuntu)
+-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+         with:
+           path: build/${{ steps.artifact-names.outputs.DDEB_ARTIFACT_NAME }}
+           archive: false
+@@ -174,7 +174,7 @@ jobs:
+ 
+       - name: Upload scenario test artifacts (Ubuntu)
+         if: always()
+-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+         with:
+           name: scenario-test-results-ubuntu-resolute-${{ inputs.arm64 && 'arm64' || 'amd64' }}
+           path: ${{ github.workspace }}/build_test_reports
+diff --git a/.github/workflows/build-windows.yml b/.github/workflows/build-windows.yml
+index 0f79274d..b341e088 100644
+--- a/.github/workflows/build-windows.yml
++++ b/.github/workflows/build-windows.yml
+@@ -357,14 +357,14 @@ jobs:
+           subject-path: ${{ steps.package-pdb.outputs.PDB_ARTIFACT_NAME }}
+ 
+       - name: Upload ZIP artifact
+-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+         with:
+           path: ${{ steps.package-zip.outputs.ZIP_ARTIFACT_NAME }}
+           archive: false
+           if-no-files-found: error
+ 
+       - name: Upload PDB artifact
+-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+         with:
+           path: ${{ steps.package-pdb.outputs.PDB_ARTIFACT_NAME }}
+           archive: false
+@@ -425,7 +425,7 @@ jobs:
+ 
+       - name: Upload scenario test artifacts (Windows)
+         if: always()
+-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+         with:
+           name: scenario-test-results-windows-x64
+           path: artifacts/scenario-tests/windows
+diff --git a/.github/workflows/pages.yml b/.github/workflows/pages.yml
+index 10247aac..a06a2b3c 100644
+--- a/.github/workflows/pages.yml
++++ b/.github/workflows/pages.yml
+@@ -48,7 +48,7 @@ jobs:
+         run: node docs/BUILD.mjs site
+ 
+       - name: Upload artifact
+-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+         with:
+           name: pages-build
+           path: docs/dist

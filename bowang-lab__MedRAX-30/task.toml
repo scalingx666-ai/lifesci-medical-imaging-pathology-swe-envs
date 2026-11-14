@@ -1,0 +1,75 @@
+version = "1.0"
+
+[task]
+name = "default/bowang-lab__MedRAX-30"
+description = "Feature/python"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "MedRAX",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "bowang-lab/MedRAX"
+ref = "9c049f010eda6a1f71b4a80ab8c2156cf769510e"
+reference = "https://github.com/bowang-lab/MedRAX/pull/30"
+source_access = "auto"
+built_at = "2026-11-14T06:28:01.157817+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:2700f75e21a154d7a367fe2ff2f5752c4ac7cd4538ad1b1fc1a9ef6cf1948d4e"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2025-07-05T06:49:10Z"
+diff_format = "unified"
+context_files = [
+    "README.md",
+    "main.py",
+    "medrax/agent/__init__.py",
+    "medrax/agent/agent.py",
+    "medrax/models/__init__.py",
+    "medrax/models/model_factory.py",
+    "medrax/tools/__init__.py",
+    "medrax/tools/classification/__init__.py",
+    "medrax/tools/classification/arcplus.py",
+    "medrax/tools/classification/torchxrayvision.py",
+    "medrax/tools/python_tool.py",
+    "medrax/tools/web_browser.py",
+    "pyproject.toml",
+    "quickstart.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 1161
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

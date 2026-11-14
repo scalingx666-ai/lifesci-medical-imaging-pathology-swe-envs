@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/rexcardan__Evil-DICOM-101"
+description = "IdleTimeout added (SpinUpAssociation, DICOMSCP)"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "Evil-DICOM",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "rexcardan/Evil-DICOM"
+ref = "027f4d19c0f5b5350f237eab52f7e00396a4ec6e"
+reference = "https://github.com/rexcardan/Evil-DICOM/pull/101"
+source_access = "auto"
+built_at = "2026-11-14T07:13:22.905112+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:40ce692f8f40c4c9741bb79015b64df8d5cfd751d614fd71649f4ae5c7adc93e"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2024-08-16T14:44:49Z"
+diff_format = "unified"
+context_files = [
+    "EvilDICOM/EvilDICOM/Network/DICOMSCP.cs",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 7
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

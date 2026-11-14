@@ -1,0 +1,169 @@
+diff --git a/.gitattributes b/.gitattributes
+new file mode 100644
+index 000000000..84c52c52b
+--- /dev/null
++++ b/.gitattributes
+@@ -0,0 +1,36 @@
++# Auto detect text files and perform LF normalization
++* -text
++
++# Custom for Visual Studio
++*.cs     diff=csharp
++*.sln    merge=union
++*.csproj merge=union
++*.vbproj merge=union
++*.fsproj merge=union
++*.dbproj merge=union
++
++# Other source files
++*.h      diff=astextplain
++*.c      diff=astextplain
++*.sh     diff=astextplain
++*.rb     diff=astextplain
++*.css    diff=astextplain
++*.js     diff=astextplain
++*.csproj diff=astextplain
++*.resx   diff=astextplain
++*.html   diff=astextplain
++*.txt    diff=astextplain
++*.xml    diff=astextplain
++
++
++# Standard to msysgit
++*.doc	 diff=astextplain
++*.DOC	 diff=astextplain
++*.docx diff=astextplain
++*.DOCX diff=astextplain
++*.dot  diff=astextplain
++*.DOT  diff=astextplain
++*.pdf  diff=astextplain
++*.PDF	 diff=astextplain
++*.rtf	 diff=astextplain
++*.RTF	 diff=astextplain
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 000000000..1ea55dce6
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,64 @@
++syntax: glob
++*.obj
++*.pdb
++*.user
++*.aps
++*.pch
++*.vspscc
++*_i.c
++*_p.c
++*.ncb
++*.suo
++*.tlb
++*.tlh
++*.bak
++*.cache
++*.ilk
++*.log
++*.lib
++*.sbr
++*.scc
++*.gen.cs
++*.gen.xml
++*.orig
++*.swp
++*.*~
++[Bb]in
++[Dd]ebug*/
++obj/
++[Rr]elease*/
++_ReSharper*/
++[Tt]est[Rr]esult*
++[Bb]uild[Ll]og.*
++*.[Pp]ublish.xml
++BuildProcessTemplates/*
++Published/*
++[Tt]humbs.db
++[Uu]pgradeLog*.[Xx][Mm][Ll]
++_[Uu]pgradeReport_Files*/
++*.build.csdef
++[Pp]ackage/*
++ASPNETDB.MDF
++aspnetdb_log.ldf
++*.SR.resources
++ClearCanvas.Common.xml
++ClearCanvas.Desktop.xml
++ImageViewer/ClearCanvas.ImageViewer.xml
++
++# Viewer local datastore files
++dicom_datastore/*.sdf
++dicom_datastore/filestore/*.*
++*.dcm
++*studyXml.xml
++
++# ImageServer files generated and copied by build scripts
++ImageServer/Web/Application/App_Themes/Default/images/LoginSplash.png
++ImageServer/Web/Application/ClientBin/Silverlight.xap
++ImageServer/Web/Application/ClientBin/Silverlight.*.xap
++ImageServer/Web/Application/Logging.config
++ImageServer/Web/Application/Web.config
++ImageServer/Web/Application/critical.config
++ImageServer/Web/Application/Pages/Help/UsersGuide/*
++
++# Files for Github integration
++ReferencedAssemblies
+diff --git a/README.md b/README.md
+new file mode 100644
+index 000000000..a14a2ae9c
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,51 @@
++ClearCanvas
++===========
++
++Open source RIS/PACS and DICOM viewer
++
++How to build using Github For Windows
++-------------------------------------
++Read this section if you intend to build the ClearCanvas projects only, and
++read the section on *Preparing clones for forked contributions* in addition to
++this section if you intend to make code changes you want to share.
++
++1. Download Github for Windows and install it.
++2. Using Github for Windows clone the ClearCanvas/ClearCanvas repository to
++   your local drive, for example, into ....Documents/Github/ClearCanvas.
++3. Using Github for Windows clone the ClearCanvas/ReferencedAssemblies to your
++   local drive, for example into ....Documents/Github/ReferencedAssemblies.
++4. Using a command-line window, create a symbolic link within the ClearCanvas
++   directory called "ReferencedAssemblies" that points to
++   ..\ReferencedAssemblies.
++   In Windows 7, the command-line to do this is
++   `mklink ReferencedAssemblies ..\ReferencedAssemblies`
++5. Load the ImageViewer/ImageViewer.sln into Visual Studio.
++6. Build.
++
++Preparing clones for forked contributions
++-----------------------------------------
++If you intend to make changes to the code and contribute it to the ClearCanvas
++(upstream) repository, then you must first use Fork on Github.com to create a
++clone of ClearCanvas/ClearCanvas on Github.com. The ClearCanvas/ClearCanvas
++repository itself is moderated and you will not be able to automatically
++publish your changes to it. 
++
++Therefore, 
++
++1. Use Fork on Github.com to create a clone of ClearCanvas/ClearCanvas. For
++   example, to yourUserName/ClearCanvas.
++2. If you intend to make changes to the ClearCanvas/ReferencedAssemblies, make
++   a fork/clone of this repository as well. Otherwise, it is unnecessary to do
++   so.
++3. Download Github for Windows and install it.
++4. Using Github for Windows clone the yourUserName/ClearCanvas repository to
++   your local drive.
++5. Using Github for Windows clone the yourUserName/ReferencedAssemblies
++   repository to your local drive if you have forked it on Github, otherwise,
++   simply clone the repository from ClearCanvas/ClearCanvas to your local drive.
++6. Create a symbolic link so that ReferencedAssemblies can be referenced from
++   within your ClearCanvas directory.
++
++You are now ready to make changes to the code in your private fork/clone.
++
++

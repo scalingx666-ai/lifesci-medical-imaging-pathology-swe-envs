@@ -1,0 +1,13 @@
+diff --git a/wsi_core/WholeSlideImage.py b/wsi_core/WholeSlideImage.py
+index d39a1adf..80cff7a9 100755
+--- a/wsi_core/WholeSlideImage.py
++++ b/wsi_core/WholeSlideImage.py
+@@ -460,7 +460,7 @@ def process_contour(self, cont, contour_holes, patch_level, save_path, patch_siz
+         
+         print('Extracted {} coordinates'.format(len(results)))
+ 
+-        if len(results)>1:
++        if len(results)>0:
+             asset_dict = {'coords' :          results}
+             
+             attr = {'patch_size' :            patch_size, # To be considered...

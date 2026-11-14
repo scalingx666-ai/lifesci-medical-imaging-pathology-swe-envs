@@ -1,0 +1,37 @@
+diff --git a/src/components/ImageClassification/index.js b/src/components/ImageClassification/index.js
+index fe3b320f..36fe1aac 100644
+--- a/src/components/ImageClassification/index.js
++++ b/src/components/ImageClassification/index.js
+@@ -41,6 +41,7 @@ const ImageContainer = styled("div")({
+   position: "relative",
+   display: "flex",
+   flexGrow: 1,
++  minHeight: '20vh',
+ })
+ 
+ const Image = styled("img")({
+diff --git a/src/components/RawJSONEditor/index.js b/src/components/RawJSONEditor/index.js
+index 45b53938..479d0611 100644
+--- a/src/components/RawJSONEditor/index.js
++++ b/src/components/RawJSONEditor/index.js
+@@ -21,6 +21,7 @@ export const RawJSONEditor = ({ content, onSave }) => {
+         theme="github"
+         mode="javascript"
+         width="100%"
++        height="calc(100vh - 80px)"
+         value={jsonText}
+         editorProps={{ $blockScrolling: Infinity }}
+         onChange={(t) => setJSONText(t)}
+diff --git a/src/components/WorkspaceContainer/index.js b/src/components/WorkspaceContainer/index.js
+index 785e0112..3dbfde33 100644
+--- a/src/components/WorkspaceContainer/index.js
++++ b/src/components/WorkspaceContainer/index.js
+@@ -64,7 +64,7 @@ export default ({
+       iconSidebarItems={[]}
+       rightSidebarItems={[]}
+     >
+-      <Box padding={2} style={{ width: "100%" }}>
++      <Box padding={2, 0} style={{ width: "100%" }}>
+         {children}
+       </Box>
+     </Workspace>

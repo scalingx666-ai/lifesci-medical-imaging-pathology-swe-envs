@@ -1,0 +1,16 @@
+diff --git a/oct_converter/dicom/dicom.py b/oct_converter/dicom/dicom.py
+index 3ecfc0a..fd674c2 100644
+--- a/oct_converter/dicom/dicom.py
++++ b/oct_converter/dicom/dicom.py
+@@ -169,8 +169,10 @@ def opt_shared_functional_groups(ds: Dataset, meta: DicomMetadata) -> Dataset:
+     shared_ds = [Dataset()]
+     # Frame anatomy PS3.3 C.7.6.16.2.8
+     shared_ds[0].FrameAnatomySequence = [Dataset()]
+-    shared_ds[0].FrameAnatomySequence[0] = ds.AnatomicRegionSequence[0].copy()
+     shared_ds[0].FrameAnatomySequence[0].FrameLaterality = meta.series_info.laterality
++    shared_ds[0].FrameAnatomySequence[0].AnatomicRegionSequence = [
++        ds.AnatomicRegionSequence[0].copy()
++    ]
+     # Pixel Measures PS3.3 C.7.6.16.2.1
+     shared_ds[0].PixelMeasuresSequence = [Dataset()]
+     shared_ds[0].PixelMeasuresSequence[

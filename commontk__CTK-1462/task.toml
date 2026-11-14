@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/commontk__CTK-1462"
+description = "BUG: Fix crash in ctkDICOMItem::Decode when called from multiple threads"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "CTK",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "commontk/CTK"
+ref = "0d63a39f9d7c58e9b840d861f75e079434fc71b7"
+reference = "https://github.com/commontk/CTK/pull/1462"
+source_access = "auto"
+built_at = "2026-11-14T07:07:43.904176+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:3e74a7b829b280b020cd65f1a10edb82efc9a9ff08e1df76d02daa3af5064011"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-03T02:58:55Z"
+diff_format = "unified"
+context_files = [
+    "Libs/DICOM/Core/ctkDICOMItem.cpp",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 59
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

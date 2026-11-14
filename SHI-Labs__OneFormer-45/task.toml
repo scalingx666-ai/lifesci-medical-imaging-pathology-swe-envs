@@ -1,0 +1,65 @@
+version = "1.0"
+
+[task]
+name = "default/SHI-Labs__OneFormer-45"
+description = ":sparkles: Add ConvNeXt-XL on mapillary"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "OneFormer",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "SHI-Labs/OneFormer"
+ref = "761189909f392a110a4ead574d85ed3a17fbc8a7"
+reference = "https://github.com/SHI-Labs/OneFormer/pull/45"
+source_access = "auto"
+built_at = "2026-11-14T07:05:51.819006+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:4e5defb582ec5ea64fab4c9e9b78133a126ea5e35460c73dc8d9b05a62988bfa"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2023-04-18T13:45:53Z"
+diff_format = "unified"
+context_files = [
+    "README.md",
+    "configs/cityscapes/convnext/mapillary_pretrain_oneformer_convnext_xlarge_bs16_90k.yaml",
+    "configs/coco/Base-COCO-UnifiedSegmentation.yaml",
+    "configs/mapillary_vistas/convnext/cityscapes_pretrain_oneformer_convnext_xlarge_bs16_300k.yaml",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 43
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

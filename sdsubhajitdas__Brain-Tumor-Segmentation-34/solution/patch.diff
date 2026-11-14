@@ -1,0 +1,127 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index d0e76ba..8b1a6af 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -83,7 +83,16 @@ is combined onto this one branch, open as a single PR against `master`.
+   `data-domains="bts.subhajitdas.me"` restricts tracking to the live domain, so local
+   dev visits never show up in stats. Umami is served from `https://umami.subhajitdas.me`
+   — it must stay https, since browsers block an http script on the https site
+-  (mixed content).
++  (mixed content). Umami site name "Brain Tumor Segmentation", website ID
++  `bac2904d-8927-4555-947e-2748cc210489`. Do-Not-Track is intentionally *not* honored
++  (Umami's default — don't add `data-do-not-track="true"`).
++  - **Custom events**, fired via the guarded `window.track()` helper in `base.html`
++    (no-ops if an ad blocker removed `window.umami`): `predict-start` (`source`,
++    `sample_id`|`file_type`), `predict-success` (`source`, `inference_ms`, `dice` for
++    samples), `predict-error` (`source`, `status`; 0 = network failure, 429 = rate
++    limited), `gallery-open` (`image_id`, `dice`), and `github-click` (declarative
++    `data-umami-event` on the header link). Never send filenames, image data, error
++    text or anything identifying the uploader.
+ - **Dokploy deployment**: uses the existing GitHub App integration on that instance
+   (no new auth needed), builds directly from the repo's root `Dockerfile`. No
+   `serverId` set — deploys on the Dokploy host itself (no separate remote servers are
+diff --git a/web/static/js/gallery.js b/web/static/js/gallery.js
+index 2d9cd9d..bd2a384 100644
+--- a/web/static/js/gallery.js
++++ b/web/static/js/gallery.js
+@@ -9,6 +9,7 @@
+       lightboxImage.src = thumb.dataset.full;
+       lightboxCaption.textContent = `Dice score: ${thumb.dataset.dice}`;
+       lightbox.showModal();
++      track("gallery-open", { image_id: thumb.dataset.id, dice: parseFloat(thumb.dataset.dice) });
+     });
+   });
+ 
+diff --git a/web/static/js/main.js b/web/static/js/main.js
+index 84b95eb..f7587bb 100644
+--- a/web/static/js/main.js
++++ b/web/static/js/main.js
+@@ -33,7 +33,7 @@
+ 
+     const formData = new FormData();
+     formData.append("file", selectedFile);
+-    runPredict(formData);
++    runPredict(formData, { source: "upload", file_type: selectedFile.type });
+   });
+ 
+   sampleThumbs.forEach((btn) => {
+@@ -50,11 +50,12 @@
+ 
+       const formData = new FormData();
+       formData.append("sample_id", sampleId);
+-      runPredict(formData);
++      runPredict(formData, { source: "sample", sample_id: sampleId });
+     });
+   });
+ 
+-  async function runPredict(formData) {
++  async function runPredict(formData, meta) {
++    track("predict-start", meta);
+     resultBox.hidden = false;
+     resultStatus.textContent = "Running model...";
+     resultStatus.classList.remove("error");
+@@ -70,7 +71,9 @@
+       const data = await response.json();
+ 
+       if (!response.ok) {
+-        throw new Error(data.detail || "Prediction failed.");
++        const error = new Error(data.detail || "Prediction failed.");
++        error.status = response.status;
++        throw error;
+       }
+ 
+       resultStatus.textContent = "Done.";
+@@ -83,7 +86,13 @@
+           ? `Dice score vs. ground truth: ${data.dice_score.toFixed(4)}`
+           : "No ground-truth mask available for uploaded images.";
+       resultTiming.textContent = `Inference time: ${Math.round(data.inference_ms)}ms`;
++      track("predict-success", {
++        source: meta.source,
++        inference_ms: Math.round(data.inference_ms),
++        ...(data.dice_score !== null && { dice: Number(data.dice_score.toFixed(4)) }),
++      });
+     } catch (err) {
++      track("predict-error", { source: meta.source, status: err.status ?? 0 });
+       resultStatus.textContent = `Error: ${err.message}`;
+       resultStatus.classList.add("error");
+       setLoading(resultMaskLoading, "No series loaded");
+diff --git a/web/templates/base.html b/web/templates/base.html
+index 2b7719e..6b22353 100644
+--- a/web/templates/base.html
++++ b/web/templates/base.html
+@@ -52,7 +52,12 @@
+   </script>
+   <link rel="stylesheet" href="/static/css/style.css">
+ 
+-  <script defer src="https://umami.subhajitdas.me/script.js" data-website-id="d1fff9a1-5600-4549-8fc4-7cef8c703da9" data-domains="bts.subhajitdas.me"></script>
++  <script defer src="https://umami.subhajitdas.me/script.js" data-website-id="bac2904d-8927-4555-947e-2748cc210489" data-domains="bts.subhajitdas.me"></script>
++  <script>
++    window.track = (name, data) => {
++      try { window.umami && window.umami.track(name, data); } catch (_) {}
++    };
++  </script>
+ </head>
+ <body class="min-h-screen flex flex-col font-body bg-ink text-film antialiased">
+ 
+@@ -65,7 +70,7 @@
+         <a href="/" class="{{ 'text-finding' if request.url.path == '/' else 'text-mute hover:text-film' }} transition-colors">Try&nbsp;It</a>
+         <a href="/about" class="{{ 'text-finding' if request.url.path == '/about' else 'text-mute hover:text-film' }} transition-colors">About</a>
+         <a href="/gallery" class="{{ 'text-finding' if request.url.path == '/gallery' else 'text-mute hover:text-film' }} transition-colors">Gallery</a>
+-        <a href="https://github.com/sdsubhajitdas/Brain-Tumor-Segmentation" target="_blank" rel="noopener" class="text-mute hover:text-film transition-colors">GitHub&nbsp;↗</a>
++        <a href="https://github.com/sdsubhajitdas/Brain-Tumor-Segmentation" data-umami-event="github-click" target="_blank" rel="noopener" class="text-mute hover:text-film transition-colors">GitHub&nbsp;↗</a>
+       </nav>
+     </div>
+   </header>
+diff --git a/web/templates/gallery.html b/web/templates/gallery.html
+index 0444052..7ec9d4a 100644
+--- a/web/templates/gallery.html
++++ b/web/templates/gallery.html
+@@ -14,7 +14,7 @@ <h1 class="font-display font-bold text-4xl sm:text-6xl leading-[1.05] max-w-3xl"
+ <section class="max-w-6xl mx-auto px-5 sm:px-8 pb-16">
+   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+     {% for item in gallery_items %}
+-    <button class="gallery-thumb viewport" data-full="/static/gallery/full/{{ item.id }}.webp" data-dice="{{ item.dice_label }}" aria-label="Result, Dice score {{ item.dice_label }}">
++    <button class="gallery-thumb viewport" data-id="{{ item.id }}" data-full="/static/gallery/full/{{ item.id }}.webp" data-dice="{{ item.dice_label }}" aria-label="Result, Dice score {{ item.dice_label }}">
+       <span class="vp-tr"></span><span class="vp-bl"></span>
+       <img src="/static/gallery/thumbs/{{ item.id }}.webp" alt="Result, Dice score {{ item.dice_label }}" loading="lazy" class="block w-full aspect-square object-cover">
+       <span class="dice-badge absolute bottom-1.5 right-1.5 bg-ink/85 text-film font-mono text-[10px] px-1.5 py-0.5">{{ item.dice_label }}</span>

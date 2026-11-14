@@ -1,0 +1,309 @@
+diff --git a/lungmask/mask.py b/lungmask/mask.py
+index 1adabb8..6ff4f54 100644
+--- a/lungmask/mask.py
++++ b/lungmask/mask.py
+@@ -93,9 +93,9 @@ def __init__(
+             tqdm_disable (bool, optional): If `True`, will disable progress bar. Defaults to False.
+         """
+         assert (
+-            modelname in MODEL_URLS
++            modelpath is not None or modelname in MODEL_URLS
+         ), "Modelname not found. Please choose from: {}".format(MODEL_URLS.keys())
+-        if fillmodel is not None:
++        if fillmodel is not None and fillmodel_path is None:
+             assert (
+                 fillmodel in MODEL_URLS
+             ), "Modelname not found. Please choose from: {}".format(MODEL_URLS.keys())
+@@ -229,7 +229,9 @@ def apply(self, image: Union[sitk.Image, np.ndarray]) -> np.ndarray:
+             res_l[np.logical_and(res_l == 0, res_r > 0)] = spare_value
+             res_l[res_r == 0] = 0
+             logger.info("Fusing results... this may take up to several minutes!")
+-            return utils.postprocessing(res_l, spare=[spare_value])
++            return utils.postprocessing(
++                res_l, spare=[spare_value], disable_tqdm=self.tqdm_disable
++            )
+ 
+ 
+ def apply(
+diff --git a/lungmask/utils.py b/lungmask/utils.py
+index e89a319..023f783 100644
+--- a/lungmask/utils.py
++++ b/lungmask/utils.py
+@@ -182,6 +182,11 @@ def read_dicoms(
+                                 dicom_header.SeriesInstanceUID,
+                                 fname,
+                                 dicom_header.ImagePositionPatient,
++                                getattr(
++                                    dicom_header,
++                                    "ImageOrientationPatient",
++                                    [1, 0, 0, 0, 1, 0],
++                                ),
+                             ]
+                             if h_info_wo_name not in unique_set:
+                                 unique_set.append(h_info_wo_name)
+@@ -209,9 +214,10 @@ def read_dicoms(
+         curr_vol = i
+         info_idxs = np.where(vol_unique[2] == curr_vol)[0]
+         vol_files = dcm_header_info[info_idxs, 2]
+-        positions = np.asarray(
+-            [np.asarray(x[2]) for x in dcm_header_info[info_idxs, 3]]
+-        )
++        orientation = np.asarray(dcm_header_info[info_idxs[0], 4], dtype=float)
++        normal = np.cross(orientation[:3], orientation[3:])
++        # Project onto the slice normal: z alone cannot order non-axial scans.
++        positions = np.asarray(list(dcm_header_info[info_idxs, 3]), dtype=float) @ normal
+         slicesort_idx = np.argsort(positions)
+         vol_files = vol_files[slicesort_idx]
+         relevant_series.append(vol_files)
+@@ -305,6 +311,8 @@ def postprocessing(
+     regions = skimage.measure.regionprops(regionmask, label_image)
+     regions.sort(key=lambda x: x.area)
+     regionlabels = [x.label for x in regions]
++    # Neighbors use component IDs, whereas spare contains original label values.
++    spare_regions = {r.label for r in regions if int(r.intensity_max) in spare}
+ 
+     # will hold mapping from regionlabels to original labels
+     region_to_lobemap = np.zeros((len(regionlabels) + 1,), dtype=np.uint8)
+@@ -327,7 +335,12 @@ def postprocessing(
+             maxmap = 0
+             myarea = 0
+             for ix, n in enumerate(neighbours):
+-                if n != 0 and n != r.label and counts[ix] > maxmap and n not in spare:
++                if (
++                    n != 0
++                    and n != r.label
++                    and counts[ix] > maxmap
++                    and n not in spare_regions
++                ):
+                     maxmap = counts[ix]
+                     mapto = n
+                     myarea = r.area
+@@ -349,17 +362,21 @@ def postprocessing(
+     outmask_mapped[np.isin(outmask_mapped, spare)] = 0
+ 
+     if outmask_mapped.shape[0] == 1:
+-        holefiller = (
+-            lambda x: skimage.morphology.area_closing(
+-                x[0].astype(int), area_threshold=64
++
++        def holefiller(x):
++            # Boolean closing preserves foreground even for images below 64 pixels.
++            # Restrict additions to holes so exterior background stays background.
++            return (
++                skimage.morphology.area_closing(x[0], area_threshold=64)
++                & ndimage.binary_fill_holes(x[0])
+             )[None, :, :]
+-            == 1
+-        )
+     else:
+         holefiller = fill_voids.fill
+ 
+     outmask = np.zeros(outmask_mapped.shape, dtype=np.uint8)
+-    for i in np.unique(outmask_mapped)[1:]:
++    for i in np.unique(outmask_mapped):
++        if i == 0:
++            continue
+         outmask[holefiller(keep_largest_connected_component(outmask_mapped == i))] = i
+ 
+     return outmask
+@@ -405,6 +422,8 @@ def keep_largest_connected_component(mask: np.ndarray) -> np.ndarray:
+     """
+     mask = skimage.measure.label(mask)
+     regions = skimage.measure.regionprops(mask)
++    if not regions:
++        return np.zeros(mask.shape, dtype=bool)
+     resizes = np.asarray([x.area for x in regions])
+     max_region = np.argsort(resizes)[-1] + 1
+     mask = mask == max_region
+diff --git a/pyproject.toml b/pyproject.toml
+index 11b7e26..3512de4 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "lungmask"
+-version = "0.2.21"
++version = "0.2.22"
+ authors = [
+     { name = "Johannes Hofmanninger", email = "j.hofmanninger@gmail.com" }
+ ]
+diff --git a/tests/test_mask.py b/tests/test_mask.py
+index 825c1ba..56deb3c 100644
+--- a/tests/test_mask.py
++++ b/tests/test_mask.py
+@@ -58,3 +58,47 @@ def test_LMInferer_fused(fixture_testvol):
+     assert np.all(
+         np.unique(res, return_counts=True)[1] == [423000, 13334, 23202, 23834, 40918]
+     )
++
++
++def test_LMInferer_fused_preserves_fill_only_voxels(monkeypatch):
++    monkeypatch.setattr("lungmask.mask.get_model", lambda *args: torch.nn.Identity())
++    inferer = LMInferer(
++        modelname="LTRCLobes", fillmodel="R231", force_cpu=True, tqdm_disable=True
++    )
++    lobes = np.zeros((2, 5, 32), dtype=np.uint8)
++    for value, start in [(1, 1), (2, 7), (3, 13), (4, 19)]:
++        lobes[:, 1, start : start + 3] = value
++    lobes[:, 2, 26:30] = 5
++    fill = (lobes > 0).astype(np.uint8)
++    fill[:, 1, 26:28] = 1
++    # Spare label 6 is component 5; its valid lobe-5 neighbor is component 6.
++    monkeypatch.setattr(
++        inferer,
++        "_inference",
++        lambda image, model: lobes.copy() if model is inferer.model else fill.copy(),
++    )
++
++    result = inferer.apply(np.zeros(lobes.shape, dtype=np.int16))
++
++    expected = lobes.copy()
++    expected[:, 1, 26:28] = 5
++    assert np.array_equal(result, expected)
++
++
++@pytest.mark.parametrize("model_kind", ["base", "fill"])
++def test_LMInferer_custom_path_overrides_unknown_model_name(monkeypatch, model_kind):
++    calls = []
++
++    def get_stub_model(name, path):
++        calls.append((name, path))
++        return torch.nn.Identity()
++
++    monkeypatch.setattr("lungmask.mask.get_model", get_stub_model)
++    if model_kind == "base":
++        LMInferer(modelname="custom", modelpath="/models/base.pth", force_cpu=True)
++        assert calls == [("base.pth", "/models/base.pth")]
++    else:
++        LMInferer(
++            fillmodel="custom", fillmodel_path="/models/fill.pth", force_cpu=True
++        )
++        assert calls == [("R231", None), ("fill.pth", "/models/fill.pth")]
+diff --git a/tests/test_utils.py b/tests/test_utils.py
+index 3497a40..dededb5 100644
+--- a/tests/test_utils.py
++++ b/tests/test_utils.py
+@@ -1,12 +1,14 @@
+ import os
+ 
+ import numpy as np
++import pydicom
+ import pytest
+ import SimpleITK as sitk
+ 
+ from lungmask.utils import (
+     bbox_3D,
+     crop_and_resize,
++    keep_largest_connected_component,
+     load_input_image,
+     postprocessing,
+     preprocess,
+@@ -72,6 +74,37 @@ def test_read_dicoms(read_metadata, exp_len_metadata):
+     assert len(d[0].GetMetaDataKeys()) == exp_len_metadata
+ 
+ 
++@pytest.mark.parametrize(
++    "orientation", [(1, 0, 0, 0, 1, 0), (0, 1, 0, 0, 0, 1), (1, 0, 0, 0, 0, -1)]
++)
++def test_read_dicoms_sorts_along_slice_normal(tmp_path, monkeypatch, orientation):
++    normal = np.cross(orientation[:3], orientation[3:])
++    source = os.path.join(os.path.dirname(__file__), "testdata", "0.dcm")
++    # Deliberately supply slices out of spatial order, including non-axial series.
++    for file_index, position in enumerate([2, 0, 1]):
++        dicom = pydicom.dcmread(source)
++        dicom.ImageOrientationPatient = list(orientation)
++        dicom.ImagePositionPatient = (normal * position).tolist()
++        dicom.SOPInstanceUID = pydicom.uid.generate_uid()
++        dicom.file_meta.MediaStorageSOPInstanceUID = dicom.SOPInstanceUID
++        dicom.RescaleSlope = 1
++        dicom.RescaleIntercept = 0
++        dicom.PixelData = np.full(
++            (dicom.Rows, dicom.Columns), position, dtype=np.int16
++        ).tobytes()
++        dicom.save_as(tmp_path / f"{file_index}.dcm")
++
++    monkeypatch.setattr(
++        "lungmask.utils.os.walk",
++        lambda path: [(str(tmp_path), [], ["0.dcm", "1.dcm", "2.dcm"])],
++    )
++    volume = read_dicoms(tmp_path, disable_tqdm=True)[0]
++
++    assert np.array_equal(sitk.GetArrayFromImage(volume)[:, 0, 0], [0, 1, 2])
++    assert np.allclose(volume.GetOrigin(), [0, 0, 0])
++    assert np.allclose(np.asarray(volume.GetDirection()).reshape(3, 3)[:, 2], normal)
++
++
+ def test_simple_bodymask():
+     img = np.full((10, 10), dtype=np.int16, fill_value=-1000)
+     img[2:8, 3:7] = 1
+@@ -161,3 +194,56 @@ def test_postprocessing():
+         np.tile(label_image, (2, 1, 1)), spare=[3], disable_tqdm=True, skip_below=3
+     )[0]
+     assert res[2, 1] == 0
++
++
++@pytest.mark.parametrize("extra_spare", [False, True])
++def test_postprocessing_does_not_merge_lobe_fragment_into_spare(extra_spare):
++    label_image = np.zeros((2, 6, 17), dtype=np.uint8)
++    label_image[:, 1, 1:4] = 1  # largest component of lobe 1
++    label_image[:, 1:3, 8:11] = 6  # spare region, with component ID 2
++    label_image[:, 1:3, 11:15] = 3
++    label_image[:, 3, 8:10] = 1  # fragment shares a larger border with spare
++    label_image[:, 4, 8:9] = 2  # valid neighbor for the fragment
++    if extra_spare:
++        # A tied spare component can have a zero entry in region_to_lobemap.
++        label_image[:, 1:3, 4:7] = 6
++
++    result = postprocessing(label_image, spare=[6], disable_tqdm=True)
++
++    assert np.all(result[:, 3, 8:10] == 2)
++    assert np.all(result[:, 1:3, 8:11] == 3)
++    if extra_spare:
++        assert np.all(result[:, 1:3, 4:7] == 1)
++
++
++@pytest.mark.parametrize("slices", [1, 2])
++@pytest.mark.parametrize("label_count", [1, 2])
++def test_postprocessing_preserves_labels_without_background(slices, label_count):
++    label_image = np.ones((slices, 4, 4), dtype=np.uint8)
++    if label_count == 2:
++        label_image[:, :, 2:] = 2
++
++    result = postprocessing(label_image, disable_tqdm=True)
++
++    assert np.array_equal(result, label_image)
++
++
++def test_keep_largest_connected_component_empty():
++    mask = np.zeros((2, 4, 4), dtype=bool)
++
++    result = keep_largest_connected_component(mask)
++
++    assert result.dtype == bool
++    assert np.array_equal(result, mask)
++
++
++def test_postprocessing_single_slice_fills_only_enclosed_holes():
++    label_image = np.zeros((1, 6, 6), dtype=np.uint8)
++    label_image[:, 1:5, 1:5] = 1
++    label_image[:, 2:4, 2:4] = 0
++    expected = label_image.copy()
++    expected[:, 2:4, 2:4] = 1
++
++    result = postprocessing(label_image, disable_tqdm=True)
++
++    assert np.array_equal(result, expected)
+diff --git a/uv.lock b/uv.lock
+index 91bbbb2..24be1c1 100644
+--- a/uv.lock
++++ b/uv.lock
+@@ -273,7 +273,7 @@ wheels = [
+ 
+ [[package]]
+ name = "lungmask"
+-version = "0.2.21"
++version = "0.2.22"
+ source = { editable = "." }
+ dependencies = [
+     { name = "fill-voids" },

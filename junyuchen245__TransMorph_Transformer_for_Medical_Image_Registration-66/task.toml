@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/junyuchen245__TransMorph_Transformer_for_Medical_Image_Registration-66"
+description = "Swin-Transformer's support for different size of height dimension"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "TransMorph_Transformer_for_Medical_Image_Registration",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "junyuchen245/TransMorph_Transformer_for_Medical_Image_Registration"
+ref = "11455359531b1586cb33a1b50d5e795c49c2014c"
+reference = "https://github.com/junyuchen245/TransMorph_Transformer_for_Medical_Image_Registration/pull/66"
+source_access = "auto"
+built_at = "2026-11-14T07:09:11.657187+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:bd32d8fa41da076e4fc698f99f7d37fb0be6e723a4e4786813c21121f519e146"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2023-11-22T18:24:31Z"
+diff_format = "unified"
+context_files = [
+    "TransMorph/models/TransMorph.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 2
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

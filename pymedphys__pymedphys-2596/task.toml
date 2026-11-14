@@ -1,0 +1,76 @@
+version = "1.0"
+
+[task]
+name = "default/pymedphys__pymedphys-2596"
+description = "Clean and preview floating-point pixel data under the pixel options"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "pymedphys",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "pymedphys/pymedphys"
+ref = "c6fe84631ff13f2e59fd067e1161d48148acbdc7"
+reference = "https://github.com/pymedphys/pymedphys/pull/2596"
+source_access = "auto"
+built_at = "2026-11-14T07:11:54.718422+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:09edeec3cd962148a9eb773f6468ea210a33e3e025ecd7b543d4d361ec39c215"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-10T00:10:52Z"
+diff_format = "unified"
+context_files = [
+    "lib/pymedphys/_dicom/deidentify/conformance_values.py",
+    "lib/pymedphys/_dicom/deidentify/instance_transform.py",
+    "lib/pymedphys/_dicom/deidentify/pixel_cleaning.py",
+    "lib/pymedphys/_dicom/deidentify/qc_previews.py",
+    "lib/pymedphys/_dicom/deidentify/reasons.py",
+    "lib/pymedphys/_dicom/deidentify/scope.py",
+    "lib/pymedphys/_dicom/deidentify/text_evaluation_sources.py",
+    "lib/pymedphys/docs/contrib/info/deidentification-design.md",
+    "lib/pymedphys/tests/dicom/test_deidentify_float_pixel_cleaning.py",
+    "lib/pymedphys/tests/dicom/test_deidentify_parametric_map_scope.py",
+    "lib/pymedphys/tests/dicom/test_deidentify_pixel_cleaning.py",
+    "lib/pymedphys/tests/dicom/test_deidentify_qc_float_previews.py",
+    "lib/pymedphys/tests/dicom/test_deidentify_qc_pixel_digests.py",
+    "lib/pymedphys/tests/dicom/test_deidentify_qc_previews.py",
+    "lib/pymedphys/tests/dicom/test_deidentify_text_evaluation.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 1423
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

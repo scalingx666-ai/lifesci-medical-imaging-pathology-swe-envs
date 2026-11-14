@@ -1,0 +1,75 @@
+version = "1.0"
+
+[task]
+name = "default/SHI-Labs__OneFormer-21"
+description = "Add Mapillary and other SOTA Models using Extra Training Data"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "OneFormer",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "SHI-Labs/OneFormer"
+ref = "5a4a4fa7bd11ca5a4387738bd2881ee9a0cea09a"
+reference = "https://github.com/SHI-Labs/OneFormer/pull/21"
+source_access = "auto"
+built_at = "2026-11-14T07:05:57.010953+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:9f03cc64800e5a7a86679e16a88385b5019dbcc6a9102cb51e72d963d8efe27d"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2023-01-26T20:28:32Z"
+diff_format = "unified"
+context_files = [
+    "README.md",
+    "configs/ade20k/dinat/coco_pretrain_oneformer_dinat_large_bs16_160k_1280x1280.yaml",
+    "configs/cityscapes/convnext/mapillary_pretrain_oneformer_convnext_large_bs16_90k.yaml",
+    "configs/mapillary_vistas/Base-Mapillary-UnifiedSegmentation.yaml",
+    "configs/mapillary_vistas/convnext/cityscapes_pretrain_oneformer_convnext_large_bs16_300k.yaml",
+    "configs/mapillary_vistas/convnext/oneformer_convnext_large_bs16_300k.yaml",
+    "configs/mapillary_vistas/dinat/oneformer_dinat_large_bs16_300k.yaml",
+    "configs/mapillary_vistas/oneformer_R50_bs16_300k.yaml",
+    "configs/mapillary_vistas/swin/oneformer_swin_large_bs16_300k.yaml",
+    "datasets/README.md",
+    "oneformer/data/datasets/__init__.py",
+    "oneformer/data/datasets/register_mapillary_vistas.py",
+    "oneformer/data/datasets/register_mapillary_vistas_panoptic.py",
+    "train_net.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 1323
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

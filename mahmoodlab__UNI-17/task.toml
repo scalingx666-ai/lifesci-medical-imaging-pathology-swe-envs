@@ -1,0 +1,69 @@
+version = "1.0"
+
+[task]
+name = "default/mahmoodlab__UNI-17"
+description = "Sort-prune-imports"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "UNI",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "mahmoodlab/UNI"
+ref = "449f95b5dd9c1c8c5d3328fb62ff85397c3cdce2"
+reference = "https://github.com/mahmoodlab/UNI/pull/17"
+source_access = "auto"
+built_at = "2026-11-14T07:08:23.896813+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:359e1098bc1ee1fcaf17490b71ce628d50868739c3b8d7e70216834f654d62af"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2024-03-29T03:13:36Z"
+diff_format = "unified"
+context_files = [
+    "uni/downstream/eval_patch_features/__init__.py",
+    "uni/downstream/eval_patch_features/fewshot.py",
+    "uni/downstream/eval_patch_features/linear_probe.py",
+    "uni/downstream/eval_patch_features/protonet.py",
+    "uni/downstream/extract_patch_features.py",
+    "uni/downstream/utils.py",
+    "uni/get_encoder/get_encoder.py",
+    "uni/get_encoder/models/resnet50_trunc.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 51
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

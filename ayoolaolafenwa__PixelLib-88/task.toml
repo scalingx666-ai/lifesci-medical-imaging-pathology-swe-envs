@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/ayoolaolafenwa__PixelLib-88"
+description = "Adding function to extract masks and other information in semantic segmentation"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "PixelLib",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "ayoolaolafenwa/PixelLib"
+ref = "7e4da962468f0d7c803c10c3c90dc3e62f580e6d"
+reference = "https://github.com/ayoolaolafenwa/PixelLib/pull/88"
+source_access = "auto"
+built_at = "2026-11-14T07:07:05.708423+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:f77f3ad62d4bf603779d2ef8c5cf9f4224a5fde6f61d2b0a047c839ea52ec7ec"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2021-08-17T13:16:39Z"
+diff_format = "unified"
+context_files = [
+    "pixellib/semantic.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 217
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

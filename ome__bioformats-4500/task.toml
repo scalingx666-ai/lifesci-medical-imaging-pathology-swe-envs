@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/ome__bioformats-4500"
+description = "Bump org.json:json from 20231013 to 20260719 in /components/formats-bsd"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "bioformats",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "ome/bioformats"
+ref = "77833925c46f0be6046e6f9bcaa94dc5511aec3e"
+reference = "https://github.com/ome/bioformats/pull/4500"
+source_access = "auto"
+built_at = "2026-11-14T07:11:07.906809+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:a7f3ad4b4146b081fca86b645cf946a5c0536f14159c81478425d622e7191a4d"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-11T19:59:18Z"
+diff_format = "unified"
+context_files = [
+    "components/formats-bsd/pom.xml",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 2
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,1455 @@
+diff --git a/README.md b/README.md
+index 748bc4e..1554a38 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,8 @@
+ 
+ [![Framework: PyTorch](https://img.shields.io/badge/Framework-PyTorch-orange.svg)](https://pytorch.org/) [![Huggingface space](https://img.shields.io/badge/🤗-Huggingface%20Space-cyan.svg)](https://huggingface.co/spaces/shi-labs/OneFormer) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/SHI-Labs/OneFormer/blob/main/colab/oneformer_colab.ipynb) [![License](https://img.shields.io/badge/License-MIT-red.svg)](https://opensource.org/licenses/MIT) [![YouTube](https://badges.aleen42.com/src/youtube.svg)](https://youtu.be/_Zr1pOi7Chw)
+  	
+-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/instance-segmentation-on-cityscapes-val)](https://paperswithcode.com/sota/instance-segmentation-on-cityscapes-val?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/semantic-segmentation-on-coco-1)](https://paperswithcode.com/sota/semantic-segmentation-on-coco-1?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/instance-segmentation-on-coco-val-panoptic)](https://paperswithcode.com/sota/instance-segmentation-on-coco-val-panoptic?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/panoptic-segmentation-on-ade20k-val)](https://paperswithcode.com/sota/panoptic-segmentation-on-ade20k-val?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/instance-segmentation-on-ade20k-val)](https://paperswithcode.com/sota/instance-segmentation-on-ade20k-val?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/panoptic-segmentation-on-cityscapes-val)](https://paperswithcode.com/sota/panoptic-segmentation-on-cityscapes-val?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/semantic-segmentation-on-ade20k-val)](https://paperswithcode.com/sota/semantic-segmentation-on-ade20k-val?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/panoptic-segmentation-on-coco-minival)](https://paperswithcode.com/sota/panoptic-segmentation-on-coco-minival?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/semantic-segmentation-on-cityscapes-val)](https://paperswithcode.com/sota/semantic-segmentation-on-cityscapes-val?p=oneformer-one-transformer-to-rule-universal)
++[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/instance-segmentation-on-cityscapes-val)](https://paperswithcode.com/sota/instance-segmentation-on-cityscapes-val?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/instance-segmentation-on-coco-val-panoptic)](https://paperswithcode.com/sota/instance-segmentation-on-coco-val-panoptic?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/panoptic-segmentation-on-ade20k-val)](https://paperswithcode.com/sota/panoptic-segmentation-on-ade20k-val?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/instance-segmentation-on-ade20k-val)](https://paperswithcode.com/sota/instance-segmentation-on-ade20k-val?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/panoptic-segmentation-on-cityscapes-val)](https://paperswithcode.com/sota/panoptic-segmentation-on-cityscapes-val?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/panoptic-segmentation-on-cityscapes-test)](https://paperswithcode.com/sota/panoptic-segmentation-on-cityscapes-test?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/panoptic-segmentation-on-mapillary-val)](https://paperswithcode.com/sota/panoptic-segmentation-on-mapillary-val?p=oneformer-one-transformer-to-rule-universal) 	
++[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/semantic-segmentation-on-mapillary-val)](https://paperswithcode.com/sota/semantic-segmentation-on-mapillary-val?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/semantic-segmentation-on-coco-1)](https://paperswithcode.com/sota/semantic-segmentation-on-coco-1?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/semantic-segmentation-on-ade20k-val)](https://paperswithcode.com/sota/semantic-segmentation-on-ade20k-val?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/panoptic-segmentation-on-coco-minival)](https://paperswithcode.com/sota/panoptic-segmentation-on-coco-minival?p=oneformer-one-transformer-to-rule-universal) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/oneformer-one-transformer-to-rule-universal/semantic-segmentation-on-cityscapes-val)](https://paperswithcode.com/sota/semantic-segmentation-on-cityscapes-val?p=oneformer-one-transformer-to-rule-universal)
+ 
+ [Jitesh Jain](https://praeclarumjj3.github.io/), [Jiachen Li](https://chrisjuniorli.github.io/)<sup>&dagger;</sup>, [MangTik Chiu](https://www.linkedin.com/in/mtchiu/)<sup>&dagger;</sup>, [Ali Hassani](https://alihassanijr.com/), [Nikita Orlov](https://www.linkedin.com/in/nukich74/), [Humphrey Shi](https://www.humphreyshi.com/home)
+ 
+@@ -92,6 +93,7 @@ This repo contains the code for our paper **OneFormer: One Transformer to Rule U
+ | OneFormer | DiNAT-L<sup>&dagger;</sup> | 640&times;640 | 50.5 | 36.0 | 58.3 | 58.4 | 223M | [config](configs/ade20k/dinat/oneformer_dinat_large_bs16_160k.yaml) | [model](https://shi-labs.com/projects/oneformer/ade20k/250_16_dinat_l_oneformer_ade20k_160k.pth) |
+ | OneFormer | DiNAT-L<sup>&dagger;</sup> | 896&times;896 | 51.2 | 36.8 | 58.1 | 58.6 | 223M | [config](configs/ade20k/dinat/oneformer_dinat_large_bs16_160k_896x896.yaml) | [model](https://shi-labs.com/projects/oneformer/ade20k/896x896_250_16_dinat_l_oneformer_ade20k_160k.pth) |
+ | OneFormer | DiNAT-L<sup>&dagger;</sup> | 1280&times;1280 | 51.5 | 37.1 | 58.3 | 58.7 | 223M | [config](configs/ade20k/dinat/oneformer_dinat_large_bs16_160k_1280x1280.yaml) | [model](https://shi-labs.com/projects/oneformer/ade20k/1280x1280_250_16_dinat_l_oneformer_ade20k_160k.pth) |
++| OneFormer (COCO-Pretrained) | DiNAT-L<sup>&dagger;</sup> | 1280&times;1280 | 53.4 | 40.2 | 58.4 | 58.8 | 223M | [config](configs/ade20k/dinat/coco_pretrain_oneformer_dinat_large_bs16_160k_1280x1280_coco_pretrain.yaml) | [model](https://shi-labs.com/projects/oneformer/ade20k/coco_pretrain_1280x1280_250_16_dinat_l_oneformer_ade20k_160k.pth) &#124; [pretrained](https://shi-labs.com/projects/oneformer/coco/150_16_dinat_l_oneformer_coco_100ep.pth) |
+ | OneFormer | ConvNeXt-XL<sup>&dagger;</sup> | 640&times;640 | 50.1 | 36.3 | 57.4 | 58.8 | 372M | [config](configs/ade20k/convnext/oneformer_convnext_xlarge_bs16_160k.yaml) | [model](https://shi-labs.com/projects/oneformer/ade20k/250_16_convnext_xl_oneformer_ade20k_160k.pth) |
+ 
+ ### Cityscapes
+@@ -100,6 +102,7 @@ This repo contains the code for our paper **OneFormer: One Transformer to Rule U
+ |   :---:| :---:    | :---: | :---:| :---:      | :---:          | :---:   |  :---: |    :---:   |
+ | OneFormer | Swin-L<sup>&dagger;</sup> | 67.2 | 45.6 | 83.0 | 84.4 | 219M | [config](configs/cityscapes/swin/oneformer_swin_large_bs16_90k.yaml) | [model](https://shi-labs.com/projects/oneformer/cityscapes/250_16_swin_l_oneformer_cityscapes_90k.pth) |
+ | OneFormer | ConvNeXt-L<sup>&dagger;</sup> | 68.5 | 46.5 | 83.0 | 84.0 | 220M | [config](configs/cityscapes/convnext/oneformer_convnext_large_bs16_90k.yaml) | [model](https://shi-labs.com/projects/oneformer/cityscapes/250_16_convnext_l_oneformer_cityscapes_90k.pth) |
++| OneFormer (Mapillary Vistas-Pretrained) | ConvNeXt-L<sup>&dagger;</sup> | 70.1 | 48.7 | 84.6 | 85.2 | 220M | [config](configs/cityscapes/convnext/mapillary_pretrain_oneformer_convnext_large_bs16_90k.yaml) | [model](https://shi-labs.com/projects/oneformer/cityscapes/mapillary_pretrain_250_16_convnext_l_oneformer_cityscapes_90k.pth) &#124; [pretrained](https://shi-labs.com/projects/oneformer/mapillary/mapillary_pretrain_250_16_convnext_l_oneformer_mapillary_300k.pth) |
+ | OneFormer | DiNAT-L<sup>&dagger;</sup> | 67.6 | 45.6 | 83.1 | 84.0 | 223M | [config](configs/cityscapes/dinat/oneformer_dinat_large_bs16_90k.yaml) | [model](https://shi-labs.com/projects/oneformer/cityscapes/250_16_dinat_l_oneformer_cityscapes_90k.pth) |
+ | OneFormer | ConvNeXt-XL<sup>&dagger;</sup> | 68.4 | 46.7 | 83.6 | 84.6 | 372M | [config](configs/cityscapes/convnext/oneformer_convnext_xlarge_bs16_90k.yaml) | [model](https://shi-labs.com/projects/oneformer/cityscapes/250_16_convnext_xl_oneformer_cityscapes_90k.pth) |
+ 
+@@ -110,6 +113,14 @@ This repo contains the code for our paper **OneFormer: One Transformer to Rule U
+ | OneFormer | Swin-L<sup>&dagger;</sup> | 57.9 | 64.4 | 48.0 | 49.0 | 67.4 | 219M | [config](configs/coco/swin/oneformer_swin_large_bs16_100ep.yaml) | [model](https://shi-labs.com/projects/oneformer/coco/150_16_swin_l_oneformer_coco_100ep.pth) |
+ | OneFormer | DiNAT-L<sup>&dagger;</sup> | 58.0 | 64.3 | 48.4 | 49.2 | 68.1 | 223M | [config](configs/coco/dinat/oneformer_dinat_large_bs16_100ep.yaml) | [model](https://shi-labs.com/projects/oneformer/coco/150_16_dinat_l_oneformer_coco_100ep.pth) |
+ 
++### Mapillary Vistas
++
++| Method | Backbone |  PQ   | mIoU <br> (s.s) | mIoU <br> (ms+flip) | #params | config | Checkpoint |
++|   :---:| :---:    | :---: |:---:            | :---:               | :---:  |  :---: |    :---:   |
++| OneFormer | Swin-L<sup>&dagger;</sup> | 46.7 | 62.9 | 64.1 | 219M | [config](configs/mapillary_vistas/swin/oneformer_swin_large_bs16_300k.yaml) | [model](https://shi-labs.com/projects/oneformer/mapillary/250_16_swin_l_oneformer_mapillary_300k.pth) |
++| OneFormer | ConvNeXt-L<sup>&dagger;</sup> | 47.9 | 63.2 | 63.8 | 220M | [config](configs/mapillary_vistas/convnext/oneformer_convnext_large_bs16_300k.yaml) | [model](https://shi-labs.com/projects/oneformer/mapillary/250_16_convnext_l_oneformer_mapillary_300k.pth) |
++| OneFormer | DiNAT-L<sup>&dagger;</sup> | 47.8 | 64.0 | 64.9 | 223M | [config](configs/mapillary_vistas/dinat/oneformer_dinat_large_bs16_300k.yaml) | [model](https://shi-labs.com/projects/oneformer/mapillary/250_16_dinat_l_oneformer_coco_300k.pth) |
++
+ 
+ ## Citation
+ 
+diff --git a/configs/ade20k/dinat/coco_pretrain_oneformer_dinat_large_bs16_160k_1280x1280.yaml b/configs/ade20k/dinat/coco_pretrain_oneformer_dinat_large_bs16_160k_1280x1280.yaml
+new file mode 100644
+index 0000000..dcada2b
+--- /dev/null
++++ b/configs/ade20k/dinat/coco_pretrain_oneformer_dinat_large_bs16_160k_1280x1280.yaml
+@@ -0,0 +1,42 @@
++_BASE_: ../oneformer_R50_bs16_160k.yaml
++MODEL:
++  BACKBONE:
++    NAME: "D2DiNAT"
++  DiNAT:
++    EMBED_DIM: 192
++    MLP_RATIO: 2.0
++    DEPTHS: [3, 4, 18, 5]
++    NUM_HEADS: [6, 12, 24, 48]
++    KERNEL_SIZE: 11
++    DROP_PATH_RATE: 0.3
++    DILATIONS: [[1, 28, 1], [1, 7, 1, 14], [1, 3, 1, 5, 1, 5, 1, 7, 1, 3, 1, 5, 1, 5, 1, 7, 1, 7], [1, 3, 1, 3, 1]]
++  WEIGHTS: "150_16_dinat_l_oneformer_coco_100ep.pth"
++  PIXEL_MEAN: [123.675, 116.280, 103.530]
++  PIXEL_STD: [58.395, 57.120, 57.375]
++  ONE_FORMER:
++    NUM_OBJECT_QUERIES: 150
++SOLVER:
++  AMP:
++    ENABLED: False
++INPUT:
++  MIN_SIZE_TRAIN: !!python/object/apply:eval ["[int(x * 0.1 * 1280) for x in range(5, 21)]"]
++  MIN_SIZE_TRAIN_SAMPLING: "choice"
++  MIN_SIZE_TEST: 1280
++  MAX_SIZE_TRAIN: 5120
++  MAX_SIZE_TEST: 5120
++  CROP:
++    ENABLED: True
++    TYPE: "absolute"
++    SIZE: (1280, 1280)
++    SINGLE_CATEGORY_MAX_AREA: 1.0
++  COLOR_AUG_SSD: True
++  SIZE_DIVISIBILITY: 1280  # used in dataset mapper
++  FORMAT: "RGB"
++TEST:
++  DETECTIONS_PER_IMAGE: 150
++  EVAL_PERIOD: 5000
++  AUG:
++    ENABLED: False
++    MIN_SIZES: [640, 960, 1280, 1600, 1920, 2240]
++    MAX_SIZE: 8960
++    FLIP: True
+\ No newline at end of file
+diff --git a/configs/cityscapes/convnext/mapillary_pretrain_oneformer_convnext_large_bs16_90k.yaml b/configs/cityscapes/convnext/mapillary_pretrain_oneformer_convnext_large_bs16_90k.yaml
+new file mode 100644
+index 0000000..81d8ff1
+--- /dev/null
++++ b/configs/cityscapes/convnext/mapillary_pretrain_oneformer_convnext_large_bs16_90k.yaml
+@@ -0,0 +1,18 @@
++_BASE_: ../oneformer_R50_bs16_90k.yaml
++MODEL:
++  BACKBONE:
++    NAME: "D2ConvNeXt"
++  CONVNEXT:
++    IN_CHANNELS: 3
++    DEPTHS: [3, 3, 27, 3]
++    DIMS: [192, 384, 768, 1536]
++    DROP_PATH_RATE: 0.4
++    LSIT: 1.0
++    OUT_INDICES: [0, 1, 2, 3]
++  WEIGHTS: "250_16_convnext_l_oneformer_mapillary_300k.pth"
++  PIXEL_MEAN: [123.675, 116.280, 103.530]
++  PIXEL_STD: [58.395, 57.120, 57.375]
++  ONE_FORMER:
++    NUM_OBJECT_QUERIES: 250
++TEST:
++  DETECTIONS_PER_IMAGE: 250
+diff --git a/configs/mapillary_vistas/Base-Mapillary-UnifiedSegmentation.yaml b/configs/mapillary_vistas/Base-Mapillary-UnifiedSegmentation.yaml
+new file mode 100644
+index 0000000..b83daf8
+--- /dev/null
++++ b/configs/mapillary_vistas/Base-Mapillary-UnifiedSegmentation.yaml
+@@ -0,0 +1,68 @@
++MODEL:
++  BACKBONE:
++    FREEZE_AT: 0
++    NAME: "build_resnet_backbone"
++  WEIGHTS: "detectron2://ImageNetPretrained/torchvision/R-50.pkl"
++  PIXEL_MEAN: [123.675, 116.280, 103.530]
++  PIXEL_STD: [58.395, 57.120, 57.375]
++  RESNETS:
++    DEPTH: 50
++    STEM_TYPE: "basic"  # not used
++    STEM_OUT_CHANNELS: 64
++    STRIDE_IN_1X1: False
++    OUT_FEATURES: ["res2", "res3", "res4", "res5"]
++    NORM: "SyncBN"  # use syncbn for cityscapes dataset
++    RES5_MULTI_GRID: [1, 1, 1]  # not used
++DATASETS:
++  TRAIN: ("mapillary_vistas_panoptic_train",)
++  TEST_PANOPTIC: ("mapillary_vistas_panoptic_val",)
++  TEST_INSTANCE: ("mapillary_vistas_panoptic_val",)
++  TEST_SEMANTIC: ("mapillary_vistas_sem_seg_val",)
++SOLVER:
++  IMS_PER_BATCH: 16
++  BASE_LR: 0.0001
++  MAX_ITER: 300000
++  WARMUP_FACTOR: 1.0
++  WARMUP_ITERS: 0
++  WEIGHT_DECAY: 0.05
++  OPTIMIZER: "ADAMW"
++  LR_SCHEDULER_NAME: "WarmupPolyLR"
++  BACKBONE_MULTIPLIER: 0.1
++  CLIP_GRADIENTS:
++    ENABLED: True
++    CLIP_TYPE: "full_model"
++    CLIP_VALUE: 0.01
++    NORM_TYPE: 2.0
++  AMP:
++    ENABLED: True
++INPUT:
++  MIN_SIZE_TRAIN: !!python/object/apply:eval ["[int(x * 0.1 * 2048) for x in range(5, 21)]"]
++  MIN_SIZE_TRAIN_SAMPLING: "choice"
++  MIN_SIZE_TEST: 2048
++  MAX_SIZE_TRAIN: 8192
++  MAX_SIZE_TEST: 2048
++  CROP:
++    ENABLED: True
++    TYPE: "absolute"
++    SIZE: (1024, 1024)
++    SINGLE_CATEGORY_MAX_AREA: 1.0
++  COLOR_AUG_SSD: True
++  SIZE_DIVISIBILITY: 1024  # used in dataset mapper
++  FORMAT: "RGB"
++  DATASET_MAPPER_NAME: "oneformer_unified"
++  MAX_SEQ_LEN: 77
++  TASK_SEQ_LEN: 77
++  TASK_PROB: 
++    SEMANTIC: 0.50
++    INSTANCE: 0.50
++TEST:
++  EVAL_PERIOD: 30000
++  AUG:
++    ENABLED: False
++    MIN_SIZES: [512, 768, 1024, 1280, 1536, 1792]
++    MAX_SIZE: 4096
++    FLIP: True
++DATALOADER:
++  FILTER_EMPTY_ANNOTATIONS: True
++  NUM_WORKERS: 10
++VERSION: 2
+\ No newline at end of file
+diff --git a/configs/mapillary_vistas/convnext/cityscapes_pretrain_oneformer_convnext_large_bs16_300k.yaml b/configs/mapillary_vistas/convnext/cityscapes_pretrain_oneformer_convnext_large_bs16_300k.yaml
+new file mode 100644
+index 0000000..1baade1
+--- /dev/null
++++ b/configs/mapillary_vistas/convnext/cityscapes_pretrain_oneformer_convnext_large_bs16_300k.yaml
+@@ -0,0 +1,22 @@
++_BASE_: ../oneformer_R50_bs16_300k.yaml
++MODEL:
++  BACKBONE:
++    NAME: "D2ConvNeXt"
++  CONVNEXT:
++    IN_CHANNELS: 3
++    DEPTHS: [3, 3, 27, 3]
++    DIMS: [192, 384, 768, 1536]
++    DROP_PATH_RATE: 0.4
++    LSIT: 1.0
++    OUT_INDICES: [0, 1, 2, 3]
++  WEIGHTS: "convnext_large_22k_1k_384.pkl"
++  PIXEL_MEAN: [123.675, 116.280, 103.530]
++  PIXEL_STD: [58.395, 57.120, 57.375]
++  ONE_FORMER:
++    NUM_OBJECT_QUERIES: 250
++INPUT:
++  TASK_PROB: 
++    SEMANTIC: 0.33
++    INSTANCE: 0.66
++TEST:
++  DETECTIONS_PER_IMAGE: 250
+diff --git a/configs/mapillary_vistas/convnext/oneformer_convnext_large_bs16_300k.yaml b/configs/mapillary_vistas/convnext/oneformer_convnext_large_bs16_300k.yaml
+new file mode 100644
+index 0000000..615c140
+--- /dev/null
++++ b/configs/mapillary_vistas/convnext/oneformer_convnext_large_bs16_300k.yaml
+@@ -0,0 +1,18 @@
++_BASE_: ../oneformer_R50_bs16_300k.yaml
++MODEL:
++  BACKBONE:
++    NAME: "D2ConvNeXt"
++  CONVNEXT:
++    IN_CHANNELS: 3
++    DEPTHS: [3, 3, 27, 3]
++    DIMS: [192, 384, 768, 1536]
++    DROP_PATH_RATE: 0.4
++    LSIT: 1.0
++    OUT_INDICES: [0, 1, 2, 3]
++  WEIGHTS: "convnext_large_22k_1k_384.pkl"
++  PIXEL_MEAN: [123.675, 116.280, 103.530]
++  PIXEL_STD: [58.395, 57.120, 57.375]
++  ONE_FORMER:
++    NUM_OBJECT_QUERIES: 250
++TEST:
++  DETECTIONS_PER_IMAGE: 250
+diff --git a/configs/mapillary_vistas/dinat/oneformer_dinat_large_bs16_300k.yaml b/configs/mapillary_vistas/dinat/oneformer_dinat_large_bs16_300k.yaml
+new file mode 100644
+index 0000000..b2819fe
+--- /dev/null
++++ b/configs/mapillary_vistas/dinat/oneformer_dinat_large_bs16_300k.yaml
+@@ -0,0 +1,22 @@
++_BASE_: ../oneformer_R50_bs16_300k.yaml
++MODEL:
++  BACKBONE:
++    NAME: "D2DiNAT"
++  DiNAT:
++    EMBED_DIM: 192
++    MLP_RATIO: 2.0
++    DEPTHS: [3, 4, 18, 5]
++    NUM_HEADS: [6, 12, 24, 48]
++    KERNEL_SIZE: 11
++    DROP_PATH_RATE: 0.3
++    DILATIONS: [[1, 20, 1], [1, 5, 1, 10], [1, 2, 1, 3, 1, 4, 1, 5, 1, 2, 1, 3, 1, 4, 1, 5, 1, 5], [1, 2, 1, 2, 1]]
++  WEIGHTS: "dinat_large_in22k_in1k_384_11x11.pkl"
++  PIXEL_MEAN: [123.675, 116.280, 103.530]
++  PIXEL_STD: [58.395, 57.120, 57.375]
++  ONE_FORMER:
++    NUM_OBJECT_QUERIES: 250
++SOLVER:
++  AMP:
++    ENABLED: False
++TEST:
++  DETECTIONS_PER_IMAGE: 250
+\ No newline at end of file
+diff --git a/configs/mapillary_vistas/oneformer_R50_bs16_300k.yaml b/configs/mapillary_vistas/oneformer_R50_bs16_300k.yaml
+new file mode 100644
+index 0000000..2833784
+--- /dev/null
++++ b/configs/mapillary_vistas/oneformer_R50_bs16_300k.yaml
+@@ -0,0 +1,59 @@
++_BASE_: Base-Mapillary-UnifiedSegmentation.yaml
++MODEL:
++  META_ARCHITECTURE: "OneFormer"
++  SEM_SEG_HEAD:
++    NAME: "OneFormerHead"
++    IGNORE_VALUE: 65
++    NUM_CLASSES: 65
++    LOSS_WEIGHT: 1.0
++    CONVS_DIM: 256
++    MASK_DIM: 256
++    NORM: "GN"
++    # pixel decoder
++    PIXEL_DECODER_NAME: "MSDeformAttnPixelDecoder"
++    IN_FEATURES: ["res2", "res3", "res4", "res5"]
++    DEFORMABLE_TRANSFORMER_ENCODER_IN_FEATURES: ["res3", "res4", "res5"]
++    COMMON_STRIDE: 4
++    TRANSFORMER_ENC_LAYERS: 6
++  ONE_FORMER:
++    TRANSFORMER_DECODER_NAME: "ContrastiveMultiScaleMaskedTransformerDecoder"
++    TRANSFORMER_IN_FEATURE: "multi_scale_pixel_decoder"
++    DEEP_SUPERVISION: True
++    NO_OBJECT_WEIGHT: 0.1
++    CLASS_WEIGHT: 2.0
++    MASK_WEIGHT: 5.0
++    DICE_WEIGHT: 5.0
++    CONTRASTIVE_WEIGHT: 0.5
++    CONTRASTIVE_TEMPERATURE: 0.07
++    HIDDEN_DIM: 256
++    NUM_OBJECT_QUERIES: 150
++    USE_TASK_NORM: True
++    NHEADS: 8
++    DROPOUT: 0.1
++    DIM_FEEDFORWARD: 2048
++    ENC_LAYERS: 0
++    PRE_NORM: False
++    ENFORCE_INPUT_PROJ: False
++    SIZE_DIVISIBILITY: 32
++    ENC_LAYERS: 0
++    CLASS_DEC_LAYERS: 2
++    DEC_LAYERS: 10  # 9 decoder layers, add one for the loss on learnable query
++    TRAIN_NUM_POINTS: 12544
++    OVERSAMPLE_RATIO: 3.0
++    IMPORTANCE_SAMPLE_RATIO: 0.75
++  TEXT_ENCODER:
++    WIDTH: 256
++    CONTEXT_LENGTH: 77
++    NUM_LAYERS: 6
++    VOCAB_SIZE: 49408
++    PROJ_NUM_LAYERS: 2
++    N_CTX: 16
++  TEST:
++    SEMANTIC_ON: True
++    INSTANCE_ON: True
++    PANOPTIC_ON: True
++    OVERLAP_THRESHOLD: 0.8
++    OBJECT_MASK_THRESHOLD: 0.8
++    TASK: "panoptic"
++TEST:
++  DETECTIONS_PER_IMAGE: 150
+diff --git a/configs/mapillary_vistas/swin/oneformer_swin_large_bs16_300k.yaml b/configs/mapillary_vistas/swin/oneformer_swin_large_bs16_300k.yaml
+new file mode 100644
+index 0000000..86da20f
+--- /dev/null
++++ b/configs/mapillary_vistas/swin/oneformer_swin_large_bs16_300k.yaml
+@@ -0,0 +1,20 @@
++_BASE_: ../oneformer_R50_bs16_300k.yaml
++MODEL:
++  BACKBONE:
++    NAME: "D2SwinTransformer"
++  SWIN:
++    EMBED_DIM: 192
++    DEPTHS: [2, 2, 18, 2]
++    NUM_HEADS: [6, 12, 24, 48]
++    WINDOW_SIZE: 12
++    APE: False
++    DROP_PATH_RATE: 0.3
++    PATCH_NORM: True
++    PRETRAIN_IMG_SIZE: 384
++  WEIGHTS: "swin_large_patch4_window12_384_22kto1k.pkl"
++  PIXEL_MEAN: [123.675, 116.280, 103.530]
++  PIXEL_STD: [58.395, 57.120, 57.375]
++  ONE_FORMER:
++    NUM_OBJECT_QUERIES: 250
++TEST:
++  DETECTIONS_PER_IMAGE: 250
+diff --git a/datasets/README.md b/datasets/README.md
+index 7de0ec0..b7b441d 100644
+--- a/datasets/README.md
++++ b/datasets/README.md
+@@ -9,6 +9,7 @@
+     ADEChallengeData2016/
+     cityscapes/
+     coco/
++    mapillary_vistas/
+   ```
+ 
+ - You can set the location for builtin datasets by `export DETECTRON2_DATASETS=/path/to/datasets`. If left unset, the default is `./datasets` relative to your current working directory.
+@@ -144,3 +145,24 @@ coco/
+   ```bash
+   python datasets/panoptic2detection_coco_format.py --things_only
+   ```
++
++## Expected dataset structure for [Mapillary Vistas](https://www.mapillary.com/dataset/vistas)
++
++```text
++mapillary_vistas/
++  training/
++    images/
++    instances/
++    labels/
++    panoptic/
++  validation/
++    images/
++    instances/
++    labels/
++    panoptic/
++  mapillary_vistas_instance_{train,val}.json  # generated by the script mentioned below
++```
++
++No preprocessing is needed for Mapillary Vistas on semantic and panoptic segmentation.
++
++We do not evaluate for the instance segmentation task on the Mapillary Vistas dataset.
+diff --git a/oneformer/data/datasets/__init__.py b/oneformer/data/datasets/__init__.py
+index 59ce307..bfb31c1 100644
+--- a/oneformer/data/datasets/__init__.py
++++ b/oneformer/data/datasets/__init__.py
+@@ -4,4 +4,6 @@
+     register_coco_panoptic_annos_semseg,
+     register_ade20k_instance,
+     register_coco_panoptic2instance,
++    register_mapillary_vistas,
++    register_mapillary_vistas_panoptic,
+ )
+diff --git a/oneformer/data/datasets/register_mapillary_vistas.py b/oneformer/data/datasets/register_mapillary_vistas.py
+new file mode 100644
+index 0000000..12fa1e2
+--- /dev/null
++++ b/oneformer/data/datasets/register_mapillary_vistas.py
+@@ -0,0 +1,507 @@
++# Copyright (c) Facebook, Inc. and its affiliates.
++import os
++
++from detectron2.data import DatasetCatalog, MetadataCatalog
++from detectron2.data.datasets import load_sem_seg
++
++MAPILLARY_VISTAS_SEM_SEG_CATEGORIES = [
++    {
++        "color": [165, 42, 42],
++        "instances": True,
++        "readable": "Bird",
++        "name": "animal--bird",
++        "evaluate": True,
++    },
++    {
++        "color": [0, 192, 0],
++        "instances": True,
++        "readable": "Ground Animal",
++        "name": "animal--ground-animal",
++        "evaluate": True,
++    },
++    {
++        "color": [196, 196, 196],
++        "instances": False,
++        "readable": "Curb",
++        "name": "construction--barrier--curb",
++        "evaluate": True,
++    },
++    {
++        "color": [190, 153, 153],
++        "instances": False,
++        "readable": "Fence",
++        "name": "construction--barrier--fence",
++        "evaluate": True,
++    },
++    {
++        "color": [180, 165, 180],
++        "instances": False,
++        "readable": "Guard Rail",
++        "name": "construction--barrier--guard-rail",
++        "evaluate": True,
++    },
++    {
++        "color": [90, 120, 150],
++        "instances": False,
++        "readable": "Barrier",
++        "name": "construction--barrier--other-barrier",
++        "evaluate": True,
++    },
++    {
++        "color": [102, 102, 156],
++        "instances": False,
++        "readable": "Wall",
++        "name": "construction--barrier--wall",
++        "evaluate": True,
++    },
++    {
++        "color": [128, 64, 255],
++        "instances": False,
++        "readable": "Bike Lane",
++        "name": "construction--flat--bike-lane",
++        "evaluate": True,
++    },
++    {
++        "color": [140, 140, 200],
++        "instances": True,
++        "readable": "Crosswalk - Plain",
++        "name": "construction--flat--crosswalk-plain",
++        "evaluate": True,
++    },
++    {
++        "color": [170, 170, 170],
++        "instances": False,
++        "readable": "Curb Cut",
++        "name": "construction--flat--curb-cut",
++        "evaluate": True,
++    },
++    {
++        "color": [250, 170, 160],
++        "instances": False,
++        "readable": "Parking",
++        "name": "construction--flat--parking",
++        "evaluate": True,
++    },
++    {
++        "color": [96, 96, 96],
++        "instances": False,
++        "readable": "Pedestrian Area",
++        "name": "construction--flat--pedestrian-area",
++        "evaluate": True,
++    },
++    {
++        "color": [230, 150, 140],
++        "instances": False,
++        "readable": "Rail Track",
++        "name": "construction--flat--rail-track",
++        "evaluate": True,
++    },
++    {
++        "color": [128, 64, 128],
++        "instances": False,
++        "readable": "Road",
++        "name": "construction--flat--road",
++        "evaluate": True,
++    },
++    {
++        "color": [110, 110, 110],
++        "instances": False,
++        "readable": "Service Lane",
++        "name": "construction--flat--service-lane",
++        "evaluate": True,
++    },
++    {
++        "color": [244, 35, 232],
++        "instances": False,
++        "readable": "Sidewalk",
++        "name": "construction--flat--sidewalk",
++        "evaluate": True,
++    },
++    {
++        "color": [150, 100, 100],
++        "instances": False,
++        "readable": "Bridge",
++        "name": "construction--structure--bridge",
++        "evaluate": True,
++    },
++    {
++        "color": [70, 70, 70],
++        "instances": False,
++        "readable": "Building",
++        "name": "construction--structure--building",
++        "evaluate": True,
++    },
++    {
++        "color": [150, 120, 90],
++        "instances": False,
++        "readable": "Tunnel",
++        "name": "construction--structure--tunnel",
++        "evaluate": True,
++    },
++    {
++        "color": [220, 20, 60],
++        "instances": True,
++        "readable": "Person",
++        "name": "human--person",
++        "evaluate": True,
++    },
++    {
++        "color": [255, 0, 0],
++        "instances": True,
++        "readable": "Bicyclist",
++        "name": "human--rider--bicyclist",
++        "evaluate": True,
++    },
++    {
++        "color": [255, 0, 100],
++        "instances": True,
++        "readable": "Motorcyclist",
++        "name": "human--rider--motorcyclist",
++        "evaluate": True,
++    },
++    {
++        "color": [255, 0, 200],
++        "instances": True,
++        "readable": "Other Rider",
++        "name": "human--rider--other-rider",
++        "evaluate": True,
++    },
++    {
++        "color": [200, 128, 128],
++        "instances": True,
++        "readable": "Lane Marking - Crosswalk",
++        "name": "marking--crosswalk-zebra",
++        "evaluate": True,
++    },
++    {
++        "color": [255, 255, 255],
++        "instances": False,
++        "readable": "Lane Marking - General",
++        "name": "marking--general",
++        "evaluate": True,
++    },
++    {
++        "color": [64, 170, 64],
++        "instances": False,
++        "readable": "Mountain",
++        "name": "nature--mountain",
++        "evaluate": True,
++    },
++    {
++        "color": [230, 160, 50],
++        "instances": False,
++        "readable": "Sand",
++        "name": "nature--sand",
++        "evaluate": True,
++    },
++    {
++        "color": [70, 130, 180],
++        "instances": False,
++        "readable": "Sky",
++        "name": "nature--sky",
++        "evaluate": True,
++    },
++    {
++        "color": [190, 255, 255],
++        "instances": False,
++        "readable": "Snow",
++        "name": "nature--snow",
++        "evaluate": True,
++    },
++    {
++        "color": [152, 251, 152],
++        "instances": False,
++        "readable": "Terrain",
++        "name": "nature--terrain",
++        "evaluate": True,
++    },
++    {
++        "color": [107, 142, 35],
++        "instances": False,
++        "readable": "Vegetation",
++        "name": "nature--vegetation",
++        "evaluate": True,
++    },
++    {
++        "color": [0, 170, 30],
++        "instances": False,
++        "readable": "Water",
++        "name": "nature--water",
++        "evaluate": True,
++    },
++    {
++        "color": [255, 255, 128],
++        "instances": True,
++        "readable": "Banner",
++        "name": "object--banner",
++        "evaluate": True,
++    },
++    {
++        "color": [250, 0, 30],
++        "instances": True,
++        "readable": "Bench",
++        "name": "object--bench",
++        "evaluate": True,
++    },
++    {
++        "color": [100, 140, 180],
++        "instances": True,
++        "readable": "Bike Rack",
++        "name": "object--bike-rack",
++        "evaluate": True,
++    },
++    {
++        "color": [220, 220, 220],
++        "instances": True,
++        "readable": "Billboard",
++        "name": "object--billboard",
++        "evaluate": True,
++    },
++    {
++        "color": [220, 128, 128],
++        "instances": True,
++        "readable": "Catch Basin",
++        "name": "object--catch-basin",
++        "evaluate": True,
++    },
++    {
++        "color": [222, 40, 40],
++        "instances": True,
++        "readable": "CCTV Camera",
++        "name": "object--cctv-camera",
++        "evaluate": True,
++    },
++    {
++        "color": [100, 170, 30],
++        "instances": True,
++        "readable": "Fire Hydrant",
++        "name": "object--fire-hydrant",
++        "evaluate": True,
++    },
++    {
++        "color": [40, 40, 40],
++        "instances": True,
++        "readable": "Junction Box",
++        "name": "object--junction-box",
++        "evaluate": True,
++    },
++    {
++        "color": [33, 33, 33],
++        "instances": True,
++        "readable": "Mailbox",
++        "name": "object--mailbox",
++        "evaluate": True,
++    },
++    {
++        "color": [100, 128, 160],
++        "instances": True,
++        "readable": "Manhole",
++        "name": "object--manhole",
++        "evaluate": True,
++    },
++    {
++        "color": [142, 0, 0],
++        "instances": True,
++        "readable": "Phone Booth",
++        "name": "object--phone-booth",
++        "evaluate": True,
++    },
++    {
++        "color": [70, 100, 150],
++        "instances": False,
++        "readable": "Pothole",
++        "name": "object--pothole",
++        "evaluate": True,
++    },
++    {
++        "color": [210, 170, 100],
++        "instances": True,
++        "readable": "Street Light",
++        "name": "object--street-light",
++        "evaluate": True,
++    },
++    {
++        "color": [153, 153, 153],
++        "instances": True,
++        "readable": "Pole",
++        "name": "object--support--pole",
++        "evaluate": True,
++    },
++    {
++        "color": [128, 128, 128],
++        "instances": True,
++        "readable": "Traffic Sign Frame",
++        "name": "object--support--traffic-sign-frame",
++        "evaluate": True,
++    },
++    {
++        "color": [0, 0, 80],
++        "instances": True,
++        "readable": "Utility Pole",
++        "name": "object--support--utility-pole",
++        "evaluate": True,
++    },
++    {
++        "color": [250, 170, 30],
++        "instances": True,
++        "readable": "Traffic Light",
++        "name": "object--traffic-light",
++        "evaluate": True,
++    },
++    {
++        "color": [192, 192, 192],
++        "instances": True,
++        "readable": "Traffic Sign (Back)",
++        "name": "object--traffic-sign--back",
++        "evaluate": True,
++    },
++    {
++        "color": [220, 220, 0],
++        "instances": True,
++        "readable": "Traffic Sign (Front)",
++        "name": "object--traffic-sign--front",
++        "evaluate": True,
++    },
++    {
++        "color": [140, 140, 20],
++        "instances": True,
++        "readable": "Trash Can",
++        "name": "object--trash-can",
++        "evaluate": True,
++    },
++    {
++        "color": [119, 11, 32],
++        "instances": True,
++        "readable": "Bicycle",
++        "name": "object--vehicle--bicycle",
++        "evaluate": True,
++    },
++    {
++        "color": [150, 0, 255],
++        "instances": True,
++        "readable": "Boat",
++        "name": "object--vehicle--boat",
++        "evaluate": True,
++    },
++    {
++        "color": [0, 60, 100],
++        "instances": True,
++        "readable": "Bus",
++        "name": "object--vehicle--bus",
++        "evaluate": True,
++    },
++    {
++        "color": [0, 0, 142],
++        "instances": True,
++        "readable": "Car",
++        "name": "object--vehicle--car",
++        "evaluate": True,
++    },
++    {
++        "color": [0, 0, 90],
++        "instances": True,
++        "readable": "Caravan",
++        "name": "object--vehicle--caravan",
++        "evaluate": True,
++    },
++    {
++        "color": [0, 0, 230],
++        "instances": True,
++        "readable": "Motorcycle",
++        "name": "object--vehicle--motorcycle",
++        "evaluate": True,
++    },
++    {
++        "color": [0, 80, 100],
++        "instances": False,
++        "readable": "On Rails",
++        "name": "object--vehicle--on-rails",
++        "evaluate": True,
++    },
++    {
++        "color": [128, 64, 64],
++        "instances": True,
++        "readable": "Other Vehicle",
++        "name": "object--vehicle--other-vehicle",
++        "evaluate": True,
++    },
++    {
++        "color": [0, 0, 110],
++        "instances": True,
++        "readable": "Trailer",
++        "name": "object--vehicle--trailer",
++        "evaluate": True,
++    },
++    {
++        "color": [0, 0, 70],
++        "instances": True,
++        "readable": "Truck",
++        "name": "object--vehicle--truck",
++        "evaluate": True,
++    },
++    {
++        "color": [0, 0, 192],
++        "instances": True,
++        "readable": "Wheeled Slow",
++        "name": "object--vehicle--wheeled-slow",
++        "evaluate": True,
++    },
++    {
++        "color": [32, 32, 32],
++        "instances": False,
++        "readable": "Car Mount",
++        "name": "void--car-mount",
++        "evaluate": True,
++    },
++    {
++        "color": [120, 10, 10],
++        "instances": False,
++        "readable": "Ego Vehicle",
++        "name": "void--ego-vehicle",
++        "evaluate": True,
++    },
++    {
++        "color": [0, 0, 0],
++        "instances": False,
++        "readable": "Unlabeled",
++        "name": "void--unlabeled",
++        "evaluate": False,
++    },
++]
++
++
++def _get_mapillary_vistas_meta():
++    stuff_classes = [k["readable"] for k in MAPILLARY_VISTAS_SEM_SEG_CATEGORIES if k["evaluate"]]
++    assert len(stuff_classes) == 65
++
++    stuff_colors = [k["color"] for k in MAPILLARY_VISTAS_SEM_SEG_CATEGORIES if k["evaluate"]]
++    assert len(stuff_colors) == 65
++
++    ret = {
++        "stuff_classes": stuff_classes,
++        "stuff_colors": stuff_colors,
++    }
++    return ret
++
++
++def register_all_mapillary_vistas(root):
++    root = os.path.join(root, "mapillary_vistas")
++    meta = _get_mapillary_vistas_meta()
++    for name, dirname in [("train", "training"), ("val", "validation")]:
++        image_dir = os.path.join(root, dirname, "images")
++        gt_dir = os.path.join(root, dirname, "labels")
++        name = f"mapillary_vistas_sem_seg_{name}"
++        DatasetCatalog.register(
++            name, lambda x=image_dir, y=gt_dir: load_sem_seg(y, x, gt_ext="png", image_ext="jpg")
++        )
++        MetadataCatalog.get(name).set(
++            image_root=image_dir,
++            sem_seg_root=gt_dir,
++            evaluator_type="sem_seg",
++            ignore_label=65,  # different from other datasets, Mapillary Vistas sets ignore_label to 65
++            **meta,
++        )
++
++
++_root = os.getenv("DETECTRON2_DATASETS", "datasets")
++register_all_mapillary_vistas(_root)
+\ No newline at end of file
+diff --git a/oneformer/data/datasets/register_mapillary_vistas_panoptic.py b/oneformer/data/datasets/register_mapillary_vistas_panoptic.py
+new file mode 100644
+index 0000000..aa70339
+--- /dev/null
++++ b/oneformer/data/datasets/register_mapillary_vistas_panoptic.py
+@@ -0,0 +1,508 @@
++# Copyright (c) Facebook, Inc. and its affiliates.
++import json
++import os
++
++from detectron2.data import DatasetCatalog, MetadataCatalog
++from detectron2.utils.file_io import PathManager
++
++
++MAPILLARY_VISTAS_SEM_SEG_CATEGORIES = [
++    {'color': [165, 42, 42],
++    'id': 1,
++    'isthing': 1,
++    'name': 'Bird',
++    'supercategory': 'animal--bird'},
++    {'color': [0, 192, 0],
++    'id': 2,
++    'isthing': 1,
++    'name': 'Ground Animal',
++    'supercategory': 'animal--ground-animal'},
++    {'color': [196, 196, 196],
++    'id': 3,
++    'isthing': 0,
++    'name': 'Curb',
++    'supercategory': 'construction--barrier--curb'},
++    {'color': [190, 153, 153],
++    'id': 4,
++    'isthing': 0,
++    'name': 'Fence',
++    'supercategory': 'construction--barrier--fence'},
++    {'color': [180, 165, 180],
++    'id': 5,
++    'isthing': 0,
++    'name': 'Guard Rail',
++    'supercategory': 'construction--barrier--guard-rail'},
++    {'color': [90, 120, 150],
++    'id': 6,
++    'isthing': 0,
++    'name': 'Barrier',
++    'supercategory': 'construction--barrier--other-barrier'},
++    {'color': [102, 102, 156],
++    'id': 7,
++    'isthing': 0,
++    'name': 'Wall',
++    'supercategory': 'construction--barrier--wall'},
++    {'color': [128, 64, 255],
++    'id': 8,
++    'isthing': 0,
++    'name': 'Bike Lane',
++    'supercategory': 'construction--flat--bike-lane'},
++    {'color': [140, 140, 200],
++    'id': 9,
++    'isthing': 1,
++    'name': 'Crosswalk - Plain',
++    'supercategory': 'construction--flat--crosswalk-plain'},
++    {'color': [170, 170, 170],
++    'id': 10,
++    'isthing': 0,
++    'name': 'Curb Cut',
++    'supercategory': 'construction--flat--curb-cut'},
++    {'color': [250, 170, 160],
++    'id': 11,
++    'isthing': 0,
++    'name': 'Parking',
++    'supercategory': 'construction--flat--parking'},
++    {'color': [96, 96, 96],
++    'id': 12,
++    'isthing': 0,
++    'name': 'Pedestrian Area',
++    'supercategory': 'construction--flat--pedestrian-area'},
++    {'color': [230, 150, 140],
++    'id': 13,
++    'isthing': 0,
++    'name': 'Rail Track',
++    'supercategory': 'construction--flat--rail-track'},
++    {'color': [128, 64, 128],
++    'id': 14,
++    'isthing': 0,
++    'name': 'Road',
++    'supercategory': 'construction--flat--road'},
++    {'color': [110, 110, 110],
++    'id': 15,
++    'isthing': 0,
++    'name': 'Service Lane',
++    'supercategory': 'construction--flat--service-lane'},
++    {'color': [244, 35, 232],
++    'id': 16,
++    'isthing': 0,
++    'name': 'Sidewalk',
++    'supercategory': 'construction--flat--sidewalk'},
++    {'color': [150, 100, 100],
++    'id': 17,
++    'isthing': 0,
++    'name': 'Bridge',
++    'supercategory': 'construction--structure--bridge'},
++    {'color': [70, 70, 70],
++    'id': 18,
++    'isthing': 0,
++    'name': 'Building',
++    'supercategory': 'construction--structure--building'},
++    {'color': [150, 120, 90],
++    'id': 19,
++    'isthing': 0,
++    'name': 'Tunnel',
++    'supercategory': 'construction--structure--tunnel'},
++    {'color': [220, 20, 60],
++    'id': 20,
++    'isthing': 1,
++    'name': 'Person',
++    'supercategory': 'human--person'},
++    {'color': [255, 0, 0],
++    'id': 21,
++    'isthing': 1,
++    'name': 'Bicyclist',
++    'supercategory': 'human--rider--bicyclist'},
++    {'color': [255, 0, 100],
++    'id': 22,
++    'isthing': 1,
++    'name': 'Motorcyclist',
++    'supercategory': 'human--rider--motorcyclist'},
++    {'color': [255, 0, 200],
++    'id': 23,
++    'isthing': 1,
++    'name': 'Other Rider',
++    'supercategory': 'human--rider--other-rider'},
++    {'color': [200, 128, 128],
++    'id': 24,
++    'isthing': 1,
++    'name': 'Lane Marking - Crosswalk',
++    'supercategory': 'marking--crosswalk-zebra'},
++    {'color': [255, 255, 255],
++    'id': 25,
++    'isthing': 0,
++    'name': 'Lane Marking - General',
++    'supercategory': 'marking--general'},
++    {'color': [64, 170, 64],
++    'id': 26,
++    'isthing': 0,
++    'name': 'Mountain',
++    'supercategory': 'nature--mountain'},
++    {'color': [230, 160, 50],
++    'id': 27,
++    'isthing': 0,
++    'name': 'Sand',
++    'supercategory': 'nature--sand'},
++    {'color': [70, 130, 180],
++    'id': 28,
++    'isthing': 0,
++    'name': 'Sky',
++    'supercategory': 'nature--sky'},
++    {'color': [190, 255, 255],
++    'id': 29,
++    'isthing': 0,
++    'name': 'Snow',
++    'supercategory': 'nature--snow'},
++    {'color': [152, 251, 152],
++    'id': 30,
++    'isthing': 0,
++    'name': 'Terrain',
++    'supercategory': 'nature--terrain'},
++    {'color': [107, 142, 35],
++    'id': 31,
++    'isthing': 0,
++    'name': 'Vegetation',
++    'supercategory': 'nature--vegetation'},
++    {'color': [0, 170, 30],
++    'id': 32,
++    'isthing': 0,
++    'name': 'Water',
++    'supercategory': 'nature--water'},
++    {'color': [255, 255, 128],
++    'id': 33,
++    'isthing': 1,
++    'name': 'Banner',
++    'supercategory': 'object--banner'},
++    {'color': [250, 0, 30],
++    'id': 34,
++    'isthing': 1,
++    'name': 'Bench',
++    'supercategory': 'object--bench'},
++    {'color': [100, 140, 180],
++    'id': 35,
++    'isthing': 1,
++    'name': 'Bike Rack',
++    'supercategory': 'object--bike-rack'},
++    {'color': [220, 220, 220],
++    'id': 36,
++    'isthing': 1,
++    'name': 'Billboard',
++    'supercategory': 'object--billboard'},
++    {'color': [220, 128, 128],
++    'id': 37,
++    'isthing': 1,
++    'name': 'Catch Basin',
++    'supercategory': 'object--catch-basin'},
++    {'color': [222, 40, 40],
++    'id': 38,
++    'isthing': 1,
++    'name': 'CCTV Camera',
++    'supercategory': 'object--cctv-camera'},
++    {'color': [100, 170, 30],
++    'id': 39,
++    'isthing': 1,
++    'name': 'Fire Hydrant',
++    'supercategory': 'object--fire-hydrant'},
++    {'color': [40, 40, 40],
++    'id': 40,
++    'isthing': 1,
++    'name': 'Junction Box',
++    'supercategory': 'object--junction-box'},
++    {'color': [33, 33, 33],
++    'id': 41,
++    'isthing': 1,
++    'name': 'Mailbox',
++    'supercategory': 'object--mailbox'},
++    {'color': [100, 128, 160],
++    'id': 42,
++    'isthing': 1,
++    'name': 'Manhole',
++    'supercategory': 'object--manhole'},
++    {'color': [142, 0, 0],
++    'id': 43,
++    'isthing': 1,
++    'name': 'Phone Booth',
++    'supercategory': 'object--phone-booth'},
++    {'color': [70, 100, 150],
++    'id': 44,
++    'isthing': 0,
++    'name': 'Pothole',
++    'supercategory': 'object--pothole'},
++    {'color': [210, 170, 100],
++    'id': 45,
++    'isthing': 1,
++    'name': 'Street Light',
++    'supercategory': 'object--street-light'},
++    {'color': [153, 153, 153],
++    'id': 46,
++    'isthing': 1,
++    'name': 'Pole',
++    'supercategory': 'object--support--pole'},
++    {'color': [128, 128, 128],
++    'id': 47,
++    'isthing': 1,
++    'name': 'Traffic Sign Frame',
++    'supercategory': 'object--support--traffic-sign-frame'},
++    {'color': [0, 0, 80],
++    'id': 48,
++    'isthing': 1,
++    'name': 'Utility Pole',
++    'supercategory': 'object--support--utility-pole'},
++    {'color': [250, 170, 30],
++    'id': 49,
++    'isthing': 1,
++    'name': 'Traffic Light',
++    'supercategory': 'object--traffic-light'},
++    {'color': [192, 192, 192],
++    'id': 50,
++    'isthing': 1,
++    'name': 'Traffic Sign (Back)',
++    'supercategory': 'object--traffic-sign--back'},
++    {'color': [220, 220, 0],
++    'id': 51,
++    'isthing': 1,
++    'name': 'Traffic Sign (Front)',
++    'supercategory': 'object--traffic-sign--front'},
++    {'color': [140, 140, 20],
++    'id': 52,
++    'isthing': 1,
++    'name': 'Trash Can',
++    'supercategory': 'object--trash-can'},
++    {'color': [119, 11, 32],
++    'id': 53,
++    'isthing': 1,
++    'name': 'Bicycle',
++    'supercategory': 'object--vehicle--bicycle'},
++    {'color': [150, 0, 255],
++    'id': 54,
++    'isthing': 1,
++    'name': 'Boat',
++    'supercategory': 'object--vehicle--boat'},
++    {'color': [0, 60, 100],
++    'id': 55,
++    'isthing': 1,
++    'name': 'Bus',
++    'supercategory': 'object--vehicle--bus'},
++    {'color': [0, 0, 142],
++    'id': 56,
++    'isthing': 1,
++    'name': 'Car',
++    'supercategory': 'object--vehicle--car'},
++    {'color': [0, 0, 90],
++    'id': 57,
++    'isthing': 1,
++    'name': 'Caravan',
++    'supercategory': 'object--vehicle--caravan'},
++    {'color': [0, 0, 230],
++    'id': 58,
++    'isthing': 1,
++    'name': 'Motorcycle',
++    'supercategory': 'object--vehicle--motorcycle'},
++    {'color': [0, 80, 100],
++    'id': 59,
++    'isthing': 0,
++    'name': 'On Rails',
++    'supercategory': 'object--vehicle--on-rails'},
++    {'color': [128, 64, 64],
++    'id': 60,
++    'isthing': 1,
++    'name': 'Other Vehicle',
++    'supercategory': 'object--vehicle--other-vehicle'},
++    {'color': [0, 0, 110],
++    'id': 61,
++    'isthing': 1,
++    'name': 'Trailer',
++    'supercategory': 'object--vehicle--trailer'},
++    {'color': [0, 0, 70],
++    'id': 62,
++    'isthing': 1,
++    'name': 'Truck',
++    'supercategory': 'object--vehicle--truck'},
++    {'color': [0, 0, 192],
++    'id': 63,
++    'isthing': 1,
++    'name': 'Wheeled Slow',
++    'supercategory': 'object--vehicle--wheeled-slow'},
++    {'color': [32, 32, 32],
++    'id': 64,
++    'isthing': 0,
++    'name': 'Car Mount',
++    'supercategory': 'void--car-mount'},
++    {'color': [120, 10, 10],
++    'id': 65,
++    'isthing': 0,
++    'name': 'Ego Vehicle',
++    'supercategory': 'void--ego-vehicle'}
++]
++
++
++def load_mapillary_vistas_panoptic_json(json_file, image_dir, gt_dir, semseg_dir, meta):
++    """
++    Args:
++        image_dir (str): path to the raw dataset. e.g., "~/coco/train2017".
++        gt_dir (str): path to the raw annotations. e.g., "~/coco/panoptic_train2017".
++        json_file (str): path to the json file. e.g., "~/coco/annotations/panoptic_train2017.json".
++    Returns:
++        list[dict]: a list of dicts in Detectron2 standard format. (See
++        `Using Custom Datasets </tutorials/datasets.html>`_ )
++    """
++
++    def _convert_category_id(segment_info, meta):
++        if segment_info["category_id"] in meta["thing_dataset_id_to_contiguous_id"]:
++            segment_info["category_id"] = meta["thing_dataset_id_to_contiguous_id"][
++                segment_info["category_id"]
++            ]
++            segment_info["isthing"] = True
++        else:
++            segment_info["category_id"] = meta["stuff_dataset_id_to_contiguous_id"][
++                segment_info["category_id"]
++            ]
++            segment_info["isthing"] = False
++        return segment_info
++
++    with PathManager.open(json_file) as f:
++        json_info = json.load(f)
++
++    ret = []
++    for ann in json_info["annotations"]:
++        image_id = ann["image_id"]
++        # TODO: currently we assume image and label has the same filename but
++        # different extension, and images have extension ".jpg" for COCO. Need
++        # to make image extension a user-provided argument if we extend this
++        # function to support other COCO-like datasets.
++        image_file = os.path.join(image_dir, os.path.splitext(ann["file_name"])[0] + ".jpg")
++        label_file = os.path.join(gt_dir, ann["file_name"])
++        sem_label_file = os.path.join(semseg_dir, ann["file_name"])
++        segments_info = [_convert_category_id(x, meta) for x in ann["segments_info"]]
++        ret.append(
++            {
++                "file_name": image_file,
++                "image_id": image_id,
++                "pan_seg_file_name": label_file,
++                "sem_seg_file_name": sem_label_file,
++                "segments_info": segments_info,
++            }
++        )
++    assert len(ret), f"No images found in {image_dir}!"
++    assert PathManager.isfile(ret[0]["file_name"]), ret[0]["file_name"]
++    assert PathManager.isfile(ret[0]["pan_seg_file_name"]), ret[0]["pan_seg_file_name"]
++    assert PathManager.isfile(ret[0]["sem_seg_file_name"]), ret[0]["sem_seg_file_name"]
++    return ret
++
++
++def register_mapillary_vistas_panoptic(
++    name, metadata, image_root, panoptic_root, semantic_root, panoptic_json, instances_json=None
++):
++    """
++    Register a "standard" version of ADE20k panoptic segmentation dataset named `name`.
++    The dictionaries in this registered dataset follows detectron2's standard format.
++    Hence it's called "standard".
++    Args:
++        name (str): the name that identifies a dataset,
++            e.g. "ade20k_panoptic_train"
++        metadata (dict): extra metadata associated with this dataset.
++        image_root (str): directory which contains all the images
++        panoptic_root (str): directory which contains panoptic annotation images in COCO format
++        panoptic_json (str): path to the json panoptic annotation file in COCO format
++        sem_seg_root (none): not used, to be consistent with
++            `register_coco_panoptic_separated`.
++        instances_json (str): path to the json instance annotation file
++    """
++    panoptic_name = name
++    DatasetCatalog.register(
++        panoptic_name,
++        lambda: load_mapillary_vistas_panoptic_json(
++            panoptic_json, image_root, panoptic_root, semantic_root, metadata
++        ),
++    )
++    MetadataCatalog.get(panoptic_name).set(
++        panoptic_root=panoptic_root,
++        image_root=image_root,
++        panoptic_json=panoptic_json,
++        json_file=instances_json,
++        evaluator_type="mapillary_vistas_panoptic_seg",
++        ignore_label=65,  # different from other datasets, Mapillary Vistas sets ignore_label to 65
++        label_divisor=1000,
++        **metadata,
++    )
++
++
++_PREDEFINED_SPLITS_ADE20K_PANOPTIC = {
++    "mapillary_vistas_panoptic_train": (
++        "mapillary_vistas/training/images",
++        "mapillary_vistas/training/panoptic",
++        "mapillary_vistas/training/panoptic/panoptic_2018.json",
++        "mapillary_vistas/training/labels",
++    ),
++    "mapillary_vistas_panoptic_val": (
++        "mapillary_vistas/validation/images",
++        "mapillary_vistas/validation/panoptic",
++        "mapillary_vistas/validation/panoptic/panoptic_2018.json",
++        "mapillary_vistas/validation/labels",
++    ),
++}
++
++
++def get_metadata():
++    meta = {}
++    # The following metadata maps contiguous id from [0, #thing categories +
++    # #stuff categories) to their names and colors. We have to replica of the
++    # same name and color under "thing_*" and "stuff_*" because the current
++    # visualization function in D2 handles thing and class classes differently
++    # due to some heuristic used in Panoptic FPN. We keep the same naming to
++    # enable reusing existing visualization functions.
++    thing_classes = [k["name"] for k in MAPILLARY_VISTAS_SEM_SEG_CATEGORIES]
++    thing_colors = [k["color"] for k in MAPILLARY_VISTAS_SEM_SEG_CATEGORIES]
++    stuff_classes = [k["name"] for k in MAPILLARY_VISTAS_SEM_SEG_CATEGORIES]
++    stuff_colors = [k["color"] for k in MAPILLARY_VISTAS_SEM_SEG_CATEGORIES]
++
++    meta["thing_classes"] = thing_classes
++    meta["thing_colors"] = thing_colors
++    meta["stuff_classes"] = stuff_classes
++    meta["stuff_colors"] = stuff_colors
++
++    # Convert category id for training:
++    #   category id: like semantic segmentation, it is the class id for each
++    #   pixel. Since there are some classes not used in evaluation, the category
++    #   id is not always contiguous and thus we have two set of category ids:
++    #       - original category id: category id in the original dataset, mainly
++    #           used for evaluation.
++    #       - contiguous category id: [0, #classes), in order to train the linear
++    #           softmax classifier.
++    thing_dataset_id_to_contiguous_id = {}
++    stuff_dataset_id_to_contiguous_id = {}
++
++    for i, cat in enumerate(MAPILLARY_VISTAS_SEM_SEG_CATEGORIES):
++        if cat["isthing"]:
++            thing_dataset_id_to_contiguous_id[cat["id"]] = i
++        # else:
++        #     stuff_dataset_id_to_contiguous_id[cat["id"]] = i
++
++        # in order to use sem_seg evaluator
++        stuff_dataset_id_to_contiguous_id[cat["id"]] = i
++
++    meta["thing_dataset_id_to_contiguous_id"] = thing_dataset_id_to_contiguous_id
++    meta["stuff_dataset_id_to_contiguous_id"] = stuff_dataset_id_to_contiguous_id
++
++    return meta
++
++
++def register_all_mapillary_vistas_panoptic(root):
++    metadata = get_metadata()
++    for (
++        prefix,
++        (image_root, panoptic_root, panoptic_json, semantic_root),
++    ) in _PREDEFINED_SPLITS_ADE20K_PANOPTIC.items():
++        # The "standard" version of COCO panoptic segmentation dataset,
++        # e.g. used by Panoptic-DeepLab
++        register_mapillary_vistas_panoptic(
++            prefix,
++            metadata,
++            os.path.join(root, image_root),
++            os.path.join(root, panoptic_root),
++            os.path.join(root, semantic_root),
++            os.path.join(root, panoptic_json),
++        )
++
++
++_root = os.getenv("DETECTRON2_DATASETS", "datasets")
++register_all_mapillary_vistas_panoptic(_root)
+\ No newline at end of file
+diff --git a/train_net.py b/train_net.py
+index 699dd4b..1507b25 100644
+--- a/train_net.py
++++ b/train_net.py
+@@ -116,6 +116,8 @@ def build_evaluator(cls, cfg, dataset_name, output_folder=None):
+             evaluator_list.append(SemSegEvaluator(dataset_name, distributed=True, output_dir=output_folder))
+         if evaluator_type == "coco_panoptic_seg" and cfg.MODEL.TEST.DETECTION_ON:
+             evaluator_list.append(DetectionCOCOEvaluator(dataset_name, output_dir=output_folder))
++        if evaluator_type == "mapillary_vistas_panoptic_seg" and cfg.MODEL.TEST.SEMANTIC_ON:
++            evaluator_list.append(SemSegEvaluator(dataset_name, distributed=True, output_dir=output_folder))
+         # Cityscapes
+         if evaluator_type == "cityscapes_instance":
+             assert (

@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/pixmeo__osirix-68"
+description = "Fix of build on fresh MacOS 10.13.4 and XCode 9.4"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "osirix",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "pixmeo/osirix"
+ref = "b9cc6364cffb5fd024557e98c305068bbd7f85e1"
+reference = "https://github.com/pixmeo/osirix/pull/68"
+source_access = "auto"
+built_at = "2026-11-14T07:11:19.002904+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:4e4001f9056e502870428e031f2dffa23a3a8e7ca0e9b42d37eae1b5082f160b"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2018-06-06T08:33:06Z"
+diff_format = "unified"
+context_files = [
+    "cocoahttpserver/DDKeychain.m",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 2
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

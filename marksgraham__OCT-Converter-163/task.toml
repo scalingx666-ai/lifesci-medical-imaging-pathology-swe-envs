@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/marksgraham__OCT-Converter-163"
+description = "fix(dicom): fix invalid value for VR DS"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "OCT-Converter",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "marksgraham/OCT-Converter"
+ref = "a87498c03c4fcc548b0d0e5e5c8b0bbc4a9c4780"
+reference = "https://github.com/marksgraham/OCT-Converter/pull/163"
+source_access = "auto"
+built_at = "2026-11-14T07:12:55.525663+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:082563e9896d7b5d1d3b753179267ccd3566ea52d8dd65680fee1d1015273057"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-06-03T19:50:22Z"
+diff_format = "unified"
+context_files = [
+    "oct_converter/dicom/dicom.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 3
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

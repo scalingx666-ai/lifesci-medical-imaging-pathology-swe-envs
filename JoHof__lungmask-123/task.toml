@@ -1,0 +1,64 @@
+version = "1.0"
+
+[task]
+name = "default/JoHof__lungmask-123"
+description = "Fix documentation typos"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "lungmask",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "JoHof/lungmask"
+ref = "07442a0a2858636131e85de1926d4a00032a0060"
+reference = "https://github.com/JoHof/lungmask/pull/123"
+source_access = "auto"
+built_at = "2026-11-14T07:08:30.186861+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:badd74f388649c0be9b222bd4287aef35e6ef3f0d94ed4459144545c96aaf76f"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-10-25T11:55:22Z"
+diff_format = "unified"
+context_files = [
+    "README.md",
+    "lungmask/mask.py",
+    "lungmask/utils.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 20
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

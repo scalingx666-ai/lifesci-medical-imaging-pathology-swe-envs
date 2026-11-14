@@ -1,0 +1,66 @@
+version = "1.0"
+
+[task]
+name = "default/loli__medpy-130"
+description = "Release 0.5.1"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "medpy",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "loli/medpy"
+ref = "6eb7c150ced28ab7f8cc078d87a29b21639a7be1"
+reference = "https://github.com/loli/medpy/pull/130"
+source_access = "auto"
+built_at = "2026-11-14T07:09:24.751719+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:a1353d246cb78ff4a61c10dbb7479f2fb24af1a950de6cdc987d0b799483f721"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2024-04-03T15:41:01Z"
+diff_format = "unified"
+context_files = [
+    "CHANGES.txt",
+    "doc/source/conf.py",
+    "doc/source/installation/graphcutsupport.rst",
+    "medpy/__init__.py",
+    "setup.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 19
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

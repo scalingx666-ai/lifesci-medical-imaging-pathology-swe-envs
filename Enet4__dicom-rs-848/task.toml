@@ -1,0 +1,63 @@
+version = "1.0"
+
+[task]
+name = "default/Enet4__dicom-rs-848"
+description = "[object] [parser] Rearrange error variants to maintain discriminant numbering"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "dicom-rs",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "Enet4/dicom-rs"
+ref = "feefdaf6fd62953fe3c17a46fe74e8a9bf170bdc"
+reference = "https://github.com/Enet4/dicom-rs/pull/848"
+source_access = "auto"
+built_at = "2026-11-14T07:09:51.720287+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:f246ac019b176c3858bebf93cf369c0959df8068fadeaedfa900c26268dac480"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-10-27T12:28:05Z"
+diff_format = "unified"
+context_files = [
+    "object/src/meta.rs",
+    "parser/src/stateful/decode.rs",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 20
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

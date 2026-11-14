@@ -1,0 +1,60 @@
+{
+  "slug": "medical-imaging-pathology",
+  "title": "Medical Imaging & Digital Pathology",
+  "candidates": 647,
+  "clean": 273,
+  "final": 200,
+  "cap": 200,
+  "min_star": 50,
+  "active_since": "2023-01-01",
+  "active_all": true,
+  "non_archived_all": true,
+  "star_buckets": {
+    ">=1000": 59,
+    "500-999": 64,
+    "200-499": 71,
+    "100-199": 6
+  },
+  "top10": [
+    {
+      "repo": "amusi/CVPR2026-Papers-with-Code",
+      "stars": 22957
+    },
+    {
+      "repo": "extreme-assistant/CVPR2024-Paper-Code-Interpretation",
+      "stars": 12458
+    },
+    {
+      "repo": "qubvel-org/segmentation_models.pytorch",
+      "stars": 11807
+    },
+    {
+      "repo": "open-mmlab/mmsegmentation",
+      "stars": 9992
+    },
+    {
+      "repo": "xuebinqin/U-2-Net",
+      "stars": 9897
+    },
+    {
+      "repo": "imgly/background-removal-js",
+      "stars": 7375
+    },
+    {
+      "repo": "qubvel/segmentation_models",
+      "stars": 4919
+    },
+    {
+      "repo": "royshil/obs-backgroundremoval",
+      "stars": 4701
+    },
+    {
+      "repo": "bowang-lab/MedSAM",
+      "stars": 4445
+    },
+    {
+      "repo": "OHIF/Viewers",
+      "stars": 4409
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+version = "1.0"
+
+[task]
+name = "default/niivue__niivue-1618"
+description = "docs: add projects using NiiVue"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "niivue",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "niivue/niivue"
+ref = "ee9aefce6ce006a8b1a466434cc0d7ba2ac58344"
+reference = "https://github.com/niivue/niivue/pull/1618"
+source_access = "auto"
+built_at = "2026-11-14T07:10:28.750011+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:bf3de5bcc28d8fb3934fa283f59eb5d5d8912d3ffaeb3054d1cdac18402d6200"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-10-06T19:55:51Z"
+diff_format = "unified"
+context_files = [
+    "README.md",
+    "packages/niivue-desktop/src/renderer/src/components/MeshLayerCard.tsx",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 19
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

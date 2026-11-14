@@ -1,0 +1,64 @@
+version = "1.0"
+
+[task]
+name = "default/open-mmlab__mmsegmentation-3587"
+description = "[Fix] update build loss api"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "mmsegmentation",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "open-mmlab/mmsegmentation"
+ref = "be687fc476f0d3d636c810c25f09339da3e21f68"
+reference = "https://github.com/open-mmlab/mmsegmentation/pull/3587"
+source_access = "auto"
+built_at = "2026-11-14T07:04:30.063831+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:10515e2421c86d1469f2087bc419195695f0ebb59e2afce5e7a2cd52d5baa73c"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2024-03-08T02:23:28Z"
+diff_format = "unified"
+context_files = [
+    "mmseg/models/decode_heads/decode_head.py",
+    "mmseg/models/decode_heads/enc_head.py",
+    "mmseg/models/decode_heads/vpd_depth_head.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 14
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

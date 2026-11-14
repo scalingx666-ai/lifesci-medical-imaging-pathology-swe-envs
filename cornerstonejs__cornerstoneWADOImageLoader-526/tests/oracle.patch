@@ -1,0 +1,17 @@
+diff --git a/src/shared/scaling/scaleArray.js b/src/shared/scaling/scaleArray.js
+index 545ef787..c32387b4 100644
+--- a/src/shared/scaling/scaleArray.js
++++ b/src/shared/scaling/scaleArray.js
+@@ -2,11 +2,7 @@ export default function scaleArray(array, scalingParameters) {
+   const arrayLength = array.length;
+   const { rescaleSlope, rescaleIntercept, suvbw } = scalingParameters;
+ 
+-  if (scalingParameters.modality === 'PT') {
+-    if (typeof suvbw !== 'number') {
+-      return;
+-    }
+-
++  if (scalingParameters.modality === 'PT' && typeof suvbw === 'number') {
+     for (let i = 0; i < arrayLength; i++) {
+       array[i] = suvbw * (array[i] * rescaleSlope + rescaleIntercept);
+     }

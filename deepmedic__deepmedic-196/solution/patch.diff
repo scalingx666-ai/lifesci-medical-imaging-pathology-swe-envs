@@ -1,0 +1,1538 @@
+diff --git a/deepmedic/dataManagement/augmentSample.py b/deepmedic/dataManagement/augmentSample.py
+deleted file mode 100644
+index b3d6a9d8..00000000
+--- a/deepmedic/dataManagement/augmentSample.py
++++ /dev/null
+@@ -1,104 +0,0 @@
+-# Copyright (c) 2016, Konstantinos Kamnitsas
+-# All rights reserved.
+-#
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the BSD license. See the accompanying LICENSE file
+-# or read the terms at https://opensource.org/licenses/BSD-3-Clause.
+-
+-from __future__ import absolute_import, print_function, division
+-
+-import numpy as np
+-
+-def augment_sample(channels, gt_lbls, prms):
+-    # channels: list (x pathways) of np arrays [channels, x, y, z]. Whole volumes, channels of a case.
+-    # gt_lbls: np array of shape [x,y,z]
+-    # prms: None or Dictionary, with parameters of each augmentation type. }
+-    if prms is not None:
+-        channels = random_histogram_distortion(channels, prms['hist_dist'])
+-        channels, gt_lbls = random_flip(channels, gt_lbls, prms['reflect'])
+-        channels, gt_lbls = random_rotation_90(channels, gt_lbls, prms['rotate90'])
+-        
+-    return channels, gt_lbls
+-
+-def random_histogram_distortion(channels, prms):
+-    # Shift and scale the histogram of each channel.
+-    # channels: list (x pathways) of np arrays [channels, x, y, z]. Whole volumes, channels of a case.
+-    # prms: { 'shift': {'mu': 0.0, 'std':0.}, 'scale':{'mu': 1.0, 'std': '0.'} }
+-    if prms is None:
+-        return channels
+-    
+-    n_channs = channels[0].shape[0]
+-    if prms['shift'] is None:
+-        shift_per_chan = 0.
+-    elif prms['shift']['std'] != 0: # np.random.normal does not work for an std==0.
+-        shift_per_chan = np.random.normal( prms['shift']['mu'], prms['shift']['std'], [n_channs, 1, 1, 1])
+-    else:
+-        shift_per_chan = np.ones([n_channs, 1, 1, 1], dtype="float32") * prms['shift']['mu']
+-    
+-    if prms['scale'] is None:
+-        scale_per_chan = 1.
+-    elif prms['scale']['std'] != 0:
+-        scale_per_chan = np.random.normal(prms['scale']['mu'], prms['scale']['std'], [n_channs, 1, 1, 1])
+-    else:
+-        scale_per_chan = np.ones([n_channs, 1, 1, 1], dtype="float32") * prms['scale']['mu']
+-    
+-    # Intensity augmentation
+-    for path_idx in range(len(channels)):
+-        channels[path_idx] = (channels[path_idx] + shift_per_chan) * scale_per_chan
+-        
+-    return channels
+-
+-
+-def random_flip(channels, gt_lbls, probs_flip_axes=[0.5, 0.5, 0.5]):
+-    # Flip (reflect) along each axis.
+-    # channels: list (x pathways) of np arrays [channels, x, y, z]. Whole volumes, channels of a case.
+-    # gt_lbls: np array of shape [x,y,z]
+-    # probs_flip_axes: list of probabilities, one per axis.
+-    if probs_flip_axes is None:
+-        return channels, gt_lbls
+-    
+-    for axis_idx in range(len(gt_lbls.shape)): # 3 dims
+-        flip = np.random.choice(a=(True, False), size=1, p=(probs_flip_axes[axis_idx], 1. - probs_flip_axes[axis_idx]))
+-        if flip:
+-            for path_idx in range(len(channels)):
+-                channels[path_idx] = np.flip(channels[path_idx], axis=axis_idx+1) # + 1 because dim [0] is channels.
+-            gt_lbls = np.flip(gt_lbls, axis=axis_idx)
+-            
+-    return channels, gt_lbls
+-
+-
+-def random_rotation_90(channels, gt_lbls, probs_rot_90=None):
+-    # Rotate by 0/90/180/270 degrees.
+-    # channels: list (x pathways) of np arrays [channels, x, y, z]. Whole volumes, channels of a case.
+-    # gt_lbls: np array of shape [x,y,z]
+-    # probs_rot_90: {'xy': {'0': fl, '90': fl, '180': fl, '270': fl},
+-    #                'yz': {'0': fl, '90': fl, '180': fl, '270': fl},
+-    #                'xz': {'0': fl, '90': fl, '180': fl, '270': fl} }
+-    if probs_rot_90 is None:
+-        return channels, gt_lbls
+-        
+-    for key, plane_axes in zip( ['xy', 'yz', 'xz'], [(0,1), (1,2), (0,2)] ) :
+-        probs_plane = probs_rot_90[key]
+-        
+-        if probs_plane is None:
+-            continue
+-        
+-        assert len(probs_plane) == 4 # rotation 0, rotation 90 degrees, 180, 270.
+-        assert channels[0].shape[1+plane_axes[0]] == channels[0].shape[1+plane_axes[1]] # +1 cause [0] is channel. Image/patch must be isotropic.
+-        
+-        # Normalize probs
+-        sum_p = probs_plane['0'] + probs_plane['90'] + probs_plane['180'] + probs_plane['270']
+-        if sum_p == 0:
+-            continue
+-        for rot_k in probs_plane:
+-            probs_plane[rot_k] /= sum_p # normalize p to 1.
+-            
+-        p_rot_90_x0123 = ( probs_plane['0'], probs_plane['90'], probs_plane['180'], probs_plane['270'] )
+-        rot_90_xtimes = np.random.choice(a=(0,1,2,3), size=1, p=p_rot_90_x0123)
+-        for path_idx in range(len(channels)):
+-            channels[path_idx] = np.rot90(channels[path_idx], k=rot_90_xtimes, axes = [axis+1 for axis in plane_axes]) # + 1 cause [0] is channels.
+-        gt_lbls = np.rot90(gt_lbls, k=rot_90_xtimes, axes = plane_axes)
+-        
+-    return channels, gt_lbls
+-
+-
+diff --git a/deepmedic/dataManagement/augmentation.py b/deepmedic/dataManagement/augmentation.py
+index e04b7bcb..baf1f44e 100644
+--- a/deepmedic/dataManagement/augmentation.py
++++ b/deepmedic/dataManagement/augmentation.py
+@@ -12,6 +12,26 @@
+ import SimpleITK as sitk
+ 
+ 
++def apply_augmentations(augs, image, target=None, mask=None, wmaps=None):
++    """
++    Apply augmentations to input image
++    Keyword arguments:
++    augs -- list of augmentations (parent RandomAugmentation)
++    image -- 4D array of image channels
++    target -- 3D array of segmentation target
++    mask -- 3D array of RoI mask
++    wmaps -- 3D array of wmaps
++    """
++    if augs is not None:
++        for aug in augs:
++            image, target, mask, wmaps = aug(image, target, mask, wmaps)
++
++    return image, target, mask, wmaps
++
++
++# --------------------
++# Augmentation Classes
++# --------------------
+ class RandomAugmentation(object):
+     """
+     Abstract class for random patch augmentation, patch augmentation also works on full images
+@@ -22,98 +42,18 @@ class RandomAugmentation(object):
+     def __init__(self, prob):
+         self.prob = prob
+ 
+-    def __call__(self, image, target=None, mask=None):
++    def __call__(self, image, target=None, mask=None, wmaps=None):
+         if np.random.choice((True, False), p=(self.prob, 1. - self.prob)):
+-            return self.augment(image, target, mask)
++            return self.augment(image, target, mask, wmaps)
+         else:
+-            return image, target, mask
++            return image, target, mask, wmaps
+ 
+-    def augment(self, image, target, mask):
++    def augment(self, image, target, mask, wmaps):
+         raise NotImplementedError
+ 
+-
+-class RandomPatchRotation(RandomAugmentation):
+-    def __init__(self, prob, allowed_planes, rotations=(1, 2, 3)):
+-        super().__init__(prob)
+-        self.allowed_planes = allowed_planes
+-        self.rotations = rotations
+-
+-    def augment(self, image, target, mask):
+-        k = np.random.choice(self.rotations, len(self.allowed_planes))
+-        for i, axes in enumerate(self.allowed_planes):
+-            axes = np.random.choice(axes, 2, replace=False)  # direction of rotation
+-            image = np.rot90(image, k=k[i], axes=tuple(a + 1 for a in axes))
+-            target = np.rot90(target, k=k[i], axes=axes) if target is not None else None
+-            mask = np.rot90(mask, k=k[i], axes=axes) if mask is not None else None
+-
+-        return image, target, mask
+-
+-
+-class RandomPatchFlip(RandomAugmentation):
+-    def __init__(self, prob, allowed_axis):
+-        super().__init__(prob)
+-        self.allowed_axes = allowed_axis
+-
+-    def augment(self, image, target, mask):
+-        for axis in self.allowed_axes:
+-            image = np.flip(image, axis=axis + 1)
+-            target = np.flip(target, axis=axis) if target is not None else None
+-            mask = np.flip(mask, axis=axis) if mask is not None else None
+-
+-        return image, target, mask
+-
+-
+-class RandomHistogramDeformation(RandomAugmentation):
+-    def __init__(self, prob, shift_std=0.05, scale_std=0.01, allow_mirror=False):
+-        super().__init__(prob)
+-        self.shift_std = shift_std
+-        self.scale_std = scale_std
+-        self.allow_mirror = allow_mirror
+-
+-    def augment(self, image, target, mask):
+-        num_channels = image.shape[0]
+-        shift = np.random.uniform(0, self.shift_std, num_channels)
+-        scale = np.random.normal(1, self.scale_std, num_channels)
+-        if self.allow_mirror:
+-            scale *= np.random.choice((-1, 1))
+-        image = (image.T * scale).T
+-        image = (image.T + shift).T
+-        return image, target, mask
+-
+-
+-class RandomGammaCorrection(RandomAugmentation):
+-    def __init__(self, prob, range_min=-1., range_max=1., gamma_std=.1):
+-        super().__init__(prob)
+-        self.range_min = range_min
+-        self.range_max = range_max
+-        self.gamma_std = gamma_std
+-
+-    def augment(self, image, target, mask):
+-        num_channels = image.shape[0]
+-        # gamma correction must be performed in the range of 0 to 1
+-        image = (image - self.range_min) / (self.range_max - self.range_min)
+-        gamma = np.random.normal(1, self.gamma_std, num_channels)
+-        image = np.power(image.T, gamma).T
+-        image = image * (self.range_max - self.range_min) + self.range_min
+-        return image, target, mask
+-
+-
+-class NonLinearRandomHistogramDeformation(RandomHistogramDeformation):
+-    def __init__(self, prob, range_min=-1., range_max=1., num_segments=5, shift_std=0.25, scale_std=0.25,
+-                 allow_mirror=True):
+-        super().__init__(prob, shift_std, scale_std, allow_mirror)
+-        segments = np.linspace(range_min, range_max, num_segments + 1)
+-        segments[-1] += 1  # ensure whole array gets distorted
+-        self.segments = segments
+-
+-    def augment(self, image, target, mask):
+-        new_image = np.zeros_like(image)
+-        for i, _ in enumerate(self.segments[:-1]):
+-            indices = np.logical_and(image >= self.segments[i], image < self.segments[i + 1])
+-            image_segment, _, _ = super().augment(image, target, mask)
+-            new_image[indices] = image_segment[indices]
+-
+-        return new_image, target, mask
++    def get_attrs_str(self):
++        attrs = vars(self)
++        return '\t' + self.__class__.__name__ + '\n\t\t' + '\n\t\t'.join("%s: %s" % item for item in attrs.items())
+ 
+ 
+ class RandomElasticDeformation(RandomAugmentation):
+@@ -143,9 +83,9 @@ def get_displacement_field(self, patch_shape):
+         slices = [tuple(slice(s, s + ps, 1) for s, ps in zip(start, patch_shape)) for start in starts]
+         return [dx[i][slices[i]] for i in range(3)]
+ 
+-    def augment(self, image, target, mask):
++    def augment(self, image, target, mask, wmaps):
+ 
+-        shape = image.shape[1:]
++        shape = image[0].shape[1:]
+         if shape != self.patch_shape:
+             self.grid = [g.astype(np.int32) for g in np.meshgrid(*[np.arange(s) for s in shape], indexing='ij')]
+             self.patch_shape = shape
+@@ -158,11 +98,13 @@ def augment(self, image, target, mask):
+         try:
+             target = target.ravel()[indices].reshape(shape) if target is not None else None
+             mask = mask.ravel()[indices].reshape(shape) if mask is not None else None
+-            image = np.stack([channel.ravel()[indices].reshape(shape) for channel in image])
++            wmaps.ravel()[indices].reshape(shape) if wmaps is not None else None
++            for i in range(len(image)):
++                image[i] = np.stack([channel.ravel()[indices].reshape(shape) for channel in image[i]])
+         except IndexError:
+-            return image, target, mask
++            return image, target, mask, wmaps
+ 
+-        return image, target, mask
++        return image, target, mask, wmaps
+ 
+ 
+ class RandomElasticDeformationSimard2003(RandomElasticDeformation):
+@@ -265,181 +207,47 @@ def f(t):
+ 
+         return (1 - t[:, :, :, 2]) * n0 + t[:, :, :, 2] * n1
+ 
+-# class RandomAffineTransformation(Augmentation):
+-#     def __init__(self, prob, max_xy_rot=np.pi / 4, max_xz_rot=np.pi / 6, max_yz_rot=np.pi / 6, max_scaling=.1,
+-#                  default_channel_value=-1., default_target_value=0., is_target_discrete=True):
+-#         self.prob =  prob
+-#         self.max_xy_rot = max_xy_rot
+-#         self.max_xz_rot = max_xz_rot
+-#         self.max_yz_rot = max_yz_rot
+-#         self.max_scaling = max_scaling
+-#         self.default_channel_value = default_channel_value
+-#         self.default_target_value = default_target_value
+-#         self.is_target_discrete = is_target_discrete
+-#
+-#     @staticmethod
+-#     def resample(channel, transform, interpolation, default_value):
+-#         im = sitk.GetImageFromArray(channel)
+-#         return sitk.GetArrayFromImage(sitk.Resample(im, im, transform, interpolation, default_value))
+-#
+-#     def __call__(self, image, target=None, mask=None):
+-#         if np.random.random_sample() > self.prob:
+-#             return image, target, sampling_mask
+-#
+-#         transform = sitk.AffineTransform(3)
+-#
+-#         theta_xy = np.random.uniform(-self.max_xy_rot, self.max_xy_rot)
+-#         rot_xy = np.array(
+-#             [[np.cos(theta_xy), np.sin(theta_xy), 0], [-np.sin(theta_xy), np.cos(theta_xy), 0], [0, 0, 1]])
+-#
+-#         theta_xz = np.random.uniform(-self.max_xz_rot, self.max_xz_rot)
+-#         rot_xz = np.array(
+-#             [[np.cos(theta_xz), 0, np.sin(theta_xz)], [0, 1, 0], [-np.sin(theta_xy), 0, np.cos(theta_xy)]])
+-#
+-#         theta_yz = np.random.uniform(-self.max_yz_rot, self.max_yz_rot)
+-#         rot_yz = np.array(
+-#             [[1, 0, 0], [0, np.cos(theta_yz), np.sin(theta_yz)], [0, -np.sin(theta_yz), np.cos(theta_yz)]])
+-#
+-#         scale = np.eye(3, 3) * np.random.uniform(1 - self.max_scaling, 1 + self.max_scaling)
+-#
+-#         matrix = np.dot(scale, np.dot(np.dot(rot_xy, rot_xz), rot_yz))
+-#         transform.SetMatrix(matrix.ravel())
+-#
+-#         image = np.array(
+-#             [self.resample(channel, transform, sitk.sitkLinear, self.default_channel_value) for channel in image])
+-#         target = np.array(self.resample(target, transform, sitk.sitkNearestNeighbor, self.default_target_value))
+-#         sampling_mask = np.array(self.resample(sampling_mask.astype(np.uint8), transform, sitk.sitkNearestNeighbor, 0))
+-#
+-#         return image, target, sampling_mask
+-
+-
+-# Main function to call:
+-def augment_imgs_of_case(channels, gt_lbls, roi_mask, wmaps_per_cat, prms):
+-    # channels: list (x pathways) of np arrays [channels, x, y, z]. Whole volumes, channels of a case.
+-    # gt_lbls: np array of shape [x,y,z]. Can be None.
+-    # roi_mask: np array of shape [x,y,z]. Can be None.
+-    # wmaps_per_cat: List of np.arrays (floats or ints), weightmaps for sampling. Can be None.
+-    # prms: None (for no augmentation) or Dictionary with parameters of each augmentation type. }
+-    if prms is not None:
+-        (channels,
+-        gt_lbls,
+-        roi_mask,
+-        wmaps_per_cat) = random_affine_deformation( channels,
+-                                                    gt_lbls,
+-                                                    roi_mask,
+-                                                    wmaps_per_cat,
+-                                                    prms['affine'] )
+-    return channels, gt_lbls, roi_mask, wmaps_per_cat
+-
+-
+-def random_affine_deformation(channels, gt_lbls, roi_mask, wmaps_l, prms):
+-    if prms is None:
+-        return channels, gt_lbls, roi_mask, wmaps_l
+-    
+-    augm = AugmenterAffine(prob = prms['prob'],
+-                           max_rot_xyz = prms['max_rot_xyz'],
+-                           max_scaling = prms['max_scaling'],
+-                           seed = prms['seed'])
+-    transf_mtx = augm.roll_dice_and_get_random_transformation()
+-    assert transf_mtx is not None
+-    
+-    channels  = augm(images_l = channels,
+-                     transf_mtx = transf_mtx,
+-                     interp_orders = prms['interp_order_imgs'],
+-                     boundary_modes = prms['boundary_mode'])
+-    (gt_lbls,
+-    roi_mask) = augm(images_l = [gt_lbls, roi_mask],
+-                     transf_mtx = transf_mtx,
+-                     interp_orders = [prms['interp_order_lbls'], prms['interp_order_roi']],
+-                     boundary_modes = prms['boundary_mode'])
+-    wmaps_l   = augm(images_l = wmaps_l,
+-                     transf_mtx = transf_mtx,
+-                     interp_orders = prms['interp_order_wmaps'],
+-                     boundary_modes = prms['boundary_mode'])
+-
+-    return channels, gt_lbls, roi_mask, wmaps_l
+-
+-
+-class AugmenterParams(object):
+-    # Parent class, for parameters of augmenters.
+-    def __init__(self, prms):
+-        # prms: dictionary
+-        self._prms = collections.OrderedDict()
+-        self._set_from_dict(prms)
+-    
+-    def __str__(self):
+-        return str(self._prms)
+-    
+-    def __getitem__(self, key): # overriding the [] operator.
+-        # key: string.
+-        return self._prms[key] if key in self._prms else None
+-    
+-    def __setitem__(self, key, item): # For instance[key] = item assignment
+-        self._prms[key] = item
+-
+-    def _set_from_dict(self, prms):
+-        if prms is not None:
+-            for key in prms.keys():
+-                self._prms[key] = prms[key]
+-                
+-                
+-class AugmenterAffineParams(AugmenterParams):
+-    def __init__(self, prms):
+-        # Default values.
+-        self._prms = collections.OrderedDict([ ('prob', 0.0),
+-                                               ('max_rot_xyz', (45., 45., 45.)),
+-                                               ('max_scaling', .1),
+-                                               ('seed', None),
+-                                               # For calls.
+-                                               ('interp_order_imgs', 1),
+-                                               ('interp_order_lbls', 0),
+-                                               ('interp_order_roi', 0),
+-                                               ('interp_order_wmaps', 1),
+-                                               ('boundary_mode', 'nearest'),
+-                                               ('cval', 0.) ])
+-        # Overwrite defaults with given.
+-        self._set_from_dict(prms)
+-    
+-    def __str__(self):
+-        return str(self._prms)
+-
+-
+-class AugmenterAffine(object):
+-    def __init__(self, prob, max_rot_xyz, max_scaling, seed=None):
+-        self.prob = prob # Probability of applying the transformation.
++
++class RandomAffineTransformation(RandomAugmentation):
++    def __init__(self, prob, max_rot_xyz=(45., 45., 45.), max_scaling=.1, seed=None,
++                 interp_order_imgs=1, interp_order_lbls=0, interp_order_roi=0,
++                 interp_order_wmaps=1, boundary_mode='nearest', cval=0):
++        super().__init__(prob)
+         self.max_rot_xyz = max_rot_xyz
+         self.max_scaling = max_scaling
+-        self.rng = np.random.RandomState(seed)
++        self.seed = seed
++        self.rng = np.random.RandomState(self.seed)
++        # For calls.
++        self.interp_order_imgs = interp_order_imgs
++        self.interp_order_lbls = interp_order_lbls
++        self.interp_order_roi = interp_order_roi
++        self.interp_order_wmaps = interp_order_wmaps
++        self.boundary_mode = boundary_mode
++        self.cval = cval
+ 
+-    def roll_dice_and_get_random_transformation(self):
+-        if self.rng.random_sample() > self.prob:
+-            return -1 # No augmentation
+-        else:
+-            return self._get_random_transformation() #transformation for augmentation
+-        
+     def _get_random_transformation(self):
+         theta_x = self.rng.uniform(-self.max_rot_xyz[0], self.max_rot_xyz[0]) * np.pi / 180.
+-        rot_x = np.array([ [np.cos(theta_x), -np.sin(theta_x), 0.],
+-                           [np.sin(theta_x), np.cos(theta_x), 0.],
+-                           [0., 0., 1.]])
+-        
++        rot_x = np.array([[np.cos(theta_x), -np.sin(theta_x), 0.],
++                          [np.sin(theta_x), np.cos(theta_x), 0.],
++                          [0., 0., 1.]])
++
+         theta_y = self.rng.uniform(-self.max_rot_xyz[1], self.max_rot_xyz[1]) * np.pi / 180.
+-        rot_y = np.array([ [np.cos(theta_y), 0., np.sin(theta_y)],
+-                           [0., 1., 0.],
+-                           [-np.sin(theta_y), 0., np.cos(theta_y)]])
+-        
++        rot_y = np.array([[np.cos(theta_y), 0., np.sin(theta_y)],
++                          [0., 1., 0.],
++                          [-np.sin(theta_y), 0., np.cos(theta_y)]])
++
+         theta_z = self.rng.uniform(-self.max_rot_xyz[2], self.max_rot_xyz[2]) * np.pi / 180.
+-        rot_z = np.array([ [1., 0., 0.],
+-                           [0., np.cos(theta_z), -np.sin(theta_z)],
+-                           [0., np.sin(theta_z), np.cos(theta_z)]])
+-        
++        rot_z = np.array([[1., 0., 0.],
++                          [0., np.cos(theta_z), -np.sin(theta_z)],
++                          [0., np.sin(theta_z), np.cos(theta_z)]])
++
+         # Sample the scale (zoom in/out)
+         # TODO: Non isotropic?
+         scale = np.eye(3, 3) * self.rng.uniform(1 - self.max_scaling, 1 + self.max_scaling)
+-        
++
+         # Affine transformation matrix.
+-        transformation_mtx = np.dot( scale, np.dot(rot_z, np.dot(rot_x, rot_y)) )
+-        
++        transformation_mtx = np.dot(scale, np.dot(rot_z, np.dot(rot_x, rot_y)))
++
+         return transformation_mtx
+ 
+     def _apply_transformation(self, image, transf_mtx, interp_order=2., boundary_mode='nearest', cval=0.):
+@@ -447,169 +255,150 @@ def _apply_transformation(self, image, transf_mtx, interp_order=2., boundary_mod
+         # interp_order: Integer. 1,2,3 for images, 0 for nearest neighbour on masks (GT & brainmasks)
+         # boundary_mode = 'constant', 'min', 'nearest', 'mirror...
+         # cval: float. value given to boundaries if mode is constant.
+-        assert interp_order in [0,1,2,3]
+-        
++        assert interp_order in [0, 1, 2, 3]
++
+         mode = boundary_mode
+         if mode == 'min':
+             cval = np.min(image)
+             mode = 'constant'
+-        
++
++        new_image = np.array(image, copy=True)
++
+         # For recentering
+         centre_coords = 0.5 * np.asarray(image.shape, dtype=np.int32)
+-        c_offset = centre_coords - centre_coords.dot( transf_mtx )
+-        
+-        new_image = scipy.ndimage.affine_transform( image,
+-                                                    transf_mtx.T,
+-                                                    c_offset,
+-                                                    order=interp_order,
+-                                                    mode=mode,
+-                                                    cval=cval )
++        c_offset = centre_coords - centre_coords.dot(transf_mtx)
++
++        new_image = scipy.ndimage.affine_transform(image,
++                                                   transf_mtx.T,
++                                                   c_offset,
++                                                   order=interp_order,
++                                                   mode=mode,
++                                                   cval=cval)
++
+         return new_image
+-    
+-    def __call__(self, images_l, transf_mtx, interp_orders, boundary_modes, cval=0.):
+-        # images_l : List of images, or an array where first dimension is over images (eg channels).
+-        #            An image (element of the var) can be None, and it will be returned unchanged.
+-        #            If images_l is None, then returns None.
+-        # transf_mtx: Given (from get_random_transformation), -1, or None.
+-        #             If -1, no augmentation/transformation will be done.
+-        #             If None, new random will be made.
+-        # intrp_orders : Int or List of integers. Orders of bsplines for interpolation, one per image in images_l.
+-        #                Suggested: 3 for images. 1 is like linear. 0 for masks/labels, like NN.
+-        # boundary_mode = String or list of strings. 'constant', 'min', 'nearest', 'mirror...
+-        # cval: single float value. Value given to boundaries if mode is 'constant'.
+-        if images_l is None:
+-            return None
+-        if transf_mtx is None: # Get random transformation.
+-            transf_mtx = self.roll_dice_and_get_random_transformation()
+-        if not isinstance(transf_mtx, np.ndarray) and transf_mtx == -1: # Do not augment
+-            return images_l
+-        # If scalars/string was given, change it to list of scalars/strings, per image.
+-        if isinstance(interp_orders, int):
+-            interp_orders = [interp_orders] * len(images_l)
+-        if isinstance(boundary_modes, str):
+-            boundary_modes = [boundary_modes] * len(images_l)
+-        
+-        # Deform images.
+-        for img_i, int_order, b_mode in zip(range(len(images_l)), interp_orders, boundary_modes):
+-            if images_l[img_i] is None:
+-                pass # Dont do anything. Let it be None.
+-            else:
+-                images_l[img_i] = self._apply_transformation(images_l[img_i],
+-                                                             transf_mtx,
+-                                                             int_order,
+-                                                             b_mode,
+-                                                             cval)
+-        return images_l
+-
+-
+-############# Currently not used ####################
+-
+-# DON'T use on patches. Only on images. Cause I ll need to find min and max intensities, to move to range [0,1]
+-def random_gamma_correction(channels, gamma_std=0.05):
+-    # Gamma correction: I' = I^gamma
+-    # channels: list (x pathways) of np arrays [channels, x, y, z]. Whole volumes, channels of a case.
+-    # IMPORTANT: Does not work if intensities go to negatives.
+-    if gamma_std is None or gamma_std == 0.:
+-        return channels
+-    
+-    n_channs = channels[0].shape[0]
+-    gamma = np.random.normal(1, gamma_std, [n_channs,1,1,1])
+-    for path_idx in range(len(channels)):
+-        assert np.min(channels[path_idx]) >= 0.
+-        channels[path_idx] = np.power(channels[path_idx], 1.5, dtype='float32')
+-        
+-    return channels
+-
+-
+-def augment_sample(channels, gt_lbls, prms):
+-    # channels: list (x pathways) of np arrays [channels, x, y, z]. Whole volumes, channels of a case.
+-    # gt_lbls: np array of shape [x,y,z]
+-    # prms: None or Dictionary, with parameters of each augmentation type. }
+-    if prms is not None:
+-        channels = random_histogram_distortion(channels, prms['hist_dist'])
+-        channels, gt_lbls = random_flip(channels, gt_lbls, prms['reflect'])
+-        channels, gt_lbls = random_rotation_90(channels, gt_lbls, prms['rotate90'])
+-        
+-    return channels, gt_lbls
+-
+-
+-def random_histogram_distortion(channels, prms):
+-    # Shift and scale the histogram of each channel.
+-    # channels: list (x pathways) of np arrays [channels, x, y, z]. Whole volumes, channels of a case.
+-    # prms: { 'shift': {'mu': 0.0, 'std':0.}, 'scale':{'mu': 1.0, 'std': '0.'} }
+-    if prms is None:
+-        return channels
+-    
+-    n_channs = channels[0].shape[0]
+-    if prms['shift'] is None:
+-        shift_per_chan = 0.
+-    elif prms['shift']['std'] != 0: # np.random.normal does not work for an std==0.
+-        shift_per_chan = np.random.normal( prms['shift']['mu'], prms['shift']['std'], [n_channs, 1, 1, 1])
+-    else:
+-        shift_per_chan = np.ones([n_channs, 1, 1, 1], dtype="float32") * prms['shift']['mu']
+-    
+-    if prms['scale'] is None:
+-        scale_per_chan = 1.
+-    elif prms['scale']['std'] != 0:
+-        scale_per_chan = np.random.normal(prms['scale']['mu'], prms['scale']['std'], [n_channs, 1, 1, 1])
+-    else:
+-        scale_per_chan = np.ones([n_channs, 1, 1, 1], dtype="float32") * prms['scale']['mu']
+-    
+-    # Intensity augmentation
+-    for path_idx in range(len(channels)):
+-        channels[path_idx] = (channels[path_idx] + shift_per_chan) * scale_per_chan
+-        
+-    return channels
+-
+-
+-def random_flip(channels, gt_lbls, probs_flip_axes=[0.5, 0.5, 0.5]):
+-    # Flip (reflect) along each axis.
+-    # channels: list (x pathways) of np arrays [channels, x, y, z]. Whole volumes, channels of a case.
+-    # gt_lbls: np array of shape [x,y,z]
+-    # probs_flip_axes: list of probabilities, one per axis.
+-    if probs_flip_axes is None:
+-        return channels, gt_lbls
+-    
+-    for axis_idx in range(len(gt_lbls.shape)): # 3 dims
+-        flip = np.random.choice(a=(True, False), size=1, p=(probs_flip_axes[axis_idx], 1. - probs_flip_axes[axis_idx]))
+-        if flip:
+-            for path_idx in range(len(channels)):
+-                channels[path_idx] = np.flip(channels[path_idx], axis=axis_idx+1) # + 1 because dim [0] is channels.
+-            gt_lbls = np.flip(gt_lbls, axis=axis_idx)
+-            
+-    return channels, gt_lbls
+-
+-
+-def random_rotation_90(channels, gt_lbls, probs_rot_90=None):
+-    # Rotate by 0/90/180/270 degrees.
+-    # channels: list (x pathways) of np arrays [channels, x, y, z]. Whole volumes, channels of a case.
+-    # gt_lbls: np array of shape [x,y,z]
+-    # probs_rot_90: {'xy': {'0': fl, '90': fl, '180': fl, '270': fl},
+-    #                'yz': {'0': fl, '90': fl, '180': fl, '270': fl},
+-    #                'xz': {'0': fl, '90': fl, '180': fl, '270': fl} }
+-    if probs_rot_90 is None:
+-        return channels, gt_lbls
+-        
+-    for key, plane_axes in zip( ['xy', 'yz', 'xz'], [(0,1), (1,2), (0,2)] ) :
+-        probs_plane = probs_rot_90[key]
+-        
+-        if probs_plane is None:
+-            continue
+-        
+-        assert len(probs_plane) == 4 # rotation 0, rotation 90 degrees, 180, 270.
+-        assert channels[0].shape[1+plane_axes[0]] == channels[0].shape[1+plane_axes[1]] # +1 cause [0] is channel. Image/patch must be isotropic.
+-        
+-        # Normalize probs
+-        sum_p = probs_plane['0'] + probs_plane['90'] + probs_plane['180'] + probs_plane['270']
+-        if sum_p == 0:
+-            continue
+-        for rot_k in probs_plane:
+-            probs_plane[rot_k] /= sum_p # normalize p to 1.
+-            
+-        p_rot_90_x0123 = ( probs_plane['0'], probs_plane['90'], probs_plane['180'], probs_plane['270'] )
+-        rot_90_xtimes = np.random.choice(a=(0,1,2,3), size=1, p=p_rot_90_x0123)
+-        for path_idx in range(len(channels)):
+-            channels[path_idx] = np.rot90(channels[path_idx], k=rot_90_xtimes, axes = [axis+1 for axis in plane_axes]) # + 1 cause [0] is channels.
+-        gt_lbls = np.rot90(gt_lbls, k=rot_90_xtimes, axes = plane_axes)
+-        
+-    return channels, gt_lbls
++
++    def augment(self, image, target, mask, wmaps):
++        transf_mtx = self._get_random_transformation()
++
++        for img_i in range(len(image)):
++            image[img_i] = self._apply_transformation(image[img_i],
++                                                      transf_mtx,
++                                                      self.interp_order_imgs,
++                                                      self.boundary_mode,
++                                                      self.cval)
++
++        if mask is not None:
++            mask = self._apply_transformation(mask,
++                                              transf_mtx,
++                                              self.interp_order_roi,
++                                              self.boundary_mode,
++                                              self.cval)
++
++        if target is not None:
++            target = self._apply_transformation(target,
++                                                transf_mtx,
++                                                self.interp_order_lbls,
++                                                self.boundary_mode,
++                                                self.cval)
++
++        if wmaps is not None:
++            wmaps = self._apply_transformation(wmaps,
++                                               transf_mtx,
++                                               self.interp_order_wmaps,
++                                               self.boundary_mode,
++                                               self.cval)
++
++        return image, target, mask, wmaps
++
++
++class RandomHistogramDistortion(RandomAugmentation):
++    def __init__(self, prob, shift=None, scale=None):
++        super().__init__(prob)
++        self.shift = shift
++        self.scale = scale
++
++    def augment(self, image, target, mask, wmaps):
++        n_channs = image[0].shape[0]
++        if self.shift is None:
++            shift_per_chan = 0.
++        elif self.shift['std'] != 0:  # np.random.normal does not work for an std==0.
++            shift_per_chan = np.random.normal(self.shift['mu'], self.shift['std'], [n_channs, 1, 1, 1])
++        else:
++            shift_per_chan = np.ones([n_channs, 1, 1, 1], dtype="float32") * self.shift['mu']
++
++        if self.scale is None:
++            scale_per_chan = 1.
++        elif self.scale['std'] != 0:
++            scale_per_chan = np.random.normal(self.scale['mu'], self.scale['std'], [n_channs, 1, 1, 1])
++        else:
++            scale_per_chan = np.ones([n_channs, 1, 1, 1], dtype="float32") * self.scale['mu']
++
++        # Intensity augmentation
++        for path_idx in range(len(image)):
++            image[path_idx] = (image[path_idx] + shift_per_chan) * scale_per_chan
++
++        return image, target, mask, wmaps
++
++
++class RandomFlip(RandomAugmentation):
++    def __init__(self, prob=1., prob_flip_axes=None):
++        super().__init__(prob)
++        if prob_flip_axes is None:
++            self.prob_flip_axes = tuple([1] * 3)
++        else:
++            self.prob_flip_axes = prob_flip_axes
++
++    def augment(self, image, target, mask, wmaps):
++        for axis_idx in range(len(image[0].shape) - 1):  # 3 dims ( -1 because dim [0] refers to the channels)
++            flip = np.random.choice(a=(True, False), size=1,
++                                    p=(self.prob_flip_axes[axis_idx], 1. - self.prob_flip_axes[axis_idx]))
++            if flip:
++                for path_idx in range(len(image)):
++                    image[path_idx] = np.flip(image[path_idx], axis=axis_idx + 1)  # + 1 because dim [0] is channels.
++                target = np.flip(target, axis=axis_idx) if target is not None else None
++                mask = np.flip(mask, axis=axis_idx) if mask is not None else None
++                wmaps = np.flip(wmaps, axis=axis_idx) if wmaps is not None else None
++
++        return image, target, mask, wmaps
++
++
++class RandomRotation90(RandomAugmentation):
++    def __init__(self, prob=1., prob_rot_90=None):
++        super().__init__(prob)
++        if prob_rot_90 is None:
++            self.prob_rot_90 = {
++                'xy': {'0': 1, '90': 1, '180': 1, '270': 1},
++                'yz': {'0': 1, '90': 1, '180': 1, '270': 1},
++                'xz': {'0': 1, '90': 1, '180': 1, '270': 1}
++            }
++        else:
++            self.prob_rot_90 = prob_rot_90
++
++    def augment(self, image, target, mask, wmaps):
++        for key, plane_axes in zip(['xy', 'yz', 'xz'], [(0, 1), (1, 2), (0, 2)]):
++            probs_plane = self.prob_rot_90[key]
++
++            if probs_plane is None:
++                continue
++
++            assert len(probs_plane) == 4  # rotation 0, rotation 90 degrees, 180, 270.
++            # +1 cause [0] is channel. Image/patch must be isotropic.
++            # assert image.shape[1 + plane_axes[0]] == image.shape[1 + plane_axes[1]]
++
++            # Normalize probs
++            sum_p = probs_plane['0'] + probs_plane['90'] + probs_plane['180'] + probs_plane['270']
++            if sum_p == 0:
++                continue
++            for rot_k in probs_plane:
++                probs_plane[rot_k] /= sum_p  # normalize p to 1.
++
++            p_rot_90_x0123 = (probs_plane['0'], probs_plane['90'], probs_plane['180'], probs_plane['270'])
++            rot_90_xtimes = np.random.choice(a=(0, 1, 2, 3), size=1, p=p_rot_90_x0123)
++            for path_idx in range(len(image)):
++                image[path_idx] = np.rot90(image[path_idx], k=rot_90_xtimes,
++                                           axes=[axis + 1 for axis in plane_axes])  # + 1 cause [0] is channels.
++            target = np.rot90(target, k=rot_90_xtimes, axes=plane_axes) if target is not None else None
++            mask = np.rot90(mask, k=rot_90_xtimes, axes=plane_axes) if mask is not None else None
++            wmaps = np.rot90(wmaps, k=rot_90_xtimes, axes=plane_axes) if wmaps is not None else None
++
++        return image, target, mask, wmaps
+diff --git a/deepmedic/dataManagement/sampling.py b/deepmedic/dataManagement/sampling.py
+index b92fc25c..892651fd 100644
+--- a/deepmedic/dataManagement/sampling.py
++++ b/deepmedic/dataManagement/sampling.py
+@@ -21,8 +21,7 @@
+ from deepmedic.dataManagement.io import load_volume
+ from deepmedic.neuralnet.pathwayTypes import PathwayTypes as pt
+ from deepmedic.dataManagement.preprocessing import pad_imgs_of_case, normalize_int_of_subj, calc_border_int_of_3d_img
+-from deepmedic.dataManagement.augmentSample import augment_sample
+-from deepmedic.dataManagement.augmentImage import augment_imgs_of_case
++from deepmedic.dataManagement.augmentation import apply_augmentations
+ 
+ 
+ # Order of calls:
+@@ -149,7 +148,7 @@ def get_samples_for_subepoch(log,
+                     try:
+                         # timeout in case process for some reason never started (happens in py3)
+                         (channs_samples_from_job_per_path,
+-                         lbls_predicted_part_samples_from_job) = jobs[job_idx].get(timeout=30)
++                         lbls_predicted_part_samples_from_job) = jobs[job_idx].get(timeout=60)
+                         for pathway_i in range(cnn3d.getNumPathwaysThatRequireInput()):
+                             # concat does not copy.
+                             channs_of_samples_per_path[pathway_i] += channs_samples_from_job_per_path[pathway_i]
+@@ -186,8 +185,7 @@ def get_samples_for_subepoch(log,
+ 
+     # Got all samples for subepoch. Now shuffle them, together segments and their labels.
+     (channs_of_samples_per_path,
+-     lbls_predicted_part_of_samples) = shuffle_samples(channs_of_samples_per_path,
+-                                                                 lbls_predicted_part_of_samples)
++     lbls_predicted_part_of_samples) = shuffle_samples(channs_of_samples_per_path, lbls_predicted_part_of_samples)
+     log.print3(sampler_id + " TIMING: Sampling for next [" + tr_or_val_str_log +
+                "] lasted: {0:.1f}".format(time.time() - start_time_sampling) + " secs.")
+ 
+@@ -196,8 +194,7 @@ def get_samples_for_subepoch(log,
+     channs_of_samples_arr_per_path = [np.asarray(channs_of_samples_for_path, dtype="float32") for
+                                       channs_of_samples_for_path in channs_of_samples_per_path]
+ 
+-    lbls_predicted_part_of_samples_arr = np.asarray(lbls_predicted_part_of_samples,
+-                                                    dtype="int32")  # Could be int16 to save RAM?
++    lbls_predicted_part_of_samples_arr = np.asarray(lbls_predicted_part_of_samples, dtype="int32")
+ 
+     return channs_of_samples_arr_per_path, lbls_predicted_part_of_samples_arr
+ 
+@@ -236,7 +233,7 @@ def choose_random_subjects(n_total_subjects,
+ 
+ def get_n_samples_per_subj(n_samples, n_subjects):
+     # Distribute samples of each cat to subjects.
+-    n_samples_per_subj = np.ones([n_subjects], dtype="int32") * (n_samples // n_subjects)
++    n_samples_per_subj = np.ones([n_subjects], dtype='int32') * (n_samples // n_subjects)
+     n_undistributed_samples = n_samples % n_subjects
+     # Distribute samples that were left by inexact division.
+     for idx in range(n_undistributed_samples):
+@@ -244,6 +241,19 @@ def get_n_samples_per_subj(n_samples, n_subjects):
+     return n_samples_per_subj
+ 
+ 
++def constrain_sampling_maps_near_edges(sample_maps_per_cat, dims_sample):
++    # We wish to sample pixels around which the samples we will extract will be centered.
++    # But we need to be CAREFUL and get only pixels that are NOT closer to the image boundaries than the dimensions of the
++    # samples we wish to extract permit.
++    constrained_maps = []
++    mask_excl_edges = comp_valid_sampling_mask_excluding_edges(dims_sample, sample_maps_per_cat[0].shape)
++    for cat_i in range(len(sample_maps_per_cat)):
++        sampling_map = sample_maps_per_cat[cat_i]
++        sampling_map_excl_near_edges = np.multiply(sampling_map, mask_excl_edges, dtype=sampling_map.dtype)
++        constrained_maps.append(sampling_map_excl_near_edges)
++    return constrained_maps
++
++
+ def load_subj_and_sample(job_idx,
+                          log,
+                          train_val_or_test,
+@@ -281,7 +291,7 @@ def load_subj_and_sample(job_idx,
+     lbls_predicted_part_of_samples = []  # Labels only for the central/predicted part of segments.
+ 
+     dims_hres_segment = inp_shapes_per_path[0]
+-    
++
+     # Load images of subject
+     time_load_0 = time.time()
+     (channels,  # nparray [channels,dim0,dim1,dim2]
+@@ -293,7 +303,7 @@ def load_subj_and_sample(job_idx,
+                                                      paths_to_lbls_per_subj,
+                                                      paths_to_wmaps_per_sampl_cat_per_subj,
+                                                      paths_to_masks_per_subj)
+-     
++
+     # Pre-process images of subject
+     time_load = time.time() - time_load_0
+     time_prep_0 = time.time()
+@@ -313,24 +323,26 @@ def load_subj_and_sample(job_idx,
+     (channels,
+      gt_lbl_img,
+      roi_mask,
+-     wmaps_to_sample_per_cat) = augment_imgs_of_case(channels,
+-                                                     gt_lbl_img,
+-                                                     roi_mask,
+-                                                     wmaps_to_sample_per_cat,
+-                                                     augm_img_prms)
++     wmaps_to_sample_per_cat) = apply_augmentations(augm_img_prms,
++                                                    channels,
++                                                    gt_lbl_img,
++                                                    roi_mask,
++                                                    wmaps_to_sample_per_cat)
+     time_augm_img = time.time() - time_augm_0
+-
+     # Sampling of segments (sub-volumes) from an image.
+     dims_of_scan = channels[0].shape
+     sampling_maps_per_cat = sampling_type.derive_sampling_maps_per_cat(wmaps_to_sample_per_cat,
+                                                                        gt_lbl_img,
+                                                                        roi_mask,
+                                                                        dims_of_scan)
+-
++    sampling_maps_per_cat = constrain_sampling_maps_near_edges(sampling_maps_per_cat, dims_hres_segment)
++   
+     # Get number of samples per sampling-category for the specific subject (class, foregr/backgr, etc)
+     (n_samples_per_cat, valid_cats) = sampling_type.distribute_n_samples_to_categs(n_samples_per_subj[job_idx],
+                                                                                    sampling_maps_per_cat)
+-
++    time_sample_idxs = 0
++    time_extr_samples = 0
++    time_augm_samples = 0
+     str_samples_per_cat = " Done. Samples per category: "
+     for cat_i in range(sampling_type.get_n_sampling_cats()):
+         cat_str = sampling_type.get_sampling_cats_as_str()[cat_i]
+@@ -342,22 +354,21 @@ def load_subj_and_sample(job_idx,
+             log.print3( job_id + " WARN: Invalid sampling category! Sampling map just zeros! No [" + cat_str +
+                         "] samples from this subject!")
+             assert n_samples_for_cat == 0
+-            continue # This should not be needed, the next func should also handle it. But whatever.
++            continue  # This should not be needed, the next func should also handle it. But whatever.
+             
+-        (idxs_sampl_centers,
+-         slice_idxs_sampl_segms) = sample_idxs_of_segments(log,
+-                                                           job_id,
+-                                                           n_samples_for_cat,
+-                                                           dims_hres_segment,
+-                                                           dims_of_scan,
+-                                                           sampling_map)
++        time_sample_idx0 = time.time()
++        idxs_sampl_centers = sample_idxs_of_segments(log,
++                                                     job_id,
++                                                     n_samples_for_cat,
++                                                     sampling_map)
++        time_sample_idxs += time.time() - time_sample_idx0
+         str_samples_per_cat += "[" + cat_str + ": " + str(len(idxs_sampl_centers[0])) + "/" + str(n_samples_for_cat) + "] "
+-
++        
+         # Use the just sampled coordinates of slices to actually extract the segments (data) from the subject's images.
+-        time_augm_samples = 0
+         for image_part_i in range(len(idxs_sampl_centers[0])):
+             coord_center = idxs_sampl_centers[:, image_part_i]
+             
++            time_extr_sample_0 = time.time()
+             (channs_of_sample_per_path,
+              lbls_predicted_part_of_sample) = extractSegmentGivenSliceCoords(train_val_or_test,
+                                                                              cnn3d,
+@@ -366,13 +377,14 @@ def load_subj_and_sample(job_idx,
+                                                                              gt_lbl_img,
+                                                                              inp_shapes_per_path,
+                                                                              outp_pred_dims)
+-
++            time_extr_samples += time.time() - time_extr_sample_0
++            
+             # Augmentation of segments
+             time_augm_sample_0 = time.time()
+             (channs_of_sample_per_path,
+-             lbls_predicted_part_of_sample) = augment_sample(channs_of_sample_per_path,
+-                                                             lbls_predicted_part_of_sample,
+-                                                             augm_sample_prms)
++             lbls_predicted_part_of_sample, _, _) = apply_augmentations(augm_sample_prms,
++                                                                        channs_of_sample_per_path,
++                                                                        lbls_predicted_part_of_sample)
+             time_augm_samples += time.time() - time_augm_sample_0
+             
+             for pathway_i in range(cnn3d.getNumPathwaysThatRequireInput()):
+@@ -384,6 +396,8 @@ def load_subj_and_sample(job_idx,
+                "[Load: {0:.1f}".format(time_load) + "] "
+                "[Preproc: {0:.1f}".format(time_prep) + "] " +
+                "[Augm-Img: {0:.1f}".format(time_augm_img) + "] " +
++               "[Sample Coords: {0:.1f}".format(time_sample_idxs) + "] " +
++               "[Extract Sampl: {0:.1f}".format(time_extr_samples) + "] " +
+                "[Augm-Samples: {0:.1f}".format(time_augm_samples) + "] secs")
+     return (channs_of_samples_per_path, lbls_predicted_part_of_samples)
+ 
+@@ -487,37 +501,7 @@ def preproc_imgs_of_subj(log, job_id, channels, gt_lbl_img, roi_mask, wmaps_to_s
+     return channels, gt_lbl_img, roi_mask, wmaps_to_sample_per_cat, pad_left_right_per_axis
+ 
+ 
+-# made for 3d
+-def sample_idxs_of_segments(log,
+-                            job_id,
+-                            n_samples,
+-                            dims_of_segment,
+-                            dims_of_scan,
+-                            sampling_map):
+-    """
+-    Returns: [ idxs_of_sampled_centers, slice_idxs_of_sampled_segms ]
+-             Coordinates (xyz indices) of the "central" voxel of sampled segments (1 voxel to the left if dimension is even).
+-             Also returns the indices of the image parts, left and right indices, INCLUSIVE BOTH SIDES.
+-    
+-    > idxs_of_sampled_centers: array with shape: 3(xyz) x n_samples.
+-        Example: [ xCoordsForCentralVoxelOfEachPart, yCoordsForCentralVoxelOfEachPart, zCoordsForCentralVoxelOfEachPart ]
+-        >> x/y/z-CoordsForCentralVoxelOfEachPart: 1-dim array with n_samples, holding the x-indices of samples in image.
+-    > slice_idxs_of_sampled_segms: 3(xyz) x NumberOfImagePartSamples x 2.
+-        The last dimension has [0] for the lower boundary of the slice, and [1] for the higher boundary. INCLUSIVE BOTH SIDES.
+-        Example: [ x-sliceCoordsOfImagePart, y-sliceCoordsOfImagePart, z-sliceCoordsOfImagePart ]
+-    """
+-    # Check if the weight map is fully-zeros. In this case, return no element.
+-    # Note: Currently, the caller function is checking this case already and does not let this being called.
+-    # Which is still fine.
+-    if np.isclose(np.sum(sampling_map), 0.):
+-        log.print3(job_id + " WARN: Sampling map for category is just zeros! " +\
+-                   " No samples for category from subject!")
+-        return [[[], [], []], [[], [], []]]
+-
+-    # Now out of these, I need to randomly select one, which will be an ImagePart's central voxel.
+-    # But I need to be CAREFUL and get one that IS NOT closer to the image boundaries than the dimensions of the
+-    # ImagePart permit.
+-
++def comp_valid_sampling_mask_excluding_edges(dims_of_segment, shape):
+     # I look for lesions that are not closer to the image boundaries than the ImagePart dimensions allow.
+     # KernelDim is always odd. BUT ImagePart dimensions can be odd or even.
+     # If odd, ok, floor(dim/2) from central.
+@@ -525,16 +509,16 @@ def sample_idxs_of_segments(log,
+     # Ie, "central" imagePart voxel is 1 closer to begining.
+     # BTW imagePartDim takes kernel into account (ie if I want 9^3 voxels classified per imagePart with kernel 5x5,
+     # I want 13 dim ImagePart)
+-
++    
+     # number of voxels to exclude from edges of the image, left and right in each axis, when sampling...
+     # ...the center of a segment. So that the segment will be fully contained in the image. (half segm left & right)
+     # dim1: 1 row per r,c,z. Dim2: left/right width not to sample from (=half segment).
+-    n_vox_excl_left_right = np.zeros((len(dims_of_segment), 2), dtype='int32')
++    n_vox_excl_left_right = np.zeros((len(dims_of_segment), 2), dtype='int16')
+ 
+     # The below starts all zero. Will be Multiplied by other true-false arrays expressing if the relevant
+     # voxels are within boundaries.
+     # In the end, the final vector will be true only for the indices of lesions that are within all boundaries.
+-    mask_excl_near_edges = np.zeros(sampling_map.shape, dtype="int32")
++    mask_excl_near_edges = np.zeros(shape, dtype='int8')
+ 
+     # This loop leads to mask_excl_near_edges to be true for the indices ...
+     # ...that allow getting an imagePart CENTERED on them, and be safely within image boundaries. Note that ...
+@@ -551,46 +535,71 @@ def sample_idxs_of_segments(log,
+             # used to be [n_vox_excl_left_right[0][0]: -n_vox_excl_left_right[0][1]],
+             # but in 2D case n_vox_excl_left_right might be ==0, causes problem and you get a null slice.
+     mask_excl_near_edges[
+-        n_vox_excl_left_right[0][0]: dims_of_scan[0] - n_vox_excl_left_right[0][1],
+-        n_vox_excl_left_right[1][0]: dims_of_scan[1] - n_vox_excl_left_right[1][1],
+-        n_vox_excl_left_right[2][0]: dims_of_scan[2] - n_vox_excl_left_right[2][1]] = 1
++        n_vox_excl_left_right[0][0]: shape[0] - n_vox_excl_left_right[0][1],
++        n_vox_excl_left_right[1][0]: shape[1] - n_vox_excl_left_right[1][1],
++        n_vox_excl_left_right[2][0]: shape[2] - n_vox_excl_left_right[2][1]] = 1
++        
++    return mask_excl_near_edges
++        
++def sampling_cumsum(p_1darr, n_samples):
++    p_cumsum = p_1darr.cumsum(dtype='float64') # This is dangerous, final elements go below or beyond 1.
++    p_cumsum = np.clip(p_cumsum, a_min=None, a_max=1., out=p_cumsum)
++    #p_cumsum[p_cumsum>1.] = 1.
++    p_cumsum[-1] = 1.
++    random_ps = np.random.random(size=n_samples)
++    idxs_sampled = np.searchsorted(p_cumsum, random_ps)
++    return idxs_sampled
++
++def sample_with_appropriate_algorithm(n_samples, sampling_map, sum_sampl_map):
++    
++    p_sampling_flat = sampling_map.ravel() # Unnormalized
++    is_0 = p_sampling_flat == 0. # np.isclose(p_sampling_flat, 0.)
++    is_1 = p_sampling_flat == 1. # np.isclose(p_sampling_flat, 1.)
++    if np.all(np.logical_or(is_0, is_1)): # Whole sampling map is either 0 or 1. Do faster sampling only under valid idxs.
++        idxs = np.arange(p_sampling_flat.size, dtype='int32') # Unlikely large image size will need int64
++        valid_idxs = idxs[is_1>0]
++        idxs_sampled = np.random.choice(valid_idxs, size=n_samples, replace=True)
++    else: #if np.any( np.logical_and(sampling_map != 0., sampling_map != 1.)):
++        # Normalize, because sampling method np.random.choice requires it.
++        p_sampling_normed = np.multiply(p_sampling_flat, 1./sum_sampl_map, dtype='float64') # as before.
++        #idxs_sampled = sampling_cumsum(p_sampling_normed, n_samples)
++        idxs_sampled = np.random.choice(p_sampling_normed.size, size=n_samples, replace=True, p=p_sampling_normed)
++    
++    # np.unravel_index([listOfIndicesInFlattened], dims) returns a tuple of arrays (eg 3 of them if 3 dimImage), 
++    # where each of the array in the tuple has the same shape as the listOfIndices. 
++    # They have the r/c/z coords that correspond to the index of the flattened version.
++    # So, idxs_sampled will be array of shape: 3(rcz) x n_samples.
++    idxs_sampled = np.asarray(np.unravel_index(idxs_sampled, sampling_map.shape))
++    
++    return idxs_sampled
+ 
+-    sampling_map_excl_near_edges = sampling_map * mask_excl_near_edges
+-    # normalize the probabilities to sum to 1, cause the function needs it as so.
+-    sum_sampl_map = np.sum(sampling_map_excl_near_edges)
++# made for 3d
++def sample_idxs_of_segments(log,
++                            job_id,
++                            n_samples,
++                            sampling_map):
++    """
++    sampling_map: np.array of shape (H,W,D), dtype="int16" or potentially float if weightmaps given by user.
++    Returns: idxs_of_sampled_centers
++             Coordinates (xyz indices) of the "central" voxel of sampled segments (1 voxel to the left if dimension is even).
++    
++    > idxs_of_sampled_centers: array with shape: 3(xyz) x n_samples.
++        Example: [ xCoordsForCentralVoxelOfEachPart, yCoordsForCentralVoxelOfEachPart, zCoordsForCentralVoxelOfEachPart ]
++        >> x/y/z-CoordsForCentralVoxelOfEachPart: 1-dim array with n_samples, holding the x-indices of samples in image.
++    """
++    # Check if the weight map is fully-zeros. In this case, return no element.
++    # Note: Currently, the caller function is checking this case already and does not let this being called.
++    # Which is still fine.
++    sum_sampl_map = np.sum(sampling_map)
+     if np.isclose(sum_sampl_map, 0.) : # is zero
+-        log.print3(job_id + " WARN: AFTER EXCLUDING NEAR EDGES, sampling map for category is just zeros! " +\
++        log.print3(job_id + " WARN: Sampling map for category (after excluding near edges) is just zeros! " +\
+                    " No samples for category from subject!")
+         return [ [[],[],[]], [[],[],[]] ]
+     
+-    sampling_map_excl_near_edges = sampling_map_excl_near_edges / (1.0 * sum_sampl_map)
+-    sampling_map_excl_near_edges_flat = sampling_map_excl_near_edges.flatten()
+-
+-    # This is going to be a 3xNumberOfImagePartSamples array.
+-    idxs_of_flat_map_sampled_as_centers = np.random.choice(
+-        sampling_map_excl_near_edges.size,
+-        size=n_samples,
+-        replace=True,
+-        p=sampling_map_excl_near_edges_flat)
+-    # np.unravel_index([listOfIndicesInFlattened], dims) returns a tuple of arrays (eg 3 of them if 3 dimImage), 
+-    # where each of the array in the tuple has the same shape as the listOfIndices. 
+-    # They have the r/c/z coords that correspond to the index of the flattened version.
+-    # So, idxs_of_sampled_centers will be array of shape: 3(rcz) x n_samples.
+-    idxs_of_sampled_centers = np.asarray(np.unravel_index(idxs_of_flat_map_sampled_as_centers,
+-                                                            sampling_map_excl_near_edges.shape)
+-                                          )
+-    # Array with shape: 3(rcz) x NumberOfImagePartSamples x 2.
+-    # Last dimension has [0] for lowest boundary of slice, and [1] for highest boundary. INCLUSIVE BOTH SIDES.
+-    slice_idxs_of_sampled_segms = np.zeros(list(idxs_of_sampled_centers.shape) + [2], dtype="int32")
+-    # below, np.newaxis broadcasts. To broadcast the -+.
+-    slice_idxs_of_sampled_segms[:, :, 0] = idxs_of_sampled_centers - n_vox_excl_left_right[:, np.newaxis, 0]
+-    slice_idxs_of_sampled_segms[:, :, 1] = idxs_of_sampled_centers + n_vox_excl_left_right[:, np.newaxis, 1]
+-
+-    # idxs_of_sampled_centers: Array of dimensions 3(rcz) x NumberOfImagePartSamples.
+-    # slice_idxs_of_sampled_segms: Array of dimensions 3(rcz) x NumberOfImagePartSamples x 2. ...
+-    # ... The last dim has [0] for the lower boundary of the slice, and [1] for the higher boundary.
+-    # ... The slice coordinates returned are INCLUSIVE BOTH sides.
+-    return (idxs_of_sampled_centers, slice_idxs_of_sampled_segms)
++    # Sample indexes of pixels around which we should extract sample segments.
++    idxs_of_sampled_centers = sample_with_appropriate_algorithm(n_samples, sampling_map, sum_sampl_map)
++    
++    return idxs_of_sampled_centers
+ 
+ 
+ def get_subsampl_segment(channels, segment_hr_slice_coords, subs_factor, segment_lr_dims):
+@@ -687,7 +696,7 @@ def extractSegmentGivenSliceCoords(train_val_or_test,
+         pathwayInputShapeRcz = inp_shapes_per_path[path_idx]
+         leftBoundaryRcz = [coord_center[d] - subs_factor[d] * (pathwayInputShapeRcz[d] - 1) // 2 for d in range(3)]
+         rightBoundaryRcz = [leftBoundaryRcz[d] + subs_factor[d] * pathwayInputShapeRcz[d] - 1 for d in range(3)]
+-
++        
+         channelsForThisImagePart = channels[:,
+                                             leftBoundaryRcz[0]: rightBoundaryRcz[0] + 1: subs_factor[0],
+                                             leftBoundaryRcz[1]: rightBoundaryRcz[1] + 1: subs_factor[1],
+diff --git a/deepmedic/dataManagement/samplingType.py b/deepmedic/dataManagement/samplingType.py
+index 3a8f7d13..560bc775 100644
+--- a/deepmedic/dataManagement/samplingType.py
++++ b/deepmedic/dataManagement/samplingType.py
+@@ -38,7 +38,6 @@ def set_perc_of_samples_per_cat(self, perc_of_samples_per_cat):
+         if self._sampling_type in [0,3] and len(perc_of_samples_per_cat) != self.get_n_sampling_cats():
+             self._log.print3("ERROR: The list perc_of_samples_per_cat had [" + str(len(perc_of_samples_per_cat)) + "] elements." +\
+                              " For type [" + self._sampling_type_str + "], it requires [" + str(self.get_n_sampling_cats()) + "]! Exiting!"); exit(1)
+-            
+         if self._sampling_type == 0:
+             self._perc_to_sample_per_cat = self._normalize_percentages(perc_of_samples_per_cat)
+         elif self._sampling_type == 1:
+@@ -49,7 +48,7 @@ def set_perc_of_samples_per_cat(self, perc_of_samples_per_cat):
+             self._perc_to_sample_per_cat = self._normalize_percentages(perc_of_samples_per_cat)
+         else:
+             raise ValueError("Invalid value for sampling type.")
+-            
++
+     def _normalize_percentages(self, list_of_weights):
+         array_of_weights = np.asarray(list_of_weights, dtype="float32")
+         return array_of_weights / (1.0*np.sum(array_of_weights))
+@@ -86,12 +85,12 @@ def derive_sampling_maps_per_cat(self, wmaps_to_sample_per_cat, gt_lbl_img, roi_
+                 self._log.print3("ERROR: For sampling_type=[" + self._sampling_type_str + "], if weighted-maps are not provided, "+\
+                                 "at least Ground Truth labels should be given to extract foreground! Exiting!"); exit(1)
+             elif roi_mask is not None: # and provided GT
+-                mask_to_sample_foregr = ( (gt_lbl_img>0)*(roi_mask>0) ).astype(int)
+-                mask_to_sample_backgr = ( (mask_to_sample_foregr==0)*(roi_mask>0) ).astype(int) # ROI minus foregr.
++                mask_to_sample_foregr = ( (gt_lbl_img>0)*(roi_mask>0) ).astype("int8")
++                mask_to_sample_backgr = ( (mask_to_sample_foregr==0)*(roi_mask>0) ).astype("int8") # ROI minus foregr.
+                 sampling_maps_per_cat = [ mask_to_sample_foregr, mask_to_sample_backgr ] #Foreground / Background (in sequence)
+             else: # no weightmaps, gt provided and roi is not provided.
+-                mask_to_sample_foregr = (gt_lbl_img>0).astype(int)
+-                mask_to_sample_backgr = np.ones(dims_of_scan, dtype="int16") * (mask_to_sample_foregr==0)
++                mask_to_sample_foregr = (gt_lbl_img>0).astype("int8")
++                mask_to_sample_backgr = np.ones(dims_of_scan, dtype="int8") * (mask_to_sample_foregr==0)
+                 sampling_maps_per_cat = [ mask_to_sample_foregr, mask_to_sample_backgr ] #Foreground / Background (in sequence)
+         elif self._sampling_type == 1: # uniform
+             if n_wmaps > 0:
+@@ -102,7 +101,7 @@ def derive_sampling_maps_per_cat(self, wmaps_to_sample_per_cat, gt_lbl_img, roi_
+             elif roi_mask is not None:
+                 sampling_maps_per_cat = [ roi_mask ] #Be careful to not change either of the two arrays later or there'll be a problem.
+             else:
+-                sampling_maps_per_cat = [ np.ones(dims_of_scan, dtype="int16") ]
++                sampling_maps_per_cat = [ np.ones(dims_of_scan, dtype="int8") ]
+         elif self._sampling_type == 2: # full image. SAME AS UNIFORM?
+             if n_wmaps > 0:
+                 if n_wmaps != 1:
+@@ -112,7 +111,7 @@ def derive_sampling_maps_per_cat(self, wmaps_to_sample_per_cat, gt_lbl_img, roi_
+             elif roi_mask is not None:
+                 sampling_maps_per_cat = [ roi_mask ] #Be careful to not change either of the two arrays later or there'll be a problem.
+             else:
+-                sampling_maps_per_cat = [ np.ones(dims_of_scan, dtype="int16") ]
++                sampling_maps_per_cat = [ np.ones(dims_of_scan, dtype="int8") ]
+         elif self._sampling_type == 3: # Targeted per class.
+             if n_wmaps > 0:
+                 if n_wmaps != self.get_n_sampling_cats():
+@@ -124,11 +123,11 @@ def derive_sampling_maps_per_cat(self, wmaps_to_sample_per_cat, gt_lbl_img, roi_
+             elif roi_mask is not None: # and provided GT
+                 sampling_maps_per_cat = []
+                 for cat_i in range( self.get_n_sampling_cats() ): # Should be same number as actual classes, including background.
+-                    sampling_maps_per_cat.append( ( (gt_lbl_img==cat_i)*(roi_mask>0) ).astype(int) )
++                    sampling_maps_per_cat.append( ( (gt_lbl_img==cat_i)*(roi_mask>0) ).astype("int8") )
+             else: # no weightmaps, gt provided and roi is not provided.
+                 sampling_maps_per_cat = []
+                 for cat_i in range( self.get_n_sampling_cats() ): # Should be same number as actual classes, including background.
+-                    sampling_maps_per_cat.append( (gt_lbl_img==cat_i).astype(int) )
++                    sampling_maps_per_cat.append( (gt_lbl_img==cat_i).astype("int8") )
+                 
+         else:
+             raise ValueError("Invalid value for sampling type.")
+@@ -140,7 +139,7 @@ def distribute_n_samples_to_categs(self, n_samples, sampling_maps_per_cat):
+         # sampling_maps_per_cat: returned by self.derive_sampling_maps_per_cat(...)
+         # The below is a list of booleans, where False if a sampling_map is all 0.
+         valid_cats = [ np.sum(s_map) > 0 for s_map in sampling_maps_per_cat ]
+-        
++
+         # Set weight for sampling a category to 0 if it's not valid.
+         perc_samples_per_valid_cat = [p if v else 0. for p,v in zip(self._perc_to_sample_per_cat, valid_cats) ]
+         # Renormalize probabilities.
+diff --git a/deepmedic/frontEnd/configParsing/trainConfig.py b/deepmedic/frontEnd/configParsing/trainConfig.py
+index d4bcc1dc..3ce32e93 100644
+--- a/deepmedic/frontEnd/configParsing/trainConfig.py
++++ b/deepmedic/frontEnd/configParsing/trainConfig.py
+@@ -51,8 +51,8 @@ class TrainConfig(Config):
+     # Exponential
+     EXPON_SCH = "paramsForExpSchedForLrAndMom"
+     # ~~~~ Data Augmentation~~~
+-    AUGM_IMG_PRMS_TR = "augm_img_prms_tr"
+-    AUGM_SAMPLE_PRMS_TR = "augm_sample_prms_tr"
++    AUGMENTATION_SAMPLE = "augmentation_sample"
++    AUGMENTATION_IMAGE = "augmentation_image"
+     
+     # ============== VALIDATION ===================
+     PERFORM_VAL_SAMPLES = "performValidationOnSamplesThroughoutTraining"
+diff --git a/deepmedic/frontEnd/configParsing/trainSessionParams.py b/deepmedic/frontEnd/configParsing/trainSessionParams.py
+index 59b49808..a88a2d46 100644
+--- a/deepmedic/frontEnd/configParsing/trainSessionParams.py
++++ b/deepmedic/frontEnd/configParsing/trainSessionParams.py
+@@ -7,10 +7,13 @@
+ 
+ from __future__ import absolute_import, print_function, division
+ 
++import os
++
+ from deepmedic.frontEnd.configParsing.utils import getAbsPathEvenIfRelativeIsGiven, parseAbsFileLinesInList, \
+     parseFileLinesInList, check_and_adjust_path_to_ckpt
+ from deepmedic.dataManagement import samplingType
+ from deepmedic.dataManagement.augmentImage import AugmenterAffineParams
++import deepmedic.dataManagement.augmentation as augmentation
+ 
+ 
+ def get_default(value, default, required=False):
+@@ -27,12 +30,16 @@ def get_config_value(cfg, elem):
+     return get_default(cfg[elem.name], elem.default, elem.required)
+ 
+ 
++def get_augmentation(cfg_entry):
++    return [getattr(augmentation, name)(**kwargs) for name, kwargs in cfg_entry.items()]
++
++
+ class TrainSessionParameters(object):
+ 
+     # To be called from outside too.
+     @staticmethod
+-    def getSessionName(sessionName):
+-        return sessionName if sessionName is not None else "trainSession"
++    def getSessionName(sessionName, default):
++        return sessionName if sessionName is not None else default
+ 
+     # REQUIRED:
+     @staticmethod
+@@ -181,14 +188,14 @@ def __init__(self,
+                  num_classes,
+                  model_name,
+                  cfg):
+-
+         # Importants for running session.
+         # From Session:
+         self.log = log
+         self.mainOutputAbsFolder = mainOutputAbsFolder
+ 
+         # From Config:
+-        self.sessionName = self.getSessionName(cfg[cfg.SESSION_NAME])
++        self.sessionName = self.getSessionName(cfg[cfg.SESSION_NAME],
++                                               os.path.splitext(os.path.basename(cfg.get_abs_path_to_cfg()))[0])
+ 
+         abs_path_to_cfg = cfg.get_abs_path_to_cfg()
+         abs_path_to_saved = getAbsPathEvenIfRelativeIsGiven(cfg[cfg.SAVED_MODEL], abs_path_to_cfg) \
+@@ -281,16 +288,11 @@ def __init__(self,
+ 
+         # ~~~~~~~~~~~~~~ Augmentation~~~~~~~~~~~~~~
+         # Image level
+-        self.augm_img_prms_tr = {'affine': None}  # If var is None, no augm at all.
+-        if cfg[cfg.AUGM_IMG_PRMS_TR] is not None:
+-            self.augm_img_prms_tr['affine'] = AugmenterAffineParams(cfg[cfg.AUGM_IMG_PRMS_TR]['affine'])
+-
++        self.augmentation_image = \
++            get_augmentation(cfg[cfg.AUGMENTATION_IMAGE]) if cfg[cfg.AUGMENTATION_IMAGE] is not None else []
+         # Patch/Segment level
+-        self.augm_sample_prms_tr = {'hist_dist': None, 'reflect': None, 'rotate90': None}
+-        if cfg[cfg.AUGM_SAMPLE_PRMS_TR] is not None:
+-            for key in cfg[cfg.AUGM_SAMPLE_PRMS_TR]:
+-                # For exact form of parameters, see ./deepmedic/dataManagement/augmentation.py
+-                self.augm_sample_prms_tr[key] = cfg[cfg.AUGM_SAMPLE_PRMS_TR][key]
++        self.augmentation_sample = \
++            get_augmentation(cfg[cfg.AUGMENTATION_SAMPLE]) if cfg[cfg.AUGMENTATION_SAMPLE] is not None else []
+ 
+         # ===================VALIDATION========================
+         self.val_on_samples_during_train = \
+@@ -624,6 +626,18 @@ def print_params(self):
+         logPrint("[Expon] (Deprecated) parameters = " + str(self.lr_sched_params['expon']))
+ 
+         logPrint("~~Data Augmentation During Training~~")
++        logPrint("Image-level Augmentation (new):")
++        if self.augmentation_image == []:
++            logPrint("None")
++        else:
++            for aug in self.augmentation_image:
++                logPrint(aug.get_attrs_str())
++        logPrint("Sample-level Augmentation (new):")
++        if self.augmentation_sample == []:
++            logPrint("None")
++        else:
++            for aug in self.augmentation_sample:
++                logPrint(aug.get_attrs_str())
+         logPrint("Image level augmentation:")
+         logPrint("Parameters for image-level augmentation: " + str(self.augm_img_prms_tr))
+         if self.augm_img_prms_tr is not None:
+@@ -740,8 +754,10 @@ def get_args_for_train_routine(self):
+                 self.batchsize_val_whole,
+                 
+                 # -------Data Augmentation-------
+-                self.augm_img_prms_tr,
+-                self.augm_sample_prms_tr,
++                # self.augm_img_prms_tr,
++                self.augmentation_image,
++                self.augmentation_sample,
++                # self.augm_sample_prms_tr,
+ 
+                 # --- Validation on whole volumes ---
+                 self.val_on_whole_volumes,
+diff --git a/deepmedic/frontEnd/session.py b/deepmedic/frontEnd/session.py
+index 670cd7ae..a76e8a66 100644
+--- a/deepmedic/frontEnd/session.py
++++ b/deepmedic/frontEnd/session.py
+@@ -40,7 +40,7 @@ def setup_logger(self):
+         log_filepath = self._log_folder_abs + "/" + self._sess_name + ".txt"
+         # Create logger.
+         self._log = loggers.Logger(log_filepath)
+-    
++
+     def get_logger(self):
+         return self._log
+     
+diff --git a/deepmedic/frontEnd/trainSession.py b/deepmedic/frontEnd/trainSession.py
+index 7c9e867d..a26a5fc5 100644
+--- a/deepmedic/frontEnd/trainSession.py
++++ b/deepmedic/frontEnd/trainSession.py
+@@ -35,7 +35,8 @@ def __init__(self, cfg):
+         Session.__init__(self, cfg)
+ 
+     def _make_sess_name(self):
+-        sess_name = TrainSessionParameters.getSessionName(self._cfg[self._cfg.SESSION_NAME])
++        sess_name = TrainSessionParameters.getSessionName(self._cfg[self._cfg.SESSION_NAME],
++                                                          os.path.splitext(os.path.basename(self.get_abs_path_to_cfg()))[0])
+         return sess_name
+ 
+     def make_output_folders(self):
+@@ -62,7 +63,6 @@ def create_tensorboard_loggers(self, logger_types, tf_graph, create_log=False):
+                 tensorboard_loggers[logger_type] = None
+             self._log.print3("Config flag to log to tensorboard not present.")
+             self._log.print3("Skipping...")
+-
+         self._log.print3("-----------=============================-----------")
+ 
+         return tensorboard_loggers
+@@ -209,8 +209,8 @@ def run_session(self, *args):
+                 # TF2: ckpt_net.save(file_prefix = filename_to_save_with+".net.ckpt2")
+                 # TF2: ckpt_trainer.save(file_prefix = filename_to_save_with+".trainer.ckpt2")
+                 
+-                # tf.train.write_graph( graph_or_graph_def=sessionTf.graph.as_graph_def(),
+-                # logdir="", name=filename_to_save_with+".graph.pb", as_text=False)
++                # tf.train.write_graph(graph_or_graph_def=sessionTf.graph.as_graph_def(),
++                #                      logdir="", name=filename_to_save_with+".graph.pb", as_text=False)
+ 
+             self._log.print3("")
+             self._log.print3("=======================================================")
+diff --git a/examples/configFiles/deepMedic/train/trainConfig.cfg b/examples/configFiles/deepMedic/train/trainConfig.cfg
+index e4bde080..3c145b89 100644
+--- a/examples/configFiles/deepMedic/train/trainConfig.cfg
++++ b/examples/configFiles/deepMedic/train/trainConfig.cfg
+@@ -100,24 +100,48 @@ numEpochsToWaitBeforeLoweringLr = 10
+ # [Optional] Augmentation applied on image-level. Comment it out or set to None for no augmentation. (Default: None)
+ # Currently supported types: 'affine' deformations by rotation and scaling (Slows down training).
+ # Parameters:
+-# Affine: 'prob': Chance [0.-1.] to augment an image (suggested: 0.5, default 0.0).
++# RandomAffineTransformation:
++#         'prob': Chance [0.-1.] to augment an image (suggested: 0.5, default 0.0).
+ #         'max_rot_xyz': Max degrees rotation per axis. 'max_scaling': Max scaling [0.-1.].
+ #         'interp_order_imgs': Interpolation order for images (0, 1 or 2), higher is better but slower (suggested: 1 or 2).
+-augm_img_prms_tr = {'affine': { 'prob': 0.0, 'max_rot_xyz': (45., 45., 45.), 'max_scaling': 0.1, 'interp_order_imgs': 1 } }
++
++augmentation_image = {
++                        "RandomAffineTransformation": {
++                            'prob': 0.0,
++                            'max_rot_xyz': (45., 45., 45.),
++                            'max_scaling': 0.1,
++                            'interp_order_imgs': 1
++                        }
++                     }
+ 
+ # [Optional] Augmentation applied on segment-level. Comment it out or set to None for no augmentation. (Default: None)
+-# hist_dist: Shift and scale the intensity histogram. I' = (I + shift) * scale
++# RandomHistogramDistortion:
++#            Shift and scale the intensity histogram. I' = (I + shift) * scale
+ #            Shift and scale values are sampled from Gaussians N(mu,std).
+ #            Set 'shift': None and/or 'scale': None to disable them.
+-# reflect:   Augment by flipping samples. Specify probabilities to flip X,Y,Z axis. Set None for disabling.
+-# rotate90:  Augment by rotating samples on xy,yz,xz planes by 0,90,180,270 degrees. (suggested: image-level 'affine' seems better but slower)
++# RandomFlip:
++#            Augment by flipping samples. Specify probabilities to flip X,Y,Z axis. Set None for disabling.
++# RandomRotation90:
++#            Augment by rotating samples on xy,yz,xz planes by 0,90,180,270 degrees. (suggested: image-level 'affine' seems better but slower)
+ #            Give probabilities of flipping a plane by 0,90,180,270 degrees. Sum is internally normalised to 1.
+ #            NOTE: Size of segment must be isotropic otherwise error will be raised.
+-augm_sample_prms_tr = { 'hist_dist': {'shift': {'mu': 0., 'std': 0.05}, 'scale': {'mu': 1., 'std': 0.01} },
+-                        'reflect':   (0.5, 0., 0.),
+-                        'rotate90':  {'xy': {'0': 0., '90': 0., '180': 0., '270': 0.},
+-                                      'yz': {'0': 0., '90': 0., '180': 0., '270': 0.},
+-                                      'xz': {'0': 0., '90': 0., '180': 0., '270': 0.} } }
++
++augmentation_sample = {
++                        'RandomHistogramDistortion': {
++                            'prob': 0.5,
++                            'shift': {'mu': 0., 'std': 0.05},
++                            'scale': {'mu': 1., 'std': 0.01}
++                        },
++                        'RandomFlip':  {'prob': 1, 'prob_flip_axes': (0.5, 0., 0.)},
++                        'RandomRotation90':  {
++                            'prob' : 1.,
++                            'prob_rot_90': {
++                                'xy': {'0': 0., '90': 0., '180': 0., '270': 0.},
++                                'yz': {'0': 0., '90': 0., '180': 0., '270': 0.},
++                                'xz': {'0': 0., '90': 0., '180': 0., '270': 0.}
++                            }
++                        }
++                      }
+ 
+ #  +++++++++++Optimization+++++++++++
+ 
+@@ -242,5 +266,3 @@ norm_zscore_prms = {'apply_to_all_channels': False,
+                     'cutoff_percents': [5., 95.],
+                     'cutoff_times_std': [3.,3.],
+                     'cutoff_below_mean': False}
+-
+-
+diff --git a/examples/configFiles/tinyCnn/train/trainConfig.cfg b/examples/configFiles/tinyCnn/train/trainConfig.cfg
+index 07698c64..070d2a02 100644
+--- a/examples/configFiles/tinyCnn/train/trainConfig.cfg
++++ b/examples/configFiles/tinyCnn/train/trainConfig.cfg
+@@ -3,7 +3,7 @@
+ 
+ #  [Optional but highly suggested] The name will be used for saving the models,logs and results.
+ #  Default: "trainSession"
+-sessionName = "trainSessionTiny"
++# sessionName = "trainSessionTiny"
+ 
+ #  [Required] The main folder that the output will be placed.
+ folderForOutput = "../../../output/"
+@@ -62,3 +62,50 @@ batchsize_train = 10
+ #  Default: 'poly'
+ typeOfLearningRateSchedule = 'poly'
+ 
++#  +++++++++++Data Augmentation+++++++++++++++
++
++# [Optional] Augmentation applied on image-level. Comment it out or set to None for no augmentation. (Default: None)
++# Currently supported types: 'affine' deformations by rotation and scaling (Slows down training).
++# Parameters:
++# RandomAffineTransformation:
++#         'prob': Chance [0.-1.] to augment an image (suggested: 0.5, default 0.0).
++#         'max_rot_xyz': Max degrees rotation per axis. 'max_scaling': Max scaling [0.-1.].
++#         'interp_order_imgs': Interpolation order for images (0, 1 or 2), higher is better but slower (suggested: 1 or 2).
++
++augmentation_image = {
++                        "RandomAffineTransformation": {
++                            'prob': 0.8,
++                            'max_rot_xyz': (45., 45., 45.),
++                            'max_scaling': 0.1,
++                            'interp_order_imgs': 1
++                        }
++                     }
++
++# [Optional] Augmentation applied on segment-level. Comment it out or set to None for no augmentation. (Default: None)
++# RandomHistogramDistortion:
++#            Shift and scale the intensity histogram. I' = (I + shift) * scale
++#            Shift and scale values are sampled from Gaussians N(mu,std).
++#            Set 'shift': None and/or 'scale': None to disable them.
++# RandomFlip:
++#            Augment by flipping samples. Specify probabilities to flip X,Y,Z axis. Set None for disabling.
++# RandomRotation90:
++#            Augment by rotating samples on xy,yz,xz planes by 0,90,180,270 degrees. (suggested: image-level 'affine' seems better but slower)
++#            Give probabilities of flipping a plane by 0,90,180,270 degrees. Sum is internally normalised to 1.
++#            NOTE: Size of segment must be isotropic otherwise error will be raised.
++
++augmentation_sample = {
++                        'RandomHistogramDistortion': {
++                            'prob': 0.5,
++                            'shift': {'mu': 0., 'std': 0.05},
++                            'scale': {'mu': 1., 'std': 0.01}
++                        },
++                        'RandomFlip':  {'prob': 1, 'prob_flip_axes': (0.5, 0., 0.)},
++                        'RandomRotation90':  {
++                            'prob' : 1.,
++                            'prob_rot_90': {
++                                'xy': {'0': 0., '90': 0., '180': 0., '270': 0.},
++                                'yz': {'0': 0., '90': 0., '180': 0., '270': 0.},
++                                'xz': {'0': 0., '90': 0., '180': 0., '270': 0.}
++                            }
++                        }
++                      }

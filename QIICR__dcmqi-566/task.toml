@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/QIICR__dcmqi-566"
+description = "Accept SDK names in CMAKE_OSX_SYSROOT"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "dcmqi",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "QIICR/dcmqi"
+ref = "5571494a14416ad951a0979d2329cf15b8bba019"
+reference = "https://github.com/QIICR/dcmqi/pull/566"
+source_access = "auto"
+built_at = "2026-11-14T07:12:42.594340+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:c1c2119a1c46c8c11b7e7edd4e39ac11f4e9a3d3b1be2377a2be4338e2672e99"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-10-14T17:32:16Z"
+diff_format = "unified"
+context_files = [
+    "CMake/dcmqiBlockSetCMakeOSXVariables.cmake",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 2
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

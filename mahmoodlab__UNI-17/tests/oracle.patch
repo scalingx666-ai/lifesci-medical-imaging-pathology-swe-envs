@@ -1,0 +1,161 @@
+diff --git a/uni/downstream/eval_patch_features/__init__.py b/uni/downstream/eval_patch_features/__init__.py
+index 081a896..7be3b17 100644
+--- a/uni/downstream/eval_patch_features/__init__.py
++++ b/uni/downstream/eval_patch_features/__init__.py
+@@ -1,4 +1,4 @@
+-from .linear_probe import eval_linear_probe
+ from .fewshot import eval_knn
+-from .protonet import ProtoNet
++from .linear_probe import eval_linear_probe
+ from .metrics import get_eval_metrics, print_metrics
++from .protonet import ProtoNet
+diff --git a/uni/downstream/eval_patch_features/fewshot.py b/uni/downstream/eval_patch_features/fewshot.py
+index eeeae42..1f87651 100644
+--- a/uni/downstream/eval_patch_features/fewshot.py
++++ b/uni/downstream/eval_patch_features/fewshot.py
+@@ -4,15 +4,17 @@
+ """
+ 
+ import logging
++from typing import Any, List, Tuple
++
+ import numpy as np
+ import pandas as pd
++import sklearn.neighbors
+ import torch
+ from torch.nn.functional import normalize
+ from torch.utils.data import Sampler
+ from tqdm import tqdm
+-import sklearn.neighbors
++
+ from .metrics import get_eval_metrics
+-from typing import Any, List, Tuple
+ 
+ 
+ def eval_knn(
+diff --git a/uni/downstream/eval_patch_features/linear_probe.py b/uni/downstream/eval_patch_features/linear_probe.py
+index 48d25a4..d916f39 100644
+--- a/uni/downstream/eval_patch_features/linear_probe.py
++++ b/uni/downstream/eval_patch_features/linear_probe.py
+@@ -9,20 +9,17 @@
+ import random
+ import time
+ from collections import defaultdict
++from typing import Tuple, Dict, Any, List
+ from warnings import simplefilter
+ 
+ import torch
+ import torch.utils.data
+ from sklearn.exceptions import ConvergenceWarning
+ from sklearn.linear_model import LogisticRegression as sk_LogisticRegression
++
+ from .logistic_regression import LogisticRegression
+ from .metrics import get_eval_metrics
+ 
+-from collections import defaultdict
+-import random
+-from typing import Tuple, Dict, Any, List
+-import torch
+-
+ 
+ # Silence repeated convergence warnings from scikit-learn logistic regression.
+ simplefilter("ignore", category=ConvergenceWarning)
+diff --git a/uni/downstream/eval_patch_features/protonet.py b/uni/downstream/eval_patch_features/protonet.py
+index 2bd8a53..65ed2d0 100644
+--- a/uni/downstream/eval_patch_features/protonet.py
++++ b/uni/downstream/eval_patch_features/protonet.py
+@@ -1,17 +1,15 @@
+ """
+ Implementation adapted from: https://github.com/mbanani/lgssl/blob/df45bae647fc24dce8a6329eb697944053e9a8a0/lgssl/evaluation/fewshot.py#L9C3-L9C3
+ """
+-import torch
+-import numpy as np
+-from torch.nn.functional import normalize
++from typing import Tuple
++
+ import faiss
++import numpy as np
+ import pandas as pd
++import sklearn.cluster
+ from threadpoolctl import threadpool_limits
+-from typing import Tuple
+-import numpy as np
+ import torch
+-import torch
+-import sklearn.cluster
++from torch.nn.functional import normalize
+ 
+ class ProtoNet:
+     """
+diff --git a/uni/downstream/extract_patch_features.py b/uni/downstream/extract_patch_features.py
+index a220c64..036ba8d 100644
+--- a/uni/downstream/extract_patch_features.py
++++ b/uni/downstream/extract_patch_features.py
+@@ -1,7 +1,7 @@
+ import numpy as np
+-from tqdm import tqdm
+ import torch
+ import torch.multiprocessing
++from tqdm import tqdm
+ 
+ from ..get_encoder import get_encoder
+ 
+diff --git a/uni/downstream/utils.py b/uni/downstream/utils.py
+index 56516f8..46e9ab3 100644
+--- a/uni/downstream/utils.py
++++ b/uni/downstream/utils.py
+@@ -1,15 +1,13 @@
+-import pickle
+ import datetime
+-from tqdm import tqdm
+ import logging
+-import h5py
+-import numpy as np
++import pickle
++from typing import Any, Dict, Union
++from typing import List, Tuple
+ 
+-from PIL.ImageFile import ImageFile
++import numpy as np
+ from PIL import Image, ImageOps
+-from typing import List, Tuple
+-from PIL import Image
+-from typing import Any, Dict, Union
++from PIL.ImageFile import ImageFile
++from tqdm import tqdm
+ 
+ def scale_img(
+         img: ImageFile, 
+diff --git a/uni/get_encoder/get_encoder.py b/uni/get_encoder/get_encoder.py
+index 831363a..fcc149b 100644
+--- a/uni/get_encoder/get_encoder.py
++++ b/uni/get_encoder/get_encoder.py
+@@ -1,12 +1,12 @@
+ import os
+ import logging
+ 
++import timm
+ import torch
+ import torch.nn as nn
+ from torchvision import transforms
+ 
+ from .models.resnet50_trunc import resnet50_trunc_imagenet
+-import timm
+ 
+ def get_norm_constants(which_img_norm: str = 'imagenet'):
+     constants_zoo = {
+diff --git a/uni/get_encoder/models/resnet50_trunc.py b/uni/get_encoder/models/resnet50_trunc.py
+index 8d66810..d3cc741 100644
+--- a/uni/get_encoder/models/resnet50_trunc.py
++++ b/uni/get_encoder/models/resnet50_trunc.py
+@@ -1,8 +1,8 @@
+ # modified from Pytorch official resnet.py
+-import torch.nn as nn
+-import torch.utils.model_zoo as model_zoo
+ import torch
++import torch.nn as nn
+ import torch.nn.functional as F
++import torch.utils.model_zoo as model_zoo
+ 
+ __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
+            'resnet152']

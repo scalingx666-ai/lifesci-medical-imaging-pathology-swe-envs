@@ -1,0 +1,67 @@
+version = "1.0"
+
+[task]
+name = "default/JoHof__lungmask-124"
+description = "Fix/lobe fusion 0.2.22"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "lungmask",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "JoHof/lungmask"
+ref = "bb586878057ced41a97e9c753ff6ccb0a6e1957a"
+reference = "https://github.com/JoHof/lungmask/pull/124"
+source_access = "auto"
+built_at = "2026-11-14T07:08:24.672785+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:7035ac26dd874d4775f05e4750c0a3d18b9a973bda274f6c5694c3baccf85873"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-10-26T09:09:46Z"
+diff_format = "unified"
+context_files = [
+    "lungmask/mask.py",
+    "lungmask/utils.py",
+    "pyproject.toml",
+    "tests/test_mask.py",
+    "tests/test_utils.py",
+    "uv.lock",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 181
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

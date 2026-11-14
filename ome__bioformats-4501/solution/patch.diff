@@ -1,0 +1,14 @@
+diff --git a/.github/workflows/maven.yml b/.github/workflows/maven.yml
+index 5d17a639a7f..54b6ce65d34 100644
+--- a/.github/workflows/maven.yml
++++ b/.github/workflows/maven.yml
+@@ -15,9 +15,6 @@ jobs:
+       matrix:
+         java: [11, 17, 21, 25]
+         os: [ubuntu-latest, windows-latest, macos-latest]
+-        include:
+-          - java: '21'
+-            os: 'macos-14'
+     runs-on: ${{ matrix.os }}
+     env:
+       maven_commands: install # default is install

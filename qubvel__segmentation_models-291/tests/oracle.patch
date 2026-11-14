@@ -1,0 +1,106 @@
+diff --git a/segmentation_models/models/_utils.py b/segmentation_models/models/_utils.py
+index e7f424ab..c59d427a 100644
+--- a/segmentation_models/models/_utils.py
++++ b/segmentation_models/models/_utils.py
+@@ -8,3 +8,9 @@ def freeze_model(model, **kwargs):
+         if not isinstance(layer, layers.BatchNormalization):
+             layer.trainable = False
+     return
++
++
++def filter_keras_submodules(kwargs):
++    """Selects only arguments that define keras_application submodules. """
++    submodule_keys = kwargs.keys() & {'backend', 'layers', 'models', 'utils'}
++    return {key: kwargs[key] for key in submodule_keys}
+diff --git a/segmentation_models/models/fpn.py b/segmentation_models/models/fpn.py
+index 625df060..deab7f54 100644
+--- a/segmentation_models/models/fpn.py
++++ b/segmentation_models/models/fpn.py
+@@ -1,7 +1,7 @@
+ from keras_applications import get_submodules_from_kwargs
+ 
+ from ._common_blocks import Conv2dBn
+-from ._utils import freeze_model
++from ._utils import freeze_model, filter_keras_submodules
+ from ..backbones.backbones_factory import Backbones
+ 
+ backend = None
+@@ -217,7 +217,8 @@ def FPN(
+ 
+     """
+     global backend, layers, models, keras_utils
+-    backend, layers, models, keras_utils = get_submodules_from_kwargs(kwargs)
++    submodule_args = filter_keras_submodules(kwargs)
++    backend, layers, models, keras_utils = get_submodules_from_kwargs(submodule_args)
+ 
+     backbone = Backbones.get_backbone(
+         backbone_name,
+diff --git a/segmentation_models/models/linknet.py b/segmentation_models/models/linknet.py
+index 6009b253..74c533c9 100644
+--- a/segmentation_models/models/linknet.py
++++ b/segmentation_models/models/linknet.py
+@@ -1,7 +1,7 @@
+ from keras_applications import get_submodules_from_kwargs
+ 
+ from ._common_blocks import Conv2dBn
+-from ._utils import freeze_model
++from ._utils import freeze_model, filter_keras_submodules
+ from ..backbones.backbones_factory import Backbones
+ 
+ backend = None
+@@ -233,7 +233,8 @@ def Linknet(
+     """
+ 
+     global backend, layers, models, keras_utils
+-    backend, layers, models, keras_utils = get_submodules_from_kwargs(kwargs)
++    submodule_args = filter_keras_submodules(kwargs)
++    backend, layers, models, keras_utils = get_submodules_from_kwargs(submodule_args)
+ 
+     if decoder_block_type == 'upsampling':
+         decoder_block = DecoderUpsamplingX2Block
+diff --git a/segmentation_models/models/pspnet.py b/segmentation_models/models/pspnet.py
+index c82d270e..001b28c9 100644
+--- a/segmentation_models/models/pspnet.py
++++ b/segmentation_models/models/pspnet.py
+@@ -1,7 +1,7 @@
+ from keras_applications import get_submodules_from_kwargs
+ 
+ from ._common_blocks import Conv2dBn
+-from ._utils import freeze_model
++from ._utils import freeze_model, filter_keras_submodules
+ from ..backbones.backbones_factory import Backbones
+ 
+ backend = None
+@@ -197,7 +197,8 @@ def PSPNet(
+     """
+ 
+     global backend, layers, models, keras_utils
+-    backend, layers, models, keras_utils = get_submodules_from_kwargs(kwargs)
++    submodule_args = filter_keras_submodules(kwargs)
++    backend, layers, models, keras_utils = get_submodules_from_kwargs(submodule_args)
+ 
+     # control image input shape
+     check_input_shape(input_shape, downsample_factor)
+diff --git a/segmentation_models/models/unet.py b/segmentation_models/models/unet.py
+index ad4e5853..7da2b391 100644
+--- a/segmentation_models/models/unet.py
++++ b/segmentation_models/models/unet.py
+@@ -1,7 +1,7 @@
+ from keras_applications import get_submodules_from_kwargs
+ 
+ from ._common_blocks import Conv2dBn
+-from ._utils import freeze_model
++from ._utils import freeze_model, filter_keras_submodules
+ from ..backbones.backbones_factory import Backbones
+ 
+ backend = None
+@@ -208,7 +208,8 @@ def Unet(
+     """
+ 
+     global backend, layers, models, keras_utils
+-    backend, layers, models, keras_utils = get_submodules_from_kwargs(kwargs)
++    submodule_args = filter_keras_submodules(kwargs)
++    backend, layers, models, keras_utils = get_submodules_from_kwargs(submodule_args)
+ 
+     if decoder_block_type == 'upsampling':
+         decoder_block = DecoderUpsamplingX2Block

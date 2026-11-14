@@ -1,0 +1,63 @@
+version = "1.0"
+
+[task]
+name = "default/prov-gigatime__GigaTIME-20"
+description = "Add TCGA whole-slide inference tutorial (GigaTIME-Flash) to main"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "GigaTIME",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "prov-gigatime/GigaTIME"
+ref = "ef49dbbe96592205023524878b6c1648af1a517c"
+reference = "https://github.com/prov-gigatime/GigaTIME/pull/20"
+source_access = "auto"
+built_at = "2026-11-14T07:11:08.386714+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:6230841b172c172910f3c622ed80fccf24903822222a273c65f7ad5900687c9c"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-07-20T22:23:36Z"
+diff_format = "unified"
+context_files = [
+    "README.md",
+    "scripts/gigatime_flash_tcga_wsi_inference.ipynb",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 908
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

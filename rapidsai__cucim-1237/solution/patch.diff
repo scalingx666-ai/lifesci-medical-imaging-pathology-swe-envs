@@ -1,0 +1,88 @@
+diff --git a/conda/environments/all_cuda-129_arch-aarch64.yaml b/conda/environments/all_cuda-129_arch-aarch64.yaml
+index 78dd6db92..d328d345c 100644
+--- a/conda/environments/all_cuda-129_arch-aarch64.yaml
++++ b/conda/environments/all_cuda-129_arch-aarch64.yaml
+@@ -7,7 +7,7 @@ channels:
+ dependencies:
+ - c-compiler
+ - click
+-- cmake>=4.0
++- cmake>=4.0,<4.5
+ - cuda-cudart-dev
+ - cuda-nvcc
+ - cuda-version=12.9
+diff --git a/conda/environments/all_cuda-129_arch-x86_64.yaml b/conda/environments/all_cuda-129_arch-x86_64.yaml
+index 25de92202..03016435e 100644
+--- a/conda/environments/all_cuda-129_arch-x86_64.yaml
++++ b/conda/environments/all_cuda-129_arch-x86_64.yaml
+@@ -7,7 +7,7 @@ channels:
+ dependencies:
+ - c-compiler
+ - click
+-- cmake>=4.0
++- cmake>=4.0,<4.5
+ - cuda-cudart-dev
+ - cuda-nvcc
+ - cuda-version=12.9
+diff --git a/conda/environments/all_cuda-134_arch-aarch64.yaml b/conda/environments/all_cuda-134_arch-aarch64.yaml
+index 99e098e69..3df23719f 100644
+--- a/conda/environments/all_cuda-134_arch-aarch64.yaml
++++ b/conda/environments/all_cuda-134_arch-aarch64.yaml
+@@ -7,7 +7,7 @@ channels:
+ dependencies:
+ - c-compiler
+ - click
+-- cmake>=4.0
++- cmake>=4.0,<4.5
+ - cuda-cudart-dev
+ - cuda-nvcc
+ - cuda-version=13.4
+diff --git a/conda/environments/all_cuda-134_arch-x86_64.yaml b/conda/environments/all_cuda-134_arch-x86_64.yaml
+index 2a9f96547..438314cf0 100644
+--- a/conda/environments/all_cuda-134_arch-x86_64.yaml
++++ b/conda/environments/all_cuda-134_arch-x86_64.yaml
+@@ -7,7 +7,7 @@ channels:
+ dependencies:
+ - c-compiler
+ - click
+-- cmake>=4.0
++- cmake>=4.0,<4.5
+ - cuda-cudart-dev
+ - cuda-nvcc
+ - cuda-version=13.4
+diff --git a/conda/recipes/cucim/conda_build_config.yaml b/conda/recipes/cucim/conda_build_config.yaml
+index f53c37604..73c90d531 100644
+--- a/conda/recipes/cucim/conda_build_config.yaml
++++ b/conda/recipes/cucim/conda_build_config.yaml
+@@ -14,4 +14,4 @@ c_stdlib_version:
+   - "2.28"
+ 
+ cmake_version:
+-  - ">=4.0"
++  - ">=4.0,<4.5"
+diff --git a/conda/recipes/libcucim/conda_build_config.yaml b/conda/recipes/libcucim/conda_build_config.yaml
+index 2e1a48037..3f59d7bff 100644
+--- a/conda/recipes/libcucim/conda_build_config.yaml
++++ b/conda/recipes/libcucim/conda_build_config.yaml
+@@ -14,7 +14,7 @@ c_stdlib_version:
+   - "2.28"
+ 
+ cmake_version:
+-  - ">=4.0"
++  - ">=4.0,<4.5"
+ 
+ nvimgcodec_version:
+   - ">=0.9.0,<0.10.0"
+diff --git a/dependencies.yaml b/dependencies.yaml
+index 6ed60d3f5..f3261677b 100644
+--- a/dependencies.yaml
++++ b/dependencies.yaml
+@@ -103,7 +103,7 @@ dependencies:
+       #   python/cucim/src/cucim/clara/ before calling `pip install .`.
+       - output_types: [conda, requirements, constraints]
+         packages:
+-          - cmake>=4.0
++          - cmake>=4.0,<4.5
+           - nanobind>=3.1.0,<3.2.0a0
+           - ninja
+       - output_types: conda

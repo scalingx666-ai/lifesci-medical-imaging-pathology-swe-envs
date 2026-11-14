@@ -1,0 +1,275 @@
+diff --git a/src/GDLInterpreter.cpp b/src/GDLInterpreter.cpp
+index e790d0af8..a0f111d98 100644
+--- a/src/GDLInterpreter.cpp
++++ b/src/GDLInterpreter.cpp
+@@ -341,94 +341,89 @@ GDLInterpreter::GDLInterpreter()
+ 		}
+ 		}
+ 		}
+-
+-afterStatement:
+-    // tested a possible optimization:  make CtrlCHandler produce a DEBUG_STOP, and do not test sigControlC here at all.
+-    // Apparently does not perform noticeably better and has adverse effects. Forget it.
+-    if (interruptEnable && sigControlC)
+-    {
+-      DebugMsg(last, "Interrupted at: ");
+-      sigControlC = false;
+-      retCode = NewInterpreterInstance(last->getLine()); //-1);
+-    } 
+-    else if (interruptEnable && _retTree == NULL && (debugMode == DEBUG_RETURN || debugMode == DEBUG_OUT))
+-    {
+-      if (debugMode == DEBUG_RETURN) {
+-        if (callStack.back()->GetProName() == MyProName) {
+-          DebugMsg(last, "Return encountered: ");
+-          debugMode = DEBUG_STOP_SILENT;MyProName="$$$$$";
+-          return retCode;
+-        }
+-      } else { //DEBUG_OUT --> just do an additional .step if we are at MyProName
+-        if (callStack.back()->GetProName() == MyProName) {
+-          debugMode = DEBUG_STEP;MyProName="$$$$$";
+-          stepCount = 1;
+-          return retCode; //continue 
+-        }
+-      }
+-    }
+-    else if (debugMode != DEBUG_CLEAR)
+-    {
+-      if (debugMode == DEBUG_STOP) {
+-        DebugMsg(last, "Stop encountered: ");
+-        if (!interruptEnable) debugMode = DEBUG_PROCESS_STOP;
+-      } else if (debugMode == DEBUG_STOP_SILENT) {
+-        if (!interruptEnable) debugMode = DEBUG_PROCESS_STOP;
+-      }
+-      
+-      if (debugMode == DEBUG_RETURN) {
+-        if (callStack.back()->GetProName() == MyProName) {
+-          DebugMsg(last, "Return encountered: ");
+-          debugMode = DEBUG_STOP_SILENT;MyProName="$$$$$";
+-          return retCode;
+-        }
+-      } else if (debugMode == DEBUG_OUT) { //DEBUG_OUT --> just do an additional .step if we are at MyProName
+-        if (callStack.back()->GetProName() == MyProName) {
+-          debugMode = DEBUG_STEP;MyProName="$$$$$";
+-          stepCount = 1;
+-          return retCode; //continue 
+-        }
+-      } else if (debugMode == DEBUG_STEP) {
+-        if (stepCount == 1) {
+-          stepCount = 0;
+-          DebugMsg(last, "Stepped to: ");
+-          debugMode = DEBUG_CLEAR;
+-          retCode = NewInterpreterInstance(last->getLine()); //-1);
+-        } else {
+-          --stepCount;
+-#ifdef GDL_DEBUG
+-          std::cout << "stepCount-- = " << stepCount << std::endl;
+-#endif
+-        }
+-      } else if (debugMode == DEBUG_STEPOVER) {
+-        if (callStack.back()->GetProName() == MyProName) { //we count only in current level
+-          if (stepCount == 1) {
+-            stepCount = 0;
+-            DebugMsg(last, "Stepped to: ");
+-            debugMode = DEBUG_CLEAR;
+-            MyProName = "";
+-            retCode = NewInterpreterInstance(last->getLine()); //-1);
+-          } else {
+-            --stepCount;
+-#ifdef GDL_DEBUG
+-            std::cout << "stepCount-- = " << stepCount << std::endl;
+-#endif
+-          }
+-        }
+-      } else if (interruptEnable) {
+-        if (debugMode == DEBUG_PROCESS_STOP) DebugMsg(last, "Stepped to: ");
+-        debugMode = DEBUG_CLEAR;
+-        retCode = NewInterpreterInstance(last->getLine()); //-1);
+-      } else {
+-        if (debugMode == DEBUG_PROCESS_STOP) {
+-          debugMode = DEBUG_CLEAR;
+-          retCode = NewInterpreterInstance(last->getLine());
+-        } else {
+-          retCode = RC_ABORT;
+-        }
+-      }
+-    }
+-    return retCode;
++		
++				afterStatement:
++				// tested a possible optimization:  make CtrlCHandler produce a DEBUG_STOP, and do not test sigControlC here at all.
++				// Apparently does not perform noticeably better and has adverse effects. Forget it.
++				if (interruptEnable && sigControlC) {
++					DebugMsg(last, "Interrupted at: ");
++					sigControlC = false;
++					retCode = NewInterpreterInstance(last->getLine()); //-1);
++				} else if (interruptEnable && _retTree == NULL && (debugMode == DEBUG_RETURN || debugMode == DEBUG_OUT)) {
++					if (debugMode == DEBUG_RETURN) {
++						if (callStack.back()->GetProName() == MyProName) {
++							DebugMsg(last, "Return encountered: ");
++							debugMode = DEBUG_STOP_SILENT;MyProName="$$$$$";
++							return retCode;	
++						}
++					} else { //DEBUG_OUT --> just do an additional .step if we are at MyProName
++						if (callStack.back()->GetProName() == MyProName) {
++							debugMode = DEBUG_STEP;MyProName="$$$$$";
++							stepCount=1;
++							return retCode; //continue 
++						}
++					} 
++				} else if (debugMode != DEBUG_CLEAR) {
++					if (debugMode == DEBUG_STOP) {
++					DebugMsg(last, "Stop encountered: ");
++					if (!interruptEnable) debugMode = DEBUG_PROCESS_STOP;
++				} else if (debugMode == DEBUG_STOP_SILENT) {
++					if (!interruptEnable) debugMode = DEBUG_PROCESS_STOP;
++				}
++				
++				  if (debugMode == DEBUG_RETURN) {
++					if (callStack.back()->GetProName() == MyProName) {
++					  DebugMsg(last, "Return encountered: ");
++					  debugMode = DEBUG_STOP_SILENT;MyProName="$$$$$";
++					  return retCode;
++					}
++				  } else if (debugMode == DEBUG_OUT) { //DEBUG_OUT --> just do an additional .step if we are at MyProName
++					if (callStack.back()->GetProName() == MyProName) {
++					  debugMode = DEBUG_STEP;MyProName="$$$$$";
++					  stepCount = 1;
++					  return retCode; //continue 
++					}
++				  } else if (debugMode == DEBUG_STEP) {
++					if (stepCount == 1) {
++						stepCount = 0;
++						DebugMsg(last, "Stepped to: ");
++						debugMode = DEBUG_CLEAR;
++						retCode = NewInterpreterInstance(last->getLine()); //-1);
++					} else {
++						--stepCount;
++		#ifdef GDL_DEBUG
++						std::cout << "stepCount-- = " << stepCount << std::endl;
++		#endif
++					}
++				} else if (debugMode == DEBUG_STEPOVER) {
++					if (callStack.back()->GetProName() == MyProName) { //we count only in current level
++						if (stepCount == 1) {
++							stepCount = 0;
++							DebugMsg(last, "Stepped to: ");
++							debugMode = DEBUG_CLEAR;
++							MyProName="";
++							retCode = NewInterpreterInstance(last->getLine()); //-1);
++						} else {
++							--stepCount;
++		#ifdef GDL_DEBUG
++							std::cout << "stepCount-- = " << stepCount << std::endl;
++		#endif
++						}
++					}
++				} else if (interruptEnable) {
++					if (debugMode == DEBUG_PROCESS_STOP) DebugMsg(last, "Stepped to: ");
++					debugMode = DEBUG_CLEAR;
++					retCode = NewInterpreterInstance(last->getLine()); //-1);
++				} else {
++					if (debugMode == DEBUG_PROCESS_STOP) {
++						debugMode = DEBUG_CLEAR;
++						retCode = NewInterpreterInstance(last->getLine());
++					} else {
++						retCode = RC_ABORT;
++					}
++				}
++		}
++		return retCode;
+ 		
+ 	}
+ 	catch ( GDLException& e) {
+diff --git a/src/GDLInterpreter.hpp b/src/GDLInterpreter.hpp
+index 3c10b45ec..d2050a8c2 100644
+--- a/src/GDLInterpreter.hpp
++++ b/src/GDLInterpreter.hpp
+@@ -83,8 +83,8 @@ class CUSTOM_API GDLInterpreter : public antlr::TreeParser, public GDLInterprete
+     friend class REF_EXPRVNNode;
+     friend class ParameterVNNode;
+     friend class WRAPPED_FUNNode;
+-    friend class WRAPPED_MEDIATIZED_FUNNode;
+     friend class WRAPPED_PRONode;
++    friend class WRAPPED_MEDIATIZED_FUNNode;
+     friend class WRAPPED_MEDIATIZED_PRONode;
+ 
+ public: 
+@@ -115,8 +115,8 @@ class CUSTOM_API GDLInterpreter : public antlr::TreeParser, public GDLInterprete
+ 
+     // code in: dinterpreter.cpp
+     // procedure (searchForPro == true) or function (searchForPro == false)
+-    static int SearchCompilePro(const std::string& pro, bool searchForPro); //-1 not found, 0 both, 1 pro 2 fun
+-    static int SearchRoutineNoCompile(const std::string& pro); 
++    static int SearchCompilePro(const std::string& pro, bool searchForPro);
++	static int SearchRoutineNoCompile(const std::string& pro); 
+     static int GetFunIx( ProgNodeP, bool dothrow=true);
+     static int GetFunIx( const std::string& subName);
+     static int GetProIx( ProgNodeP);//const std::string& subName);
+diff --git a/src/GDLLexer.cpp b/src/GDLLexer.cpp
+index d3211dd96..50d71d669 100644
+--- a/src/GDLLexer.cpp
++++ b/src/GDLLexer.cpp
+@@ -2073,6 +2073,7 @@ void GDLLexer::mCONSTANT_OR_STRING_LITERAL(bool _createToken) {
+ 				match('x' /* charlit */ );
+ 			}
+ 			else {
++				throw antlr::NoViableAltForCharException(LA(1), getFilename(), getLine(), getColumn());
+ 			}
+ 			
+ 			}
+diff --git a/src/gdlc.g b/src/gdlc.g
+index 74c0f07b8..0225d86b6 100644
+--- a/src/gdlc.g
++++ b/src/gdlc.g
+@@ -2468,8 +2468,8 @@ CONSTANT_OR_STRING_LITERAL
+           | "\""!            { _ttype=STRING_LITERAL; }
+           )?
+        )
+-  |('\"' ('a'..'f') (((H)+ '\"')|'\"') ( 'x' | "xs" | "xb" | "xl" | "xu" | "xus" | "xub" | "xul" )? ) => 
+-      ('\"'! ('a'..'f') (H)? '\"'! 'x'!
++  |('\"' ('a'..'f') (((H)+ '\"')|'\"') ( 'x' | "xs" | "xb" | "xl" | "xu" | "xus" | "xub" | "xul" ) ) => 
++      ('\"'! ('a'..'f') (H)? '\"'! 'x'! 
+            (                  { _ttype=CONSTANT_HEX_I; } // DEFINT32
+             | 's'!        { _ttype=CONSTANT_HEX_INT; }
+             | 'b'!        { _ttype=CONSTANT_HEX_BYTE; }
+diff --git a/src/gdlc.i.g b/src/gdlc.i.g
+index 2e2b18ae6..8c4fafb3f 100644
+--- a/src/gdlc.i.g
++++ b/src/gdlc.i.g
+@@ -1177,12 +1177,12 @@ statement returns[ RetCode retCode]
+ 			if (debugMode == DEBUG_RETURN) {
+ 				if (callStack.back()->GetProName() == MyProName) {
+ 					DebugMsg(last, "Return encountered: ");
+-					debugMode = DEBUG_STOP_SILENT;
++					debugMode = DEBUG_STOP_SILENT;MyProName="$$$$$";
+ 					return retCode;	
+ 				}
+ 			} else { //DEBUG_OUT --> just do an additional .step if we are at MyProName
+ 				if (callStack.back()->GetProName() == MyProName) {
+-					debugMode = DEBUG_STEP;
++					debugMode = DEBUG_STEP;MyProName="$$$$$";
+ 					stepCount=1;
+ 					return retCode; //continue 
+ 				}
+@@ -1194,7 +1194,20 @@ statement returns[ RetCode retCode]
+ 		} else if (debugMode == DEBUG_STOP_SILENT) {
+ 			if (!interruptEnable) debugMode = DEBUG_PROCESS_STOP;
+ 		}
+-		if (debugMode == DEBUG_STEP) {
++		
++		  if (debugMode == DEBUG_RETURN) {
++			if (callStack.back()->GetProName() == MyProName) {
++			  DebugMsg(last, "Return encountered: ");
++			  debugMode = DEBUG_STOP_SILENT;MyProName="$$$$$";
++			  return retCode;
++			}
++		  } else if (debugMode == DEBUG_OUT) { //DEBUG_OUT --> just do an additional .step if we are at MyProName
++			if (callStack.back()->GetProName() == MyProName) {
++			  debugMode = DEBUG_STEP;MyProName="$$$$$";
++			  stepCount = 1;
++			  return retCode; //continue 
++			}
++		  } else if (debugMode == DEBUG_STEP) {
+ 			if (stepCount == 1) {
+ 				stepCount = 0;
+ 				DebugMsg(last, "Stepped to: ");

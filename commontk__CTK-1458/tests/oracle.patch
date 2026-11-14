@@ -1,0 +1,106 @@
+diff --git a/Libs/Widgets/Testing/Cpp/ctkLayoutManagerTest1.cpp b/Libs/Widgets/Testing/Cpp/ctkLayoutManagerTest1.cpp
+index 6a6a358a19..3a6e3a79bb 100644
+--- a/Libs/Widgets/Testing/Cpp/ctkLayoutManagerTest1.cpp
++++ b/Libs/Widgets/Testing/Cpp/ctkLayoutManagerTest1.cpp
+@@ -21,6 +21,8 @@
+ // Qt includse
+ #include <QApplication>
+ #include <QDebug>
++#include <QEvent>
++#include <QPointer>
+ #include <QPushButton>
+ #include <QTimer>
+ 
+@@ -101,6 +103,24 @@ class ctkNullViewFactory: public ctkLayoutViewFactory
+ };
+ }
+ 
++namespace
++{
++/// Count hide events received by a widget
++class ctkHideEventCounter : public QObject
++{
++public:
++  bool eventFilter(QObject* object, QEvent* event) override
++  {
++    if (event->type() == QEvent::Hide)
++    {
++      ++this->Count;
++    }
++    return QObject::eventFilter(object, event);
++  }
++  int Count{ 0 };
++};
++} // namespace
++
+ /// \ingroup Widgets
+ 
+ //-----------------------------------------------------------------------------
+@@ -157,6 +177,47 @@ int ctkLayoutManagerTest1(int argc, char * argv [] )
+   }
+   viewport.show();
+ 
++  // Setting a layout document with the same content must not rebuild the layout
++  // (rebuilding removes all views from the layout and adds them again, which hides and shows them).
++  QList<QPointer<QPushButton>> views;
++  for (QPushButton* view : viewport.findChildren<QPushButton*>())
++  {
++    views << view;
++  }
++  if (views.isEmpty() || !views[0]->isVisible())
++  {
++    std::cerr << __LINE__ << ": ctkLayoutFactory::setLayout() failed to show the view." << std::endl;
++    return EXIT_FAILURE;
++  }
++  ctkHideEventCounter hideEventCounter;
++  views[0]->installEventFilter(&hideEventCounter);
++  QDomDocument simpleLayoutDocCopy("simplelayout");
++  res = bool(simpleLayoutDocCopy.setContent(simpleLayout));
++  Q_ASSERT(res);
++  layoutManager.setLayout(simpleLayoutDocCopy);
++  if (layoutManager.layout() != simpleLayoutDocCopy)
++  {
++    std::cerr << __LINE__ << ": ctkLayoutFactory::setLayout() failed to set layout with same content." << std::endl;
++    return EXIT_FAILURE;
++  }
++  if (hideEventCounter.Count != 0 || !views[0]->isVisible())
++  {
++    std::cerr << __LINE__ << ": ctkLayoutFactory::setLayout() rebuilt the layout when content did not change." << std::endl;
++    return EXIT_FAILURE;
++  }
++  // A layout with different content is applied
++  layoutManager.setLayout(vboxLayoutDoc);
++  if (hideEventCounter.Count == 0)
++  {
++    std::cerr << __LINE__ << ": ctkLayoutFactory::setLayout() did not rebuild the layout when content changed." << std::endl;
++    return EXIT_FAILURE;
++  }
++  if (!views.isEmpty() && !views[0].isNull())
++  {
++    views[0]->removeEventFilter(&hideEventCounter);
++  }
++  layoutManager.setLayout(simpleLayoutDoc);
++
+   QWidget vbox;
+   vbox.setWindowTitle("Vertical Box Layout");
+   ctkLayoutFactory vboxLayoutManager;
+diff --git a/Libs/Widgets/ctkLayoutManager.cpp b/Libs/Widgets/ctkLayoutManager.cpp
+index 1808b28cbf..0909c825ed 100644
+--- a/Libs/Widgets/ctkLayoutManager.cpp
++++ b/Libs/Widgets/ctkLayoutManager.cpp
+@@ -478,7 +478,15 @@ void ctkLayoutManager::setLayout(const QDomDocument& newLayout)
+   {
+     return;
+   }
++  // QDomDocument::operator==() only checks if the two documents refer to the same underlying data,
++  // therefore the content is compared, too. This avoids rebuilding the layout (removing all views and
++  // adding them again) when a new document with the same content is set.
++  bool sameContent = (newLayout.toString() == d->Layout.toString());
+   d->Layout = newLayout;
++  if (sameContent)
++  {
++    return;
++  }
+   this->refresh();
+ }
+ 

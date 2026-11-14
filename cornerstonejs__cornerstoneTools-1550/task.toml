@@ -1,0 +1,65 @@
+version = "1.0"
+
+[task]
+name = "default/cornerstonejs__cornerstoneTools-1550"
+description = "fix(SegRendering): preserve canvas transform matrix after seg render"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "cornerstoneTools",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "cornerstonejs/cornerstoneTools"
+ref = "73cd5224782cc757275b495178c7889ba95eb152"
+reference = "https://github.com/cornerstonejs/cornerstoneTools/pull/1550"
+source_access = "auto"
+built_at = "2026-11-14T07:09:36.955803+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:6b2a29b9d15eea1827efaf414ba0fdb5489d58469f143480b8ad07a7cd80a069"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2023-07-21T11:26:41Z"
+diff_format = "unified"
+context_files = [
+    "src/eventListeners/internals/renderSegmentationFill.js",
+    "src/eventListeners/internals/renderSegmentationFill.test.js",
+    "src/eventListeners/internals/renderSegmentationOutline.js",
+    "src/eventListeners/internals/renderSegmentationOutline.test.js",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 425
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/perone__medicaltorch-40"
+description = "Update metrics.py"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "medicaltorch",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "perone/medicaltorch"
+ref = "5295576c959a5dffac7defba1640499016d43d2a"
+reference = "https://github.com/perone/medicaltorch/pull/40"
+source_access = "auto"
+built_at = "2026-11-14T07:07:46.339013+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:c00c5c2f61f9ee018c60ebb8d6fa28396e31e4958af6dfbce8c7401e0057cd83"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2021-04-16T18:50:54Z"
+diff_format = "unified"
+context_files = [
+    "medicaltorch/metrics.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 8
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

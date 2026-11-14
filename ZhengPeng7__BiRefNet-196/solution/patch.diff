@@ -1,0 +1,50 @@
+diff --git a/tutorials/BiRefNet_inference-fp16.ipynb b/tutorials/BiRefNet_inference-fp16.ipynb
+index a6ad8ac..ed4e326 100644
+--- a/tutorials/BiRefNet_inference-fp16.ipynb
++++ b/tutorials/BiRefNet_inference-fp16.ipynb
+@@ -147,6 +147,7 @@
+         "for image_path in image_paths:\n",
+         "    print('Processing {} ...'.format(image_path))\n",
+         "    image = Image.open(image_path)\n",
++        "    image = image.convert(\"RGB\") if image.mode != \"RGB\" else image\n",
+         "    input_images = transform_image(image).unsqueeze(0).to(device)\n",
+         "    input_images = input_images.half()\n",
+         "\n",
+diff --git a/tutorials/BiRefNet_inference.ipynb b/tutorials/BiRefNet_inference.ipynb
+index 3fa9b84..e6605f9 100644
+--- a/tutorials/BiRefNet_inference.ipynb
++++ b/tutorials/BiRefNet_inference.ipynb
+@@ -143,6 +143,7 @@
+         "for image_path in image_paths:\n",
+         "    print('Processing {} ...'.format(image_path))\n",
+         "    image = Image.open(image_path)\n",
++        "    image = image.convert(\"RGB\") if image.mode != \"RGB\" else image\n",
+         "    input_images = transform_image(image).unsqueeze(0).to(device)\n",
+         "\n",
+         "    # Prediction\n",
+diff --git a/tutorials/BiRefNet_inference_video.ipynb b/tutorials/BiRefNet_inference_video.ipynb
+index 75a453f..8141ec2 100644
+--- a/tutorials/BiRefNet_inference_video.ipynb
++++ b/tutorials/BiRefNet_inference_video.ipynb
+@@ -223,7 +223,8 @@
+         "    image_path = image_paths[idx]\n",
+         "    if (idx // batch_size + 1) % int(len(image_paths) // batch_size * 0.1) == 0:\n",
+         "        print('Processing {} / {} ...'.format(image_path, len(image_paths)))\n",
+-        "    input_images_pil = [Image.open(image_path) for image_path in image_paths[idx:idx + batch_size]]\n",
++        "    input_images_pil = [image.convert(\"RGB\") if image.mode != \"RGB\" else image\n",
++        "                        for image in [Image.open(image_path) for image_path in image_paths[idx:idx + batch_size]]]\n",
+         "    input_images = [transform_image(input_image).unsqueeze(0).to(device) for input_image in input_images_pil]\n",
+         "    input_images = torch.cat(input_images, dim=0)\n",
+         "\n",
+diff --git a/tutorials/BiRefNet_pth2onnx.ipynb b/tutorials/BiRefNet_pth2onnx.ipynb
+index 781fa3d..195a09b 100644
+--- a/tutorials/BiRefNet_pth2onnx.ipynb
++++ b/tutorials/BiRefNet_pth2onnx.ipynb
+@@ -315,6 +315,7 @@
+     "\n",
+     "imagepath = './Helicopter-HR.jpg'\n",
+     "image = Image.open(imagepath)\n",
++    "image = image.convert(\"RGB\") if image.mode != \"RGB\" else image\n",
+     "input_images = transform_image(image).unsqueeze(0).to(device)\n",
+     "input_images_numpy = input_images.cpu().numpy()"
+    ]

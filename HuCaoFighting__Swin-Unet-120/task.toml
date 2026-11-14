@@ -1,0 +1,70 @@
+version = "1.0"
+
+[task]
+name = "default/HuCaoFighting__Swin-Unet-120"
+description = "Fix test.sh"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "Swin-Unet",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "HuCaoFighting/Swin-Unet"
+ref = "7d805419ad562eff89941a1cb785e61f0aed5fc3"
+reference = "https://github.com/HuCaoFighting/Swin-Unet/pull/120"
+source_access = "auto"
+built_at = "2026-11-14T07:05:16.335681+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:dcb28bb859254af5a7ad5d42958b10061db621a7e40637a0528e5a07f86514fb"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2024-10-22T17:32:33Z"
+diff_format = "unified"
+context_files = [
+    "datasets/__init__.py",
+    "datasets/dataset_synapse.py",
+    "make_dataset_txt.py",
+    "networks/swin_transformer_unet_skip_expand_decoder_sys.py",
+    "test.py",
+    "test.sh",
+    "train.py",
+    "trainer.py",
+    "utils.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 526
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

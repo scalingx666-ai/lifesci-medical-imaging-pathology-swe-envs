@@ -1,0 +1,72 @@
+version = "1.0"
+
+[task]
+name = "default/TissueImageAnalytics__tiatoolbox-1185"
+description = "🔨  Add `mypy` type check to `wsireader` files"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "tiatoolbox",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "TissueImageAnalytics/tiatoolbox"
+ref = "dd79833bf7a4ee63f35d83be6cc24430a21fc7aa"
+reference = "https://github.com/TissueImageAnalytics/tiatoolbox/pull/1185"
+source_access = "auto"
+built_at = "2026-11-14T07:09:58.559803+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:2e958b35fbd45d04858e80286956fb1e4f9cec1cdd1372d2a5c569adc606d667"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-10T13:24:49Z"
+diff_format = "unified"
+context_files = [
+    ".github/workflows/mypy-type-check.yml",
+    "pyproject.toml",
+    "tests/test_wsireader.py",
+    "tiatoolbox/models/dataset/dataset_abc.py",
+    "tiatoolbox/wsicore/wsireader/annotation_store.py",
+    "tiatoolbox/wsicore/wsireader/base.py",
+    "tiatoolbox/wsicore/wsireader/dicom.py",
+    "tiatoolbox/wsicore/wsireader/jp2.py",
+    "tiatoolbox/wsicore/wsireader/ngff.py",
+    "tiatoolbox/wsicore/wsireader/transformed.py",
+    "tiatoolbox/wsicore/wsireader/types.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 201
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

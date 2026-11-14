@@ -1,0 +1,55 @@
+diff --git a/src/applications/BraTSPipeline.cxx b/src/applications/BraTSPipeline.cxx
+index f74ed0dad..61048a93f 100644
+--- a/src/applications/BraTSPipeline.cxx
++++ b/src/applications/BraTSPipeline.cxx
+@@ -365,34 +365,35 @@ int main(int argc, char** argv)
+       cbica::ReadImage< TImageType >(brainMaskFile),
+       finalBrainMask
+       );
+-  }
+-
+-  if (brainTumor)
+-  {
+-    /// [6] Brain Tumor Segmentation
+-    auto brainTumorMaskFile = outputDir + "/dmOut_tumor/tumors_SRI.nii.gz";
+ 
+-    if (!cbica::exists(brainTumorMaskFile))
++    // iterate over outputRegisteredMaskedImages to write brain-masked images before brain-tumor step
++    for (auto it = outputRegisteredMaskedImages.begin(); it != outputRegisteredMaskedImages.end(); it++)
+     {
+-      // iterate over outputRegisteredMaskedImages
+-      for (auto it = outputRegisteredMaskedImages.begin(); it != outputRegisteredMaskedImages.end(); it++)
+-      {
+         auto modality = it->first;
+         auto maskFilter = itk::MaskImageFilter< ImageType, ImageType >::New();
+         maskFilter->SetInput(cbica::ReadImage< ImageType >(outputRegisteredImages[modality]));
+         maskFilter->SetMaskImage(cbica::ReadImage< TImageType >(finalBrainMask));
+         try
+         {
+-          maskFilter->Update();
++            maskFilter->Update();
+         }
+         catch (const std::exception& e)
+         {
+-          std::cerr << "Something went wrong when applying the brain mask to modality '"
+-            << modality << "': " << e.what();
+-          return EXIT_FAILURE;
++            std::cerr << "Something went wrong when applying the brain mask to modality '"
++                << modality << "': " << e.what();
++            return EXIT_FAILURE;
+         }
+         cbica::WriteImage< ImageType >(maskFilter->GetOutput(), it->second); // write the masked image 
+-      }
++    }
++  }
++
++  if (brainTumor)
++  {
++    /// [6] Brain Tumor Segmentation
++    auto brainTumorMaskFile = outputDir + "/dmOut_tumor/tumors_SRI.nii.gz";
++
++    if (!cbica::exists(brainTumorMaskFile))
++    {
+       fullCommand = " -md " + captkDataDir + "/deepMedic/saved_models/brainTumorSegmentation/ " +
+         "-i " + outputRegisteredMaskedImages["T1"] + "," +
+         outputRegisteredMaskedImages["T1CE"] + "," +

@@ -1,0 +1,67 @@
+version = "1.0"
+
+[task]
+name = "default/AlizaMedicalImaging__AlizaMS-99"
+description = "MDCM sync"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "AlizaMS",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "AlizaMedicalImaging/AlizaMS"
+ref = "563a4bfb465f59af3d131da1fd32713bd0e64f7b"
+reference = "https://github.com/AlizaMedicalImaging/AlizaMS/pull/99"
+source_access = "auto"
+built_at = "2026-11-14T07:12:25.478473+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:fbb85268312575b4abfe15a1d91e9f91978c9851059df2b4c05ee8e9ff35ca7b"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-09-15T17:18:57Z"
+diff_format = "unified"
+context_files = [
+    "mdcm/Source/Common/mdcmDataEvent.h",
+    "mdcm/Source/Common/mdcmEvent.h",
+    "mdcm/Source/DataStructureAndEncodingDefinition/mdcmDataSetEvent.h",
+    "mdcm/Source/MediaStorageAndFileFormat/mdcmJPEGCodec.h",
+    "mdcm/Source/MediaStorageAndFileFormat/mdcmPixmapReader.h",
+    "mdcm/Source/MediaStorageAndFileFormat/mdcmSurfaceWriter.h",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 55
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,13 @@
+diff --git a/Platform/FO-DICOM.Instrumentation/FO-DICOM.Instrumentation.csproj b/Platform/FO-DICOM.Instrumentation/FO-DICOM.Instrumentation.csproj
+index f8df11056..7c38901f7 100644
+--- a/Platform/FO-DICOM.Instrumentation/FO-DICOM.Instrumentation.csproj
++++ b/Platform/FO-DICOM.Instrumentation/FO-DICOM.Instrumentation.csproj
+@@ -38,7 +38,7 @@
+   </ItemGroup>
+ 
+   <ItemGroup>
+-    <PackageReference Include="OpenTelemetry.Api" Version="1.16.0" />
++    <PackageReference Include="OpenTelemetry.Api" Version="1.19.1" />
+   </ItemGroup>
+ 
+ </Project>

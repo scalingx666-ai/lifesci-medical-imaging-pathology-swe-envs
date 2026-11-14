@@ -1,0 +1,25 @@
+diff --git a/EvilDICOM/EvilDICOM/Network/DICOMSCP.cs b/EvilDICOM/EvilDICOM/Network/DICOMSCP.cs
+index 210b14c9..22cd393b 100644
+--- a/EvilDICOM/EvilDICOM/Network/DICOMSCP.cs
++++ b/EvilDICOM/EvilDICOM/Network/DICOMSCP.cs
+@@ -21,6 +21,11 @@ public class DICOMSCP : DICOMServiceClass
+         private bool _started;
+         private bool _requestStop = false;
+ 
++        /// <summary>
++        /// IdleTimeout in milliseconds. Default value: 25000ms.
++        /// </summary>
++        public int IdleTimeout { get; set; } = 25000; // 25 sec
++
+         public DICOMSCP(Entity ae) : base(ae)
+         {
+             _server = new TcpListener(IPAddress.Parse(ApplicationEntity.IpAddress), ApplicationEntity.Port);
+@@ -67,7 +72,7 @@ private void SpinUpAssociation(TcpClient client)
+             {
+                 var asc = GenerateAssociation(client);
+                 Logger.LogInformation(asc.ToString());
+-                asc.Listen();
++                asc.Listen(TimeSpan.FromMilliseconds(IdleTimeout));
+                 Logger.LogInformation("Closing association with {0}.", asc.IpAddress, asc.Port);
+                 client.Close();
+             });

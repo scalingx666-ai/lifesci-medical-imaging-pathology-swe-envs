@@ -1,0 +1,64 @@
+version = "1.0"
+
+[task]
+name = "default/malaterre__GDCM-227"
+description = "ENH: Drop legacy EXECUTABLE_OUTPUT_PATH/LIBRARY_OUTPUT_PATH handling"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "GDCM",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "malaterre/GDCM"
+ref = "69b7aea5ff1f6915f0de8e8d0237d1a1bb82f2eb"
+reference = "https://github.com/malaterre/GDCM/pull/227"
+source_access = "auto"
+built_at = "2026-11-14T07:11:16.262791+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:64e5be848ef1e5c0a9d83679e8219ceb098d3729a82caf0a68ca36ed6c5a6933"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-08-20T17:25:22Z"
+diff_format = "unified"
+context_files = [
+    "CMakeLists.txt",
+    "Source/Common/gdcmConfigure.h.in",
+    "Utilities/gdcmopenjpeg/CMakeLists.txt",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 40
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

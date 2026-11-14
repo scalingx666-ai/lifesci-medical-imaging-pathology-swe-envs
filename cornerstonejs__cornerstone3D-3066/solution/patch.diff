@@ -1,0 +1,2850 @@
+diff --git a/packages/core/src/RenderingEngine/GenericViewport/Planar/PlanarCPUVolumeSampler.ts b/packages/core/src/RenderingEngine/GenericViewport/Planar/PlanarCPUVolumeSampler.ts
+index c69f3f62c7..00d76230b9 100644
+--- a/packages/core/src/RenderingEngine/GenericViewport/Planar/PlanarCPUVolumeSampler.ts
++++ b/packages/core/src/RenderingEngine/GenericViewport/Planar/PlanarCPUVolumeSampler.ts
+@@ -16,6 +16,7 @@ import type {
+ import VoxelManager from '../../../utilities/VoxelManager';
+ import getDefaultViewport from '../../helpers/cpuFallback/rendering/getDefaultViewport';
+ import getSpacingInNormalDirection from '../../../utilities/getSpacingInNormalDirection';
++import sampleVolumeGrid from '../../../utilities/sampleVolumeGrid';
+ import type { PlanarDataPresentation } from './PlanarViewportTypes';
+ import { getPlanarScaleRatio } from './planarCameraScale';
+ import PlanarCPUScalarViewportSampler from './PlanarCPUScalarViewportSampler';
+@@ -646,6 +647,26 @@ export default class PlanarCPUVolumeSampler {
+     if (scalarViewportSample) {
+       sampledRange.min = scalarViewportSample.min;
+       sampledRange.max = scalarViewportSample.max;
++    } else if (numberOfComponents < 2) {
++      const scalarGridRange = sampleVolumeGrid({
++        volume,
++        pixelData: sliceScalarData,
++        width,
++        height,
++        startIndex: rowStartIndex,
++        columnStep: xStepIndexDelta,
++        rowStep: yStepIndexDelta,
++        interpolationType,
++        outsideValue: fallbackRange.min,
++        valueRange: fallbackRange,
++        round: !(
++          sliceScalarData instanceof Float32Array ||
++          sliceScalarData instanceof Float64Array
++        ),
++      });
++
++      sampledRange.min = scalarGridRange.min;
++      sampledRange.max = scalarGridRange.max;
+     } else {
+       const sampleIndex = [...rowStartIndex] as Point3;
+ 
+diff --git a/packages/core/src/utilities/index.ts b/packages/core/src/utilities/index.ts
+index 6cfb5ebe7e..a0d59d42f6 100644
+--- a/packages/core/src/utilities/index.ts
++++ b/packages/core/src/utilities/index.ts
+@@ -18,6 +18,7 @@ import isOpposite from './isOpposite';
+ import getClosestImageId from './getClosestImageId';
+ import getSpacingInNormalDirection from './getSpacingInNormalDirection';
+ import getEffectiveSpacingAlongDirection from './getEffectiveSpacingAlongDirection';
++import sampleVolumeGrid from './sampleVolumeGrid';
+ import getViewSlabDepth from './getViewSlabDepth';
+ import getTargetVolumeAndSpacingInNormalDir from './getTargetVolumeAndSpacingInNormalDir';
+ import getVolumeActorCorners from './getVolumeActorCorners';
+@@ -196,6 +197,7 @@ export {
+   getClosestImageId,
+   getSpacingInNormalDirection,
+   getEffectiveSpacingAlongDirection,
++  sampleVolumeGrid,
+   getViewSlabDepth,
+   getTargetVolumeAndSpacingInNormalDir,
+   getVolumeActorCorners,
+diff --git a/packages/core/src/utilities/sampleVolumeGrid.ts b/packages/core/src/utilities/sampleVolumeGrid.ts
+new file mode 100644
+index 0000000000..1e8b769c6f
+--- /dev/null
++++ b/packages/core/src/utilities/sampleVolumeGrid.ts
+@@ -0,0 +1,547 @@
++import { InterpolationType } from '../enums';
++import {
++  NEAREST_VOXEL_TIE_EPSILON,
++  SOURCE_SLICE_INDEX_TOLERANCE,
++} from '../RenderingEngine/GenericViewport/Planar/planarCPUVolumeSamplingUtils';
++import type { IImageVolume, PixelDataTypedArray, Point3 } from '../types';
++
++const SPAN_MARGIN = 1e-7;
++const MINIMUM_SPAN_STEP = 1e-12;
++
++type SampledVolume = Pick<IImageVolume, 'dimensions' | 'voxelManager'>;
++
++type SliceArray = PixelDataTypedArray | null;
++
++type SampledValueRange = {
++  min: number;
++  max: number;
++};
++
++type ColumnSpan = {
++  first: number;
++  last: number;
++};
++
++type SampleVolumeGridOptions = {
++  /** The volume to read. It must hold one component per voxel. */
++  volume: SampledVolume;
++  /** The array that receives one value per grid point, row after row. */
++  pixelData: PixelDataTypedArray | number[];
++  /** The number of grid points in one row. */
++  width: number;
++  /** The number of rows. */
++  height: number;
++  /** The continuous voxel index of the first grid point. */
++  startIndex: Point3;
++  /** The change of the voxel index from one grid point to the next in a row. */
++  columnStep: Point3;
++  /** The change of the voxel index from one row to the next. */
++  rowStep: Point3;
++  /**
++   * NEAREST takes the nearest voxel. Any other type takes the trilinear
++   * mix of the eight voxels around the grid point. The default is NEAREST.
++   */
++  interpolationType?: InterpolationType;
++  /**
++   * The value of a grid point outside the volume, and of a sample that is not
++   * a finite number when valueRange is given. The default is 0.
++   */
++  outsideValue?: number;
++  /** When given, each sample is limited to this range. */
++  valueRange?: SampledValueRange;
++  /** When true, each sample is rounded to the nearest whole number. */
++  round?: boolean;
++};
++
++type GridSamplingContext = {
++  volume: SampledVolume;
++  volumeArray: PixelDataTypedArray | undefined;
++  sliceArrays: Array<SliceArray | undefined>;
++  columns: number;
++  rows: number;
++  slices: number;
++  useNearest: boolean;
++  outsideValue: number;
++  limitValues: boolean;
++  rangeMin: number;
++  rangeMax: number;
++  round: boolean;
++};
++
++/**
++ * Returns the typed array that holds every voxel of the volume, when the
++ * voxel manager of the volume keeps its voxels in one array of that size.
++ */
++function getVolumeArray(
++  volume: SampledVolume,
++  voxelCount: number
++): PixelDataTypedArray | undefined {
++  const scalarData = volume.voxelManager.getWritableScalarData?.();
++
++  return scalarData?.length === voxelCount ? scalarData : undefined;
++}
++
++/**
++ * Returns the typed array that holds the voxels of one slice of the volume,
++ * or null when the slice has to be read one voxel at a time. A slice has such
++ * an array when the volume keeps all its voxels in one typed array, or when
++ * the voxel manager gives an unscaled view of the slice (_getSliceView) of the
++ * slice size. Any other slice gives null. The answer is kept for the next read.
++ */
++function getSliceArray(
++  context: GridSamplingContext,
++  sliceIndex: number
++): SliceArray {
++  const known = context.sliceArrays[sliceIndex];
++
++  if (known !== undefined) {
++    return known;
++  }
++
++  const { volume, volumeArray, columns, rows } = context;
++  const sliceSize = columns * rows;
++  let sliceArray: SliceArray = null;
++
++  if (volumeArray) {
++    sliceArray = volumeArray.subarray(
++      sliceIndex * sliceSize,
++      (sliceIndex + 1) * sliceSize
++    ) as PixelDataTypedArray;
++  } else {
++    // A voxel manager without _getSliceView (a dynamic volume) is read
++    // through getAtIJK, which follows its current dimension group.
++    const scalarData = (
++      volume.voxelManager as {
++        _getSliceView?: (sliceIndex: number) => PixelDataTypedArray | undefined;
++      }
++    )._getSliceView?.(sliceIndex);
++
++    if (scalarData?.length === sliceSize) {
++      sliceArray = scalarData;
++    }
++  }
++
++  context.sliceArrays[sliceIndex] = sliceArray;
++
++  return sliceArray;
++}
++
++/**
++ * Limits a sample to the value range and rounds it, as the options ask. A
++ * sample that is not a finite number becomes the outside value.
++ */
++function finishSample(context: GridSamplingContext, sample: number): number {
++  let value = sample;
++
++  if (context.limitValues) {
++    if (!Number.isFinite(value)) {
++      value = context.outsideValue;
++    } else if (value < context.rangeMin) {
++      value = context.rangeMin;
++    } else if (value > context.rangeMax) {
++      value = context.rangeMax;
++    }
++  }
++
++  return context.round ? Math.round(value) : value;
++}
++
++/**
++ * Samples one grid point with every check: whether the point lies on a voxel,
++ * the move of its index onto the range of the voxel centers, and the reading
++ * of a slice that has no typed array. The fast loops of sampleVolumeGrid skip
++ * these checks for the grid points that are known to need none, and give the
++ * same value there.
++ */
++function sampleCheckedPoint(
++  context: GridSamplingContext,
++  i: number,
++  j: number,
++  k: number
++): number {
++  const { columns, rows, slices } = context;
++  const lowerBound = -0.5 - SOURCE_SLICE_INDEX_TOLERANCE;
++
++  if (
++    !(
++      i >= lowerBound &&
++      i <= columns - 0.5 + SOURCE_SLICE_INDEX_TOLERANCE &&
++      j >= lowerBound &&
++      j <= rows - 0.5 + SOURCE_SLICE_INDEX_TOLERANCE &&
++      k >= lowerBound &&
++      k <= slices - 0.5 + SOURCE_SLICE_INDEX_TOLERANCE
++    )
++  ) {
++    return context.outsideValue;
++  }
++
++  const { voxelManager } = context.volume;
++  const lastI = columns - 1;
++  const lastJ = rows - 1;
++  const lastK = slices - 1;
++  const clampedI = i < 0 ? 0 : i > lastI ? lastI : i;
++  const clampedJ = j < 0 ? 0 : j > lastJ ? lastJ : j;
++  const clampedK = k < 0 ? 0 : k > lastK ? lastK : k;
++
++  if (context.useNearest) {
++    const voxelI = Math.floor(clampedI + 0.5 - NEAREST_VOXEL_TIE_EPSILON);
++    const voxelJ = Math.floor(clampedJ + 0.5 - NEAREST_VOXEL_TIE_EPSILON);
++    const voxelK = Math.floor(clampedK + 0.5 - NEAREST_VOXEL_TIE_EPSILON);
++    const sliceArray = getSliceArray(context, voxelK);
++
++    return finishSample(
++      context,
++      sliceArray
++        ? sliceArray[voxelJ * columns + voxelI]
++        : Number(voxelManager.getAtIJK(voxelI, voxelJ, voxelK))
++    );
++  }
++
++  const i0 = Math.floor(clampedI);
++  const j0 = Math.floor(clampedJ);
++  const k0 = Math.floor(clampedK);
++  const i1 = i0 < lastI ? i0 + 1 : lastI;
++  const j1 = j0 < lastJ ? j0 + 1 : lastJ;
++  const k1 = k0 < lastK ? k0 + 1 : lastK;
++  const di = clampedI - i0;
++  const dj = clampedJ - j0;
++  const dk = clampedK - k0;
++  const oneMinusDi = 1 - di;
++  const oneMinusDj = 1 - dj;
++  const oneMinusDk = 1 - dk;
++  const lowerSlice = getSliceArray(context, k0);
++  const upperSlice = getSliceArray(context, k1);
++  let c000: number;
++  let c100: number;
++  let c010: number;
++  let c110: number;
++  let c001: number;
++  let c101: number;
++  let c011: number;
++  let c111: number;
++
++  if (lowerSlice && upperSlice) {
++    c000 = lowerSlice[j0 * columns + i0];
++    c100 = lowerSlice[j0 * columns + i1];
++    c010 = lowerSlice[j1 * columns + i0];
++    c110 = lowerSlice[j1 * columns + i1];
++    c001 = upperSlice[j0 * columns + i0];
++    c101 = upperSlice[j0 * columns + i1];
++    c011 = upperSlice[j1 * columns + i0];
++    c111 = upperSlice[j1 * columns + i1];
++  } else {
++    c000 = Number(voxelManager.getAtIJK(i0, j0, k0));
++    c100 = Number(voxelManager.getAtIJK(i1, j0, k0));
++    c010 = Number(voxelManager.getAtIJK(i0, j1, k0));
++    c110 = Number(voxelManager.getAtIJK(i1, j1, k0));
++    c001 = Number(voxelManager.getAtIJK(i0, j0, k1));
++    c101 = Number(voxelManager.getAtIJK(i1, j0, k1));
++    c011 = Number(voxelManager.getAtIJK(i0, j1, k1));
++    c111 = Number(voxelManager.getAtIJK(i1, j1, k1));
++  }
++
++  const c00 = c000 * oneMinusDi + c100 * di;
++  const c10 = c010 * oneMinusDi + c110 * di;
++  const c01 = c001 * oneMinusDi + c101 * di;
++  const c11 = c011 * oneMinusDi + c111 * di;
++  const c0 = c00 * oneMinusDj + c10 * dj;
++  const c1 = c01 * oneMinusDj + c11 * dj;
++
++  return finishSample(context, c0 * oneMinusDk + c1 * dk);
++}
++
++/**
++ * Narrows a span of columns to the columns where the coordinate
++ * start + column * step lies between low and high. A step close to zero keeps
++ * the span when start lies in the range, and empties it otherwise.
++ */
++function narrowColumnSpan(
++  span: ColumnSpan,
++  start: number,
++  step: number,
++  low: number,
++  high: number
++): void {
++  if (Math.abs(step) < MINIMUM_SPAN_STEP) {
++    if (start < low || start > high) {
++      span.first = 1;
++      span.last = 0;
++    }
++
++    return;
++  }
++
++  const atLow = (low - start) / step;
++  const atHigh = (high - start) / step;
++  const from = Math.ceil(atLow < atHigh ? atLow : atHigh);
++  const to = Math.floor(atLow < atHigh ? atHigh : atLow);
++
++  if (from > span.first) {
++    span.first = from;
++  }
++
++  if (to < span.last) {
++    span.last = to;
++  }
++}
++
++/**
++ * Samples a volume on a regular grid of points and writes one value per grid
++ * point into pixelData. The grid is given in continuous voxel indices: a first
++ * point, a step along a row and a step from one row to the next. A grid in a
++ * plane gives one slice image of the volume, in any orientation.
++ *
++ * A grid point counts as inside the volume while it lies on a voxel, which
++ * reaches half a voxel beyond the center of the outermost voxels. The index of
++ * such a point is first moved onto the range of the voxel centers, so a linear
++ * sample near the border repeats the outermost voxel.
++ *
++ * Voxels are read straight from the typed array of a slice where there is
++ * one, and through the voxel manager of the volume for any other slice. Both
++ * ways give the same values.
++ *
++ * Each row is split into runs of columns. The columns that lie well inside
++ * the volume are sampled in a loop without checks. The columns that are well
++ * outside get the outside value. Only the few columns near the border of the
++ * volume go through sampleCheckedPoint.
++ *
++ * @returns The lowest and the highest value written.
++ */
++function sampleVolumeGrid(options: SampleVolumeGridOptions): SampledValueRange {
++  const {
++    volume,
++    pixelData,
++    width,
++    height,
++    startIndex,
++    columnStep,
++    rowStep,
++    interpolationType = InterpolationType.NEAREST,
++    outsideValue = 0,
++    valueRange,
++    round = false,
++  } = options;
++  const { voxelManager } = volume;
++  const [columns, rows, slices] = volume.dimensions;
++  const useNearest = interpolationType === InterpolationType.NEAREST;
++  const limitValues = !!valueRange;
++  const finishValues = limitValues || round;
++  const context: GridSamplingContext = {
++    volume,
++    volumeArray: getVolumeArray(volume, columns * rows * slices),
++    sliceArrays: new Array<SliceArray | undefined>(slices),
++    columns,
++    rows,
++    slices,
++    useNearest,
++    outsideValue,
++    limitValues,
++    rangeMin: valueRange ? valueRange.min : 0,
++    rangeMax: valueRange ? valueRange.max : 0,
++    round,
++  };
++  const { sliceArrays } = context;
++  const outerLow = -0.5 - SOURCE_SLICE_INDEX_TOLERANCE - SPAN_MARGIN;
++  const outerHighOffset = -0.5 + SOURCE_SLICE_INDEX_TOLERANCE + SPAN_MARGIN;
++  const innerLow = useNearest
++    ? -0.5 + NEAREST_VOXEL_TIE_EPSILON + SPAN_MARGIN
++    : SPAN_MARGIN;
++  const innerHighOffset = useNearest
++    ? -0.5 + NEAREST_VOXEL_TIE_EPSILON - SPAN_MARGIN
++    : -1 - SPAN_MARGIN;
++  const stepI = columnStep[0];
++  const stepJ = columnStep[1];
++  const stepK = columnStep[2];
++  const outer: ColumnSpan = { first: 0, last: 0 };
++  const inner: ColumnSpan = { first: 0, last: 0 };
++  let rowI = startIndex[0];
++  let rowJ = startIndex[1];
++  let rowK = startIndex[2];
++  let min = Infinity;
++  let max = -Infinity;
++  let wroteOutsideValue = false;
++  let pixelIndex = 0;
++
++  for (let row = 0; row < height; row++) {
++    outer.first = 0;
++    outer.last = width - 1;
++    narrowColumnSpan(outer, rowI, stepI, outerLow, columns + outerHighOffset);
++    narrowColumnSpan(outer, rowJ, stepJ, outerLow, rows + outerHighOffset);
++    narrowColumnSpan(outer, rowK, stepK, outerLow, slices + outerHighOffset);
++
++    const hasOuter = outer.first <= outer.last;
++    const outerFirst = Math.max(0, outer.first - 1);
++    const outerLast = Math.min(width - 1, outer.last + 1);
++
++    inner.first = 0;
++    inner.last = width - 1;
++    narrowColumnSpan(inner, rowI, stepI, innerLow, columns + innerHighOffset);
++    narrowColumnSpan(inner, rowJ, stepJ, innerLow, rows + innerHighOffset);
++    narrowColumnSpan(inner, rowK, stepK, innerLow, slices + innerHighOffset);
++
++    const innerFirst = inner.first + 1;
++    const innerLast = inner.last - 1;
++    const hasInner = hasOuter && innerFirst <= innerLast;
++    const outsideEnd = hasOuter ? outerFirst : width;
++    const checkedEnd = hasOuter ? outerLast + 1 : 0;
++    const firstCheckedEnd = hasInner ? innerFirst : checkedEnd;
++    let i = rowI;
++    let j = rowJ;
++    let k = rowK;
++    let column = 0;
++
++    if (outsideEnd > 0 || checkedEnd < width) {
++      wroteOutsideValue = true;
++    }
++
++    for (; column < outsideEnd; column++) {
++      pixelData[pixelIndex++] = outsideValue;
++      i += stepI;
++      j += stepJ;
++      k += stepK;
++    }
++
++    for (; column < firstCheckedEnd; column++) {
++      const value = sampleCheckedPoint(context, i, j, k);
++
++      pixelData[pixelIndex++] = value;
++
++      if (value < min) {
++        min = value;
++      }
++
++      if (value > max) {
++        max = value;
++      }
++
++      i += stepI;
++      j += stepJ;
++      k += stepK;
++    }
++
++    if (hasInner && useNearest) {
++      for (; column <= innerLast; column++) {
++        const voxelI = Math.floor(i + 0.5 - NEAREST_VOXEL_TIE_EPSILON);
++        const voxelJ = Math.floor(j + 0.5 - NEAREST_VOXEL_TIE_EPSILON);
++        const voxelK = Math.floor(k + 0.5 - NEAREST_VOXEL_TIE_EPSILON);
++        const sliceArray =
++          sliceArrays[voxelK] ?? getSliceArray(context, voxelK);
++        let value = sliceArray
++          ? sliceArray[voxelJ * columns + voxelI]
++          : Number(voxelManager.getAtIJK(voxelI, voxelJ, voxelK));
++
++        if (finishValues) {
++          value = finishSample(context, value);
++        }
++
++        pixelData[pixelIndex++] = value;
++
++        if (value < min) {
++          min = value;
++        }
++
++        if (value > max) {
++          max = value;
++        }
++
++        i += stepI;
++        j += stepJ;
++        k += stepK;
++      }
++    } else if (hasInner) {
++      for (; column <= innerLast; column++) {
++        const i0 = Math.floor(i);
++        const j0 = Math.floor(j);
++        const k0 = Math.floor(k);
++        const lowerSlice = sliceArrays[k0] ?? getSliceArray(context, k0);
++        const upperSlice =
++          sliceArrays[k0 + 1] ?? getSliceArray(context, k0 + 1);
++        let value: number;
++
++        if (lowerSlice && upperSlice) {
++          const di = i - i0;
++          const dj = j - j0;
++          const dk = k - k0;
++          const oneMinusDi = 1 - di;
++          const oneMinusDj = 1 - dj;
++          const oneMinusDk = 1 - dk;
++          const lowerRow = j0 * columns + i0;
++          const upperRow = lowerRow + columns;
++          const c00 =
++            lowerSlice[lowerRow] * oneMinusDi + lowerSlice[lowerRow + 1] * di;
++          const c10 =
++            lowerSlice[upperRow] * oneMinusDi + lowerSlice[upperRow + 1] * di;
++          const c01 =
++            upperSlice[lowerRow] * oneMinusDi + upperSlice[lowerRow + 1] * di;
++          const c11 =
++            upperSlice[upperRow] * oneMinusDi + upperSlice[upperRow + 1] * di;
++          const c0 = c00 * oneMinusDj + c10 * dj;
++          const c1 = c01 * oneMinusDj + c11 * dj;
++
++          value = c0 * oneMinusDk + c1 * dk;
++
++          if (finishValues) {
++            value = finishSample(context, value);
++          }
++        } else {
++          value = sampleCheckedPoint(context, i, j, k);
++        }
++
++        pixelData[pixelIndex++] = value;
++
++        if (value < min) {
++          min = value;
++        }
++
++        if (value > max) {
++          max = value;
++        }
++
++        i += stepI;
++        j += stepJ;
++        k += stepK;
++      }
++    }
++
++    for (; column < checkedEnd; column++) {
++      const value = sampleCheckedPoint(context, i, j, k);
++
++      pixelData[pixelIndex++] = value;
++
++      if (value < min) {
++        min = value;
++      }
++
++      if (value > max) {
++        max = value;
++      }
++
++      i += stepI;
++      j += stepJ;
++      k += stepK;
++    }
++
++    for (; column < width; column++) {
++      pixelData[pixelIndex++] = outsideValue;
++    }
++
++    rowI += rowStep[0];
++    rowJ += rowStep[1];
++    rowK += rowStep[2];
++  }
++
++  if (wroteOutsideValue) {
++    if (outsideValue < min) {
++      min = outsideValue;
++    }
++
++    if (outsideValue > max) {
++      max = outsideValue;
++    }
++  }
++
++  return { min, max };
++}
++
++export { sampleVolumeGrid as default, sampleVolumeGrid };
++export type { SampleVolumeGridOptions, SampledValueRange };
+diff --git a/packages/core/test/sampleVolumeGrid.jest.js b/packages/core/test/sampleVolumeGrid.jest.js
+new file mode 100644
+index 0000000000..64b16bb4fa
+--- /dev/null
++++ b/packages/core/test/sampleVolumeGrid.jest.js
+@@ -0,0 +1,415 @@
++import { InterpolationType } from '../src/enums';
++import { getSpatiallyClampedContinuousIndex } from '../src/RenderingEngine/GenericViewport/Planar/planarCPUVolumeSamplingUtils';
++import sampleVolumeGrid from '../src/utilities/sampleVolumeGrid';
++import VoxelManager from '../src/utilities/VoxelManager';
++
++const dimensions = [7, 6, 5];
++const sliceSize = dimensions[0] * dimensions[1];
++
++/**
++ * A small deterministic random number generator, so that a failing grid can
++ * be reproduced from its seed.
++ */
++function createRandom(seed) {
++  let state = seed >>> 0;
++
++  return () => {
++    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
++
++    return state / 4294967296;
++  };
++}
++
++/**
++ * Builds a test volume of one typed array per slice. The access option decides
++ * how the sampler can reach the voxels:
++ * - 'slices': _getSliceView gives the typed array of each slice.
++ * - 'hidden': _getSliceView gives nothing, as with RLE or scaled images.
++ * - 'volume': the voxel manager of the volume exposes one array of all voxels.
++ * - 'mixed': one slice view is missing and one has an array of another size.
++ */
++function createVolume({ ArrayType = Int16Array, access = 'slices' } = {}) {
++  const random = createRandom(7);
++  const volumeArray = new ArrayType(sliceSize * dimensions[2]);
++
++  for (let index = 0; index < volumeArray.length; index++) {
++    volumeArray[index] =
++      ArrayType === Float32Array
++        ? random() * 200 - 100
++        : Math.floor(random() * 2000) - 1000;
++  }
++
++  const sliceArrays = Array.from({ length: dimensions[2] }, (_, k) =>
++    volumeArray.subarray(k * sliceSize, (k + 1) * sliceSize)
++  );
++  const getAtIJK = jest.fn((i, j, k) => sliceArrays[k][j * dimensions[0] + i]);
++  const getSliceView = jest.fn((sliceIndex) => {
++    if (access !== 'slices' && access !== 'mixed') {
++      return undefined;
++    }
++
++    if (access === 'mixed' && sliceIndex === 1) {
++      return undefined;
++    }
++
++    if (access === 'mixed' && sliceIndex === 3) {
++      return new ArrayType(4);
++    }
++
++    return sliceArrays[sliceIndex];
++  });
++
++  return {
++    getAtIJK,
++    getSliceView,
++    volumeArray,
++    volume: {
++      dimensions,
++      voxelManager: {
++        getAtIJK,
++        _getSliceView: getSliceView,
++        getWritableScalarData: () =>
++          access === 'volume' ? volumeArray : undefined,
++      },
++    },
++  };
++}
++
++/**
++ * The sampling that the CPU volume rendering did before it used
++ * sampleVolumeGrid: one voxel manager lookup per grid point, with the same
++ * border, limit and rounding rules. sampleVolumeGrid must give the same
++ * values.
++ */
++function sampleReference(volume, options) {
++  const {
++    width,
++    height,
++    startIndex,
++    columnStep,
++    rowStep,
++    interpolationType = InterpolationType.NEAREST,
++    outsideValue = 0,
++    valueRange,
++    round = false,
++  } = options;
++  const values = [];
++  const rowStart = [...startIndex];
++  let min = Infinity;
++  let max = -Infinity;
++
++  for (let row = 0; row < height; row++) {
++    const sampleIndex = [...rowStart];
++
++    for (let column = 0; column < width; column++) {
++      const clampedIndex = getSpatiallyClampedContinuousIndex(
++        volume.dimensions,
++        sampleIndex
++      );
++      let value = outsideValue;
++
++      if (clampedIndex) {
++        value = VoxelManager.sampleAtContinuousIndex(
++          volume.voxelManager,
++          volume.dimensions,
++          clampedIndex,
++          interpolationType
++        );
++
++        if (valueRange) {
++          if (!Number.isFinite(value)) {
++            value = outsideValue;
++          } else {
++            value = Math.min(valueRange.max, Math.max(valueRange.min, value));
++          }
++        }
++
++        if (round) {
++          value = Math.round(value);
++        }
++      }
++
++      values.push(value);
++      min = Math.min(min, value);
++      max = Math.max(max, value);
++      sampleIndex[0] += columnStep[0];
++      sampleIndex[1] += columnStep[1];
++      sampleIndex[2] += columnStep[2];
++    }
++
++    rowStart[0] += rowStep[0];
++    rowStart[1] += rowStep[1];
++    rowStart[2] += rowStep[2];
++  }
++
++  return { values, range: { min, max } };
++}
++
++/**
++ * Builds a random grid that crosses the test volume. Some grids get a step
++ * with components of exactly zero, which is the case of a view along a volume
++ * axis.
++ */
++function createRandomGrid(random) {
++  const randomStep = () =>
++    [0, 1, 2].map(() =>
++      random() < 0.25 ? 0 : (random() - 0.5) * (random() < 0.5 ? 0.4 : 1.6)
++    );
++
++  return {
++    width: 5 + Math.floor(random() * 14),
++    height: 4 + Math.floor(random() * 9),
++    startIndex: dimensions.map((size) => random() * (size + 4) - 2),
++    columnStep: randomStep(),
++    rowStep: randomStep(),
++  };
++}
++
++/**
++ * Samples the grid with sampleVolumeGrid into a plain array, so that the
++ * values are compared before any typed array conversion.
++ */
++function sampleGrid(volume, options) {
++  const pixelData = new Array(options.width * options.height).fill(null);
++  const range = sampleVolumeGrid({ volume, pixelData, ...options });
++
++  return { values: pixelData, range };
++}
++
++describe('sampleVolumeGrid', () => {
++  afterEach(() => {
++    jest.restoreAllMocks();
++  });
++
++  describe.each([['slices'], ['hidden'], ['volume'], ['mixed']])(
++    'with voxel access "%s"',
++    (access) => {
++      it.each([
++        ['nearest', InterpolationType.NEAREST],
++        ['linear', InterpolationType.LINEAR],
++      ])(
++        'matches the per-voxel reference on random grids with %s sampling',
++        (_name, interpolationType) => {
++          const random = createRandom(interpolationType + 11);
++
++          for (let gridNumber = 0; gridNumber < 300; gridNumber++) {
++            const { volume } = createVolume({ access });
++            const grid = createRandomGrid(random);
++            const options = {
++              ...grid,
++              interpolationType,
++              outsideValue: -1000,
++              valueRange: { min: -1000, max: 1000 },
++              round: true,
++            };
++            const sampled = sampleGrid(volume, options);
++            const reference = sampleReference(
++              createVolume({ access: 'hidden' }).volume,
++              options
++            );
++
++            expect({ gridNumber, ...sampled }).toEqual({
++              gridNumber,
++              ...reference,
++            });
++          }
++        }
++      );
++    }
++  );
++
++  it('matches the reference on a float volume without limits or rounding', () => {
++    const random = createRandom(3);
++
++    for (let gridNumber = 0; gridNumber < 200; gridNumber++) {
++      const grid = createRandomGrid(random);
++      const options = {
++        ...grid,
++        interpolationType: InterpolationType.LINEAR,
++        outsideValue: 0,
++      };
++      const sampled = sampleGrid(
++        createVolume({ ArrayType: Float32Array }).volume,
++        options
++      );
++      const reference = sampleReference(
++        createVolume({ ArrayType: Float32Array, access: 'hidden' }).volume,
++        options
++      );
++
++      expect({ gridNumber, ...sampled }).toEqual({ gridNumber, ...reference });
++    }
++  });
++
++  it('reads the slice arrays and never the voxel manager when the slices expose them', () => {
++    const { volume, getAtIJK } = createVolume({ access: 'slices' });
++
++    sampleGrid(volume, {
++      width: 12,
++      height: 12,
++      startIndex: [-1, -1, 0.2],
++      columnStep: [0.7, 0.1, 0.3],
++      rowStep: [0.1, 0.6, 0.1],
++      interpolationType: InterpolationType.LINEAR,
++    });
++
++    expect(getAtIJK).not.toHaveBeenCalled();
++  });
++
++  it('reads the array of the volume without asking for slice views', () => {
++    const { volume, getAtIJK, getSliceView } = createVolume({
++      access: 'volume',
++    });
++
++    sampleGrid(volume, {
++      width: 12,
++      height: 12,
++      startIndex: [-1, -1, 0.2],
++      columnStep: [0.7, 0.1, 0.3],
++      rowStep: [0.1, 0.6, 0.1],
++    });
++
++    expect(getAtIJK).not.toHaveBeenCalled();
++    expect(getSliceView).not.toHaveBeenCalled();
++  });
++
++  it('reads through the voxel manager only for the slices without a usable array', () => {
++    const { volume, getAtIJK } = createVolume({ access: 'mixed' });
++
++    sampleGrid(volume, {
++      width: 7,
++      height: 5,
++      startIndex: [0, 0, 0],
++      columnStep: [1, 0, 0],
++      rowStep: [0, 0, 1],
++    });
++
++    const slicesReadPerVoxel = new Set(
++      getAtIJK.mock.calls.map(([, , sliceIndex]) => sliceIndex)
++    );
++
++    expect(Array.from(slicesReadPerVoxel).sort()).toEqual([1, 3]);
++  });
++
++  it('copies a slice of voxels for a grid on the voxel centers', () => {
++    const { volume, volumeArray } = createVolume();
++    const sampled = sampleGrid(volume, {
++      width: dimensions[0],
++      height: dimensions[1],
++      startIndex: [0, 0, 2],
++      columnStep: [1, 0, 0],
++      rowStep: [0, 1, 0],
++    });
++
++    expect(sampled.values).toEqual(
++      Array.from(volumeArray.subarray(2 * sliceSize, 3 * sliceSize))
++    );
++  });
++
++  it('counts a grid point as inside up to half a voxel beyond the outermost voxel centers', () => {
++    const { volume, volumeArray } = createVolume();
++    const sampled = sampleGrid(volume, {
++      width: 4,
++      height: 1,
++      startIndex: [-0.6, 0, 0],
++      columnStep: [0.2, 0, 0],
++      rowStep: [0, 0, 0],
++      outsideValue: 5000,
++    });
++
++    expect(sampled.values).toEqual([
++      5000,
++      volumeArray[0],
++      volumeArray[0],
++      volumeArray[0],
++    ]);
++  });
++
++  it('repeats the outermost voxel for a linear sample in the half voxel beyond its center', () => {
++    const { volume, volumeArray } = createVolume();
++    const sampled = sampleGrid(volume, {
++      width: 2,
++      height: 1,
++      startIndex: [dimensions[0] - 0.75, 0, 0],
++      columnStep: [1, 0, 0],
++      rowStep: [0, 0, 0],
++      interpolationType: InterpolationType.LINEAR,
++      outsideValue: 5000,
++    });
++
++    expect(sampled.values).toEqual([volumeArray[dimensions[0] - 1], 5000]);
++  });
++
++  it('fills a grid that misses the volume with the outside value', () => {
++    const { volume } = createVolume();
++    const sampled = sampleGrid(volume, {
++      width: 6,
++      height: 3,
++      startIndex: [40, 40, 40],
++      columnStep: [0.5, 0.5, 0],
++      rowStep: [0, 0.5, 0.5],
++      outsideValue: -7,
++    });
++
++    expect(sampled.values).toEqual(new Array(18).fill(-7));
++    expect(sampled.range).toEqual({ min: -7, max: -7 });
++  });
++
++  it('samples every grid point when both steps are zero', () => {
++    const { volume, volumeArray } = createVolume();
++    const sampled = sampleGrid(volume, {
++      width: 3,
++      height: 2,
++      startIndex: [2, 3, 1],
++      columnStep: [0, 0, 0],
++      rowStep: [0, 0, 0],
++    });
++    const value = volumeArray[sliceSize + 3 * dimensions[0] + 2];
++
++    expect(sampled.values).toEqual(new Array(6).fill(value));
++    expect(sampled.range).toEqual({ min: value, max: value });
++  });
++
++  it('limits and rounds the samples and replaces a sample that is not finite', () => {
++    const { volume, volumeArray } = createVolume({ ArrayType: Float32Array });
++
++    volumeArray[0] = 1e9;
++    volumeArray[1] = NaN;
++    volumeArray[2] = 12.6;
++
++    const sampled = sampleGrid(volume, {
++      width: 3,
++      height: 1,
++      startIndex: [0, 0, 0],
++      columnStep: [1, 0, 0],
++      rowStep: [0, 0, 0],
++      outsideValue: -50,
++      valueRange: { min: -50, max: 50 },
++      round: true,
++    });
++
++    expect(sampled.values).toEqual([50, -50, 13]);
++    expect(sampled.range).toEqual({ min: -50, max: 50 });
++  });
++
++  it('writes into a typed array and returns the range of the written values', () => {
++    const { volume, volumeArray } = createVolume();
++    const pixelData = new Int16Array(dimensions[0]);
++    const range = sampleVolumeGrid({
++      volume,
++      pixelData,
++      width: dimensions[0],
++      height: 1,
++      startIndex: [0, 0, 0],
++      columnStep: [1, 0, 0],
++      rowStep: [0, 0, 0],
++    });
++    const expected = Array.from(volumeArray.subarray(0, dimensions[0]));
++
++    expect(Array.from(pixelData)).toEqual(expected);
++    expect(range).toEqual({
++      min: Math.min(...expected),
++      max: Math.max(...expected),
++    });
++  });
++});
+diff --git a/packages/tools/src/stateManagement/segmentation/helpers/labelmapImageMapperSupport.spec.ts b/packages/tools/src/stateManagement/segmentation/helpers/labelmapImageMapperSupport.spec.ts
+index f6d328fb21..b83a62c879 100644
+--- a/packages/tools/src/stateManagement/segmentation/helpers/labelmapImageMapperSupport.spec.ts
++++ b/packages/tools/src/stateManagement/segmentation/helpers/labelmapImageMapperSupport.spec.ts
+@@ -290,6 +290,20 @@ describe('getVolumeViewportLabelmapImageMapperState', () => {
+     expect(state.key).toContain(':42');
+   });
+ 
++  it('keeps the planar key when the view turns in its own plane', () => {
++    const keyFor = (viewUp: number[]) =>
++      getVolumeViewportLabelmapImageMapperState(
++        makePlanarNextViewport({
++          slabThickness: 0.1,
++          resolvedCamera: { viewPlaneNormal: [0, 0, 1], viewUp },
++        }) as never
++      );
++    const aligned = keyFor([0, 1, 0]);
++
++    expect(aligned.supported).toBe(true);
++    expect(keyFor([0.5, 0.866, 0]).key).toBe(aligned.key);
++  });
++
+   it('marks unsupported blend mode with a distinct key', () => {
+     const viewport = makeLegacyVolumeViewport({
+       blendMode: Enums.BlendModes.LABELMAP_EDGE_PROJECTION_BLEND,
+diff --git a/packages/tools/src/stateManagement/segmentation/helpers/labelmapImageMapperSupport.ts b/packages/tools/src/stateManagement/segmentation/helpers/labelmapImageMapperSupport.ts
+index 8a207e04e7..08f0703849 100644
+--- a/packages/tools/src/stateManagement/segmentation/helpers/labelmapImageMapperSupport.ts
++++ b/packages/tools/src/stateManagement/segmentation/helpers/labelmapImageMapperSupport.ts
+@@ -386,9 +386,13 @@ export function getVolumeViewportLabelmapImageMapperState(
+   const blendMode = getCompatibilityBlendMode(viewport);
+   const slabThickness = getCompatibilitySlabThickness(viewport);
+ 
++  // The planar slice image lies in world coordinates and does not depend on
++  // viewUp, so a turn of the view in its own plane needs no new slice.
+   const orientationKey = [
+     normalizedNormal.map((value) => value.toFixed(3)).join(','),
+-    normalizedViewUp.map((value) => value.toFixed(3)).join(','),
++    ...(isLegacyVolumeViewport
++      ? [normalizedViewUp.map((value) => value.toFixed(3)).join(',')]
++      : []),
+   ].join('|');
+ 
+   if (isLegacyVolumeViewport && !isSupportedImageMapperBlendMode(blendMode)) {
+diff --git a/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapImageMapper.spec.ts b/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapImageMapper.spec.ts
+index e0153a33a0..23045c9b47 100644
+--- a/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapImageMapper.spec.ts
++++ b/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapImageMapper.spec.ts
+@@ -63,6 +63,11 @@ jest.mock('./volumeLabelmapSliceData', () => ({
+   getSliceState: jest.fn(),
+ }));
+ 
++jest.mock('./volumeLabelmapResampledSliceData', () => ({
++  canCreateResampledSliceImageData: jest.fn(),
++  createPlanarSliceImageData: jest.fn(),
++}));
++
+ import {
+   addVolumeLabelmapImageMapperActors,
+   getLabelmapForActorReference,
+@@ -89,6 +94,8 @@ const {
+   getSliceRenderingCamera,
+   getSliceState,
+ } = jest.requireMock('./volumeLabelmapSliceData');
++const { canCreateResampledSliceImageData, createPlanarSliceImageData } =
++  jest.requireMock('./volumeLabelmapResampledSliceData');
+ 
+ function makeSegmentation() {
+   return {
+@@ -201,6 +208,56 @@ describe('getVolumeLabelmapImageMapperRepresentationUIDs', () => {
+     expect(uids).toHaveLength(1);
+     expect(uids[0]).not.toContain('slice-key');
+   });
++
++  it('keeps the planar UID for an off-axis view whose slice can be resampled', () => {
++    canRenderVolumeViewportLabelmapAsImage.mockReturnValue(true);
++    getLabelmaps.mockReturnValue([{ labelmapId: 'layer-1' }]);
++    getOrCreateLabelmapVolume.mockReturnValue({ imageIds: ['v-0'] });
++    getSliceState.mockReturnValue(undefined);
++    canCreateResampledSliceImageData.mockReturnValue(true);
++
++    const uids = getVolumeLabelmapImageMapperRepresentationUIDs(
++      makePlanarNextViewport() as never,
++      'seg-1',
++      makeSegmentation()
++    );
++
++    expect(uids).toHaveLength(1);
++    expect(uids[0]).toContain('layer-1');
++  });
++
++  it('returns no planar UID when the off-axis view plane misses the volume', () => {
++    canRenderVolumeViewportLabelmapAsImage.mockReturnValue(true);
++    getLabelmaps.mockReturnValue([{ labelmapId: 'layer-1' }]);
++    getOrCreateLabelmapVolume.mockReturnValue({ imageIds: ['v-0'] });
++    getSliceState.mockReturnValue(undefined);
++    canCreateResampledSliceImageData.mockReturnValue(false);
++
++    expect(
++      getVolumeLabelmapImageMapperRepresentationUIDs(
++        makePlanarNextViewport() as never,
++        'seg-1',
++        makeSegmentation()
++      )
++    ).toEqual([]);
++  });
++
++  it('does not resample an off-axis view on an orthographic viewport', () => {
++    canRenderVolumeViewportLabelmapAsImage.mockReturnValue(true);
++    getLabelmaps.mockReturnValue([{ labelmapId: 'layer-1' }]);
++    getOrCreateLabelmapVolume.mockReturnValue({ imageIds: ['v-0'] });
++    getSliceState.mockReturnValue(undefined);
++    canCreateResampledSliceImageData.mockReturnValue(true);
++
++    expect(
++      getVolumeLabelmapImageMapperRepresentationUIDs(
++        makeOrthographicViewport() as never,
++        'seg-1',
++        makeSegmentation()
++      )
++    ).toEqual([]);
++    expect(canCreateResampledSliceImageData).not.toHaveBeenCalled();
++  });
+ });
+ 
+ describe('addVolumeLabelmapImageMapperActors', () => {
+@@ -257,9 +314,9 @@ describe('addVolumeLabelmapImageMapperActors', () => {
+     getOrCreateLabelmapVolume.mockReturnValue({
+       imageIds: ['v-0', 'v-1'],
+     });
+-    createSliceImageData.mockReturnValue({
++    createPlanarSliceImageData.mockReturnValue({
+       imageData: {},
+-      state: { key: 'slice-key', sliceIndex: 0 },
++      sliceIndex: 0,
+     });
+     getSliceRenderingCamera.mockReturnValue({
+       viewPlaneNormal: [0, 0, 1],
+@@ -287,6 +344,77 @@ describe('addVolumeLabelmapImageMapperActors', () => {
+     stackInputs[0].callback({ imageActor: fakeImageActor });
+     expect(applyPlanarOverlayDepthOffset).toHaveBeenCalled();
+   });
++
++  it('gives the planar slice image of an off-axis view to addImages', async () => {
++    canRenderVolumeViewportLabelmapAsImage.mockReturnValue(true);
++    const viewport = makePlanarNextViewport();
++    const resampledImageData = {};
++
++    getLabelmaps.mockReturnValue([{ labelmapId: 'layer-1' }]);
++    getOrCreateLabelmapVolume.mockReturnValue({
++      imageIds: ['v-0', 'v-1'],
++    });
++    createPlanarSliceImageData.mockReturnValue({
++      imageData: resampledImageData,
++      sliceIndex: 1,
++    });
++
++    await addVolumeLabelmapImageMapperActors({
++      viewport: viewport as never,
++      segmentation: makeSegmentation(),
++      segmentationId: 'seg-1',
++    });
++
++    const [stackInputs] = viewport.addImages.mock.calls[0];
++
++    expect(createSliceImageData).not.toHaveBeenCalled();
++    expect(stackInputs[0].imageData).toBe(resampledImageData);
++    expect(stackInputs[0].useWorldCoordinateImageData).toBe(true);
++  });
++
++  it('falls back to the image of the slice index when the planar viewport has no current image', async () => {
++    canRenderVolumeViewportLabelmapAsImage.mockReturnValue(true);
++    const viewport = makePlanarNextViewport();
++
++    viewport.getCurrentImageId = jest.fn(() => undefined);
++    getLabelmaps.mockReturnValue([{ labelmapId: 'layer-1' }]);
++    getOrCreateLabelmapVolume.mockReturnValue({
++      imageIds: ['v-0', 'v-1'],
++    });
++    createPlanarSliceImageData.mockReturnValue({
++      imageData: {},
++      sliceIndex: 1,
++    });
++
++    await addVolumeLabelmapImageMapperActors({
++      viewport: viewport as never,
++      segmentation: makeSegmentation(),
++      segmentationId: 'seg-1',
++    });
++
++    const [stackInputs] = viewport.addImages.mock.calls[0];
++
++    expect(stackInputs[0].imageId).toBe('v-1');
++  });
++
++  it('adds no planar actor for a layer without a slice image', async () => {
++    canRenderVolumeViewportLabelmapAsImage.mockReturnValue(true);
++    const viewport = makePlanarNextViewport();
++
++    getLabelmaps.mockReturnValue([{ labelmapId: 'layer-1' }]);
++    getOrCreateLabelmapVolume.mockReturnValue({
++      imageIds: ['v-0', 'v-1'],
++    });
++    createPlanarSliceImageData.mockReturnValue(undefined);
++
++    await addVolumeLabelmapImageMapperActors({
++      viewport: viewport as never,
++      segmentation: makeSegmentation(),
++      segmentationId: 'seg-1',
++    });
++
++    expect(viewport.addImages).not.toHaveBeenCalled();
++  });
+ });
+ 
+ describe('updateVolumeLabelmapImageMapperActors', () => {
+@@ -347,6 +475,41 @@ describe('updateVolumeLabelmapImageMapperActors', () => {
+     expect(mapperA.setInputData).toHaveBeenCalled();
+     expect(actorOther.actor.getMapper).not.toHaveBeenCalled();
+   });
++
++  it('gives planar actors the slice image of the planar slice data', () => {
++    canRenderVolumeViewportLabelmapAsImage.mockReturnValue(true);
++
++    const mapper = { setInputData: jest.fn(), modified: jest.fn() };
++    const actorEntry = {
++      uid: 'seg-1-Labelmap-layer-a',
++      representationUID: 'seg-1-Labelmap-layer-a',
++      referencedId: 'layer-a',
++      actor: {
++        getMapper: jest.fn(() => mapper),
++        modified: jest.fn(),
++      },
++    };
++    const resampledImageData = {};
++
++    getLabelmaps.mockReturnValue([{ labelmapId: 'layer-a' }]);
++    getOrCreateLabelmapVolume.mockReturnValue({ imageIds: ['v'] });
++    createPlanarSliceImageData.mockReturnValue({
++      imageData: resampledImageData,
++      sliceIndex: 0,
++    });
++
++    const viewport = makePlanarNextViewport();
++    viewport.getActors = jest.fn(() => [actorEntry]);
++
++    updateVolumeLabelmapImageMapperActors({
++      viewport: viewport as never,
++      segmentation: makeSegmentation(),
++      segmentationId: 'seg-1',
++    });
++
++    expect(createSliceImageData).not.toHaveBeenCalled();
++    expect(mapper.setInputData).toHaveBeenCalledWith(resampledImageData);
++  });
+ });
+ 
+ describe('removeVolumeLabelmapImageMapperActors', () => {
+diff --git a/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapImageMapper.ts b/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapImageMapper.ts
+index 283737d333..391ea837f5 100644
+--- a/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapImageMapper.ts
++++ b/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapImageMapper.ts
+@@ -22,6 +22,10 @@ import {
+   getSliceState,
+   type SliceRenderingViewport,
+ } from './volumeLabelmapSliceData';
++import {
++  canCreateResampledSliceImageData,
++  createPlanarSliceImageData,
++} from './volumeLabelmapResampledSliceData';
+ 
+ const OVERLAY_RENDERER_SUFFIX = 'labelmap-image-mapper-overlay';
+ 
+@@ -158,6 +162,8 @@ export function getVolumeLabelmapImageMapperRepresentationUIDs(
+   }
+ 
+   const useStablePlanarUID = isPlanarSliceRenderingViewport(viewport);
++  const sliceViewport = viewport as SliceRenderingViewport;
++  const camera = getSliceRenderingCamera(sliceViewport);
+ 
+   return getLabelmaps(segmentation)
+     .map((layer) => {
+@@ -166,7 +172,21 @@ export function getVolumeLabelmapImageMapperRepresentationUIDs(
+         return;
+       }
+ 
+-      const state = getSliceState(viewport as SliceRenderingViewport, volume);
++      const state = getSliceState(sliceViewport, volume, camera);
++
++      if (useStablePlanarUID) {
++        const canShowSlice =
++          !!state ||
++          canCreateResampledSliceImageData(volume, sliceViewport, camera);
++
++        return canShowSlice
++          ? createLabelmapRepresentationUID({
++              segmentationId,
++              referencedId: layer.labelmapId,
++            })
++          : undefined;
++      }
++
+       if (!state) {
+         return;
+       }
+@@ -174,7 +194,7 @@ export function getVolumeLabelmapImageMapperRepresentationUIDs(
+       return createLabelmapRepresentationUID({
+         segmentationId,
+         referencedId: layer.labelmapId,
+-        ...(useStablePlanarUID ? {} : { sliceStateKey: state.key }),
++        sliceStateKey: state.key,
+       });
+     })
+     .filter((value): value is string => !!value);
+@@ -347,6 +367,7 @@ async function addPlanarLabelmapImageMapperActors(args: {
+   segmentationId: string;
+ }): Promise<void> {
+   const { viewport, segmentation, segmentationId } = args;
++  const camera = getSliceRenderingCamera(viewport);
+ 
+   for (const [index, layer] of getLabelmaps(segmentation).entries()) {
+     const volume = getOrCreateLabelmapVolume(layer);
+@@ -355,7 +376,7 @@ async function addPlanarLabelmapImageMapperActors(args: {
+       continue;
+     }
+ 
+-    const sliceData = createSliceImageData(volume, viewport);
++    const sliceData = createPlanarSliceImageData(volume, viewport, camera);
+ 
+     if (!sliceData) {
+       continue;
+@@ -365,7 +386,7 @@ async function addPlanarLabelmapImageMapperActors(args: {
+       viewport.getCurrentImageId() ??
+       volume.imageIds[
+         Math.min(
+-          Math.max(sliceData.state.sliceIndex, 0),
++          Math.max(sliceData.sliceIndex, 0),
+           Math.max(volume.imageIds.length - 1, 0)
+         )
+       ];
+@@ -395,7 +416,6 @@ async function addPlanarLabelmapImageMapperActors(args: {
+         excludeFromFidelity: true,
+         callback: ({ imageActor }) => {
+           const mapper = imageActor.getMapper() as vtkImageMapper;
+-          const camera = getSliceRenderingCamera(viewport);
+ 
+           mapper.setInputData(sliceData.imageData);
+           mapper.modified();
+@@ -431,6 +451,7 @@ function updatePlanarLabelmapImageMapperActors(args: {
+       )
+       .map((actorEntry) => [actorEntry.referencedId, actorEntry] as const)
+   );
++  const camera = getSliceRenderingCamera(viewport);
+ 
+   getLabelmaps(segmentation).forEach((layer, index) => {
+     const actorEntry = actorEntriesByLabelmapId.get(layer.labelmapId);
+@@ -445,7 +466,7 @@ function updatePlanarLabelmapImageMapperActors(args: {
+       return;
+     }
+ 
+-    const sliceData = createSliceImageData(volume, viewport);
++    const sliceData = createPlanarSliceImageData(volume, viewport, camera);
+ 
+     if (!sliceData) {
+       return;
+@@ -455,7 +476,6 @@ function updatePlanarLabelmapImageMapperActors(args: {
+ 
+     mapper.setInputData(sliceData.imageData);
+     mapper.modified();
+-    const camera = getSliceRenderingCamera(viewport);
+ 
+     if (camera) {
+       applyPlanarOverlayDepthOffset(
+diff --git a/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapResampledSliceData.spec.ts b/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapResampledSliceData.spec.ts
+new file mode 100644
+index 0000000000..b326150aa3
+--- /dev/null
++++ b/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapResampledSliceData.spec.ts
+@@ -0,0 +1,851 @@
++type TestImageData = {
++  spacing: number[];
++  direction: number[];
++  origin: number[];
++};
++
++jest.mock('@cornerstonejs/core', () => ({
++  Enums: {
++    InterpolationType: {
++      NEAREST: 0,
++      LINEAR: 1,
++    },
++  },
++  utilities: {
++    getEffectiveSpacingAlongDirection: jest.requireActual(
++      '@cornerstonejs/core/utilities/getEffectiveSpacingAlongDirection'
++    ).default,
++    sampleVolumeGrid: jest.requireActual(
++      '@cornerstonejs/core/utilities/sampleVolumeGrid'
++    ).default,
++    transformIndexToWorld: jest.fn(
++      (imageData: TestImageData, index: number[]) =>
++        [0, 1, 2].map(
++          (component) =>
++            imageData.origin[component] +
++            [0, 1, 2].reduce(
++              (sum, axis) =>
++                sum +
++                index[axis] *
++                  imageData.spacing[axis] *
++                  imageData.direction[axis * 3 + component],
++              0
++            )
++        )
++    ),
++    transformWorldToIndexContinuous: jest.fn(
++      (imageData: TestImageData, point: number[]) =>
++        [0, 1, 2].map(
++          (axis) =>
++            [0, 1, 2].reduce(
++              (sum, component) =>
++                sum +
++                (point[component] - imageData.origin[component]) *
++                  imageData.direction[axis * 3 + component],
++              0
++            ) / imageData.spacing[axis]
++        )
++    ),
++  },
++}));
++
++jest.mock('@kitware/vtk.js/Common/Core/DataArray', () => ({
++  __esModule: true,
++  default: {
++    getDataType: jest.fn(() => 'Uint8Array'),
++    newInstance: jest.fn(({ values }) => ({ getData: () => values })),
++  },
++}));
++
++jest.mock('@kitware/vtk.js/Common/DataModel/ImageData', () => ({
++  __esModule: true,
++  default: {
++    newInstance: jest.fn(() => {
++      const state: Record<string, unknown> = {};
++
++      return {
++        state,
++        set: jest.fn(),
++        modified: jest.fn(),
++        setDimensions: (...dimensions: number[]) => {
++          state.dimensions = dimensions;
++        },
++        setSpacing: (spacing: number[]) => {
++          state.spacing = spacing;
++        },
++        setDirection: (direction: ArrayLike<number>) => {
++          state.direction = Array.from(direction);
++        },
++        setOrigin: (origin: number[]) => {
++          state.origin = origin;
++        },
++        getPointData: () => ({
++          setScalars: (scalars: unknown) => {
++            state.scalars = scalars;
++          },
++        }),
++      };
++    }),
++  },
++}));
++
++jest.mock(
++  '../../../stateManagement/segmentation/helpers/labelmapImageMapperSupport',
++  () => ({
++    DIRECTION_ALIGNMENT_TOLERANCE: 0.999,
++  })
++);
++
++import {
++  canCreateResampledSliceImageData,
++  createPlanarSliceImageData,
++  createResampledSliceImageData,
++} from './volumeLabelmapResampledSliceData';
++
++type Vector = [number, number, number];
++
++type FakeImageState = {
++  dimensions: number[];
++  spacing: number[];
++  direction: number[];
++  origin: number[];
++  scalars: { getData: () => Uint8Array };
++};
++
++type VolumeOptions = {
++  dimensions?: Vector;
++  spacing?: Vector;
++  direction?: number[];
++  origin?: Vector;
++};
++
++type TestVolume = ReturnType<typeof makeVolume>;
++
++const identityDirection = [1, 0, 0, 0, 1, 0, 0, 0, 1];
++const turnedDirection = [
++  Math.cos(Math.PI / 6),
++  Math.sin(Math.PI / 6),
++  0,
++  -Math.sin(Math.PI / 6),
++  Math.cos(Math.PI / 6),
++  0,
++  0,
++  0,
++  1,
++];
++const obliqueNormal: Vector = [Math.SQRT1_2, 0, Math.SQRT1_2];
++
++/**
++ * The value of a voxel of the test volume. Every voxel differs from zero, so a
++ * pixel with the value 0 is a pixel outside the volume.
++ */
++function voxelValue(i: number, j: number, k: number): number {
++  return 1 + ((i + 7 * j + 31 * k) % 200);
++}
++
++/**
++ * Builds a test volume of one typed array per slice, exposed through
++ * _getSliceView. The ways that the core sampler reads voxels are tested in
++ * sampleVolumeGrid.jest.js.
++ */
++function makeVolume(options: VolumeOptions = {}) {
++  const {
++    dimensions = [6, 5, 4] as Vector,
++    spacing = [1, 1, 2] as Vector,
++    direction = identityDirection,
++    origin = [0, 0, 0] as Vector,
++  } = options;
++  const [columns, rows, slices] = dimensions;
++  const sliceArrays = Array.from({ length: slices }, (_, k) => {
++    const data = new Uint8Array(columns * rows);
++
++    for (let j = 0; j < rows; j++) {
++      for (let i = 0; i < columns; i++) {
++        data[j * columns + i] = voxelValue(i, j, k);
++      }
++    }
++
++    return data;
++  });
++
++  return {
++    dimensions,
++    spacing,
++    direction,
++    imageData: { spacing, direction, origin },
++    voxelManager: {
++      getConstructor: () => Uint8Array,
++      getAtIJK: jest.fn(
++        (i: number, j: number, k: number) => sliceArrays[k][j * columns + i]
++      ),
++      _getSliceView: jest.fn((k: number) => sliceArrays[k]),
++    },
++  };
++}
++
++/**
++ * The world position of a voxel index of the test volume.
++ */
++function indexToWorld(volume: TestVolume, index: number[]): Vector {
++  const { spacing, direction, origin } = volume.imageData;
++
++  return [0, 1, 2].map(
++    (component) =>
++      origin[component] +
++      [0, 1, 2].reduce(
++        (sum, axis) =>
++          sum + index[axis] * spacing[axis] * direction[axis * 3 + component],
++        0
++      )
++  ) as Vector;
++}
++
++/**
++ * The index of the voxel of the test volume that is nearest to a world
++ * position. A position on the border between two voxels takes the lower
++ * voxel, which is the tie rule of the sampler.
++ */
++function nearestVoxel(volume: TestVolume, world: number[]): number[] {
++  const { spacing, direction, origin } = volume.imageData;
++
++  return [0, 1, 2].map((axis) =>
++    Math.floor(
++      [0, 1, 2].reduce(
++        (sum, component) =>
++          sum +
++          (world[component] - origin[component]) *
++            direction[axis * 3 + component],
++        0
++      ) /
++        spacing[axis] +
++        0.5 -
++        1e-6
++    )
++  );
++}
++
++/**
++ * Turns a vector of the volume axes into a world vector.
++ */
++function alongVolumeAxes(volume: TestVolume, vector: Vector): Vector {
++  const { direction } = volume.imageData;
++
++  return [0, 1, 2].map((component) =>
++    [0, 1, 2].reduce(
++      (sum, axis) => sum + vector[axis] * direction[axis * 3 + component],
++      0
++    )
++  ) as Vector;
++}
++
++/**
++ * A world position near the center of the test volume that lies off the
++ * borders between voxels. A view plane through the exact center of a volume
++ * runs along voxel borders, where two voxels are equally near to a pixel.
++ */
++function getPointNearCenter(volume: TestVolume): Vector {
++  const offsets = [0.27, -0.19, 0.13];
++
++  return indexToWorld(
++    volume,
++    volume.dimensions.map((size, axis) => (size - 1) / 2 + offsets[axis])
++  );
++}
++
++/**
++ * Builds a viewport that reports the given camera.
++ */
++function makeViewport(camera: {
++  focalPoint: Vector;
++  viewPlaneNormal: Vector;
++  viewUp: Vector;
++}) {
++  return {
++    getResolvedView: () => ({ toICamera: () => camera }),
++  };
++}
++
++/**
++ * Reads the geometry and the pixels that the code under test gave to the
++ * image data.
++ */
++function getImageState(result: { imageData: unknown }): FakeImageState {
++  return (result.imageData as { state: FakeImageState }).state;
++}
++
++/**
++ * The world position of the center of a pixel of the slice image.
++ */
++function pixelToWorld(state: FakeImageState, column: number, row: number) {
++  return [0, 1, 2].map(
++    (axis) =>
++      state.origin[axis] +
++      column * state.spacing[0] * state.direction[axis] +
++      row * state.spacing[1] * state.direction[3 + axis]
++  );
++}
++
++/**
++ * Compares every pixel of the slice image with the nearest voxel of the test
++ * volume and returns how many pixels differ and how many lie in the volume.
++ */
++function comparePixelsWithNearestVoxels(
++  volume: TestVolume,
++  state: FakeImageState
++) {
++  const [width, height] = state.dimensions;
++  const pixels = state.scalars.getData();
++  let mismatches = 0;
++  let inside = 0;
++
++  for (let row = 0; row < height; row++) {
++    for (let column = 0; column < width; column++) {
++      const [i, j, k] = nearestVoxel(volume, pixelToWorld(state, column, row));
++      const isInside =
++        i >= 0 &&
++        i < volume.dimensions[0] &&
++        j >= 0 &&
++        j < volume.dimensions[1] &&
++        k >= 0 &&
++        k < volume.dimensions[2];
++      const expected = isInside ? voxelValue(i, j, k) : 0;
++
++      if (isInside) {
++        inside++;
++      }
++
++      if (pixels[row * width + column] !== expected) {
++        mismatches++;
++      }
++    }
++  }
++
++  return { mismatches, inside };
++}
++
++/**
++ * The determinant of the direction matrix of the slice image.
++ */
++function directionDeterminant(direction: number[]): number {
++  const [a, b, c, d, e, f, g, h, i] = direction;
++
++  return a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
++}
++
++/**
++ * The distance from the center of a pixel of the slice image to the view
++ * plane.
++ */
++function distanceToViewPlane(
++  state: FakeImageState,
++  column: number,
++  row: number,
++  focalPoint: Vector,
++  viewPlaneNormal: Vector
++): number {
++  return pixelToWorld(state, column, row).reduce(
++    (sum, value, axis) =>
++      sum + (value - focalPoint[axis]) * viewPlaneNormal[axis],
++    0
++  );
++}
++
++describe('createResampledSliceImageData for a view rotated in its own plane', () => {
++  const angle = Math.PI / 6;
++
++  beforeEach(() => {
++    jest.clearAllMocks();
++  });
++
++  it.each([
++    {
++      axis: 'slice',
++      focalPoint: [2.5, 2, 4] as Vector,
++      viewPlaneNormal: [0, 0, -1] as Vector,
++      viewUp: [Math.sin(angle), -Math.cos(angle), 0] as Vector,
++      sliceIndex: 2,
++      inside: 6 * 5,
++      worldAxis: 2,
++      worldValue: 4,
++    },
++    {
++      axis: 'column',
++      focalPoint: [3, 2, 3] as Vector,
++      viewPlaneNormal: [1, 0, 0] as Vector,
++      viewUp: [0, Math.sin(angle), Math.cos(angle)] as Vector,
++      sliceIndex: 3,
++      inside: 5 * 4,
++      worldAxis: 0,
++      worldValue: 3,
++    },
++    {
++      axis: 'row',
++      focalPoint: [2.5, 1, 3] as Vector,
++      viewPlaneNormal: [0, -1, 0] as Vector,
++      viewUp: [Math.sin(angle), 0, Math.cos(angle)] as Vector,
++      sliceIndex: 1,
++      inside: 6 * 4,
++      worldAxis: 1,
++      worldValue: 1,
++    },
++  ])(
++    'copies one slice of voxels when the view normal follows the $axis axis',
++    ({
++      focalPoint,
++      viewPlaneNormal,
++      viewUp,
++      sliceIndex,
++      inside,
++      worldAxis,
++      worldValue,
++    }) => {
++      const volume = makeVolume();
++      const result = createResampledSliceImageData(
++        volume as never,
++        makeViewport({ focalPoint, viewPlaneNormal, viewUp }) as never
++      );
++      const state = getImageState(result);
++      const compared = comparePixelsWithNearestVoxels(volume, state);
++
++      expect(result.sliceIndex).toBe(sliceIndex);
++      expect(compared.inside).toBe(inside);
++      expect(compared.mismatches).toBe(0);
++      expect(pixelToWorld(state, 0, 0)[worldAxis]).toBeCloseTo(worldValue);
++    }
++  );
++
++  it('keeps the same handedness for both directions of the view normal', () => {
++    [-1, 1].forEach((normalSign) => {
++      const volume = makeVolume();
++      const viewport = makeViewport({
++        focalPoint: [2.5, 2, 4],
++        viewPlaneNormal: [0, 0, normalSign],
++        viewUp: [Math.sin(angle), -Math.cos(angle), 0],
++      });
++      const state = getImageState(
++        createResampledSliceImageData(volume as never, viewport as never)
++      );
++
++      expect(directionDeterminant(state.direction)).toBeCloseTo(-1);
++      expect(comparePixelsWithNearestVoxels(volume, state).mismatches).toBe(0);
++    });
++  });
++
++  it('copies one slice of a volume that is turned and shifted in the world', () => {
++    const volume = makeVolume({
++      direction: turnedDirection,
++      origin: [10, -20, 5],
++    });
++    const viewport = makeViewport({
++      focalPoint: indexToWorld(volume, [2.5, 2, 1]),
++      viewPlaneNormal: alongVolumeAxes(volume, [0, 0, -1]),
++      viewUp: [0, -1, 0],
++    });
++
++    const result = createResampledSliceImageData(
++      volume as never,
++      viewport as never
++    );
++    const state = getImageState(result);
++    const { mismatches, inside } = comparePixelsWithNearestVoxels(
++      volume,
++      state
++    );
++
++    expect(result.sliceIndex).toBe(1);
++    expect(inside).toBe(6 * 5);
++    expect(mismatches).toBe(0);
++  });
++
++  it('copies one slice when the volume axes are not exact unit vectors', () => {
++    const volume = makeVolume({
++      direction: [0.866025, 0.5, 0, -0.5, 0.866025, 0, 0, 0, 1],
++      origin: [10, -20, 5],
++    });
++    const viewport = makeViewport({
++      focalPoint: indexToWorld(volume, [3, 2, 1.5]),
++      viewPlaneNormal: [0.866025, 0.5, 0],
++      viewUp: [0, Math.sin(angle), Math.cos(angle)],
++    });
++
++    const result = createResampledSliceImageData(
++      volume as never,
++      viewport as never
++    );
++    const { mismatches, inside } = comparePixelsWithNearestVoxels(
++      volume,
++      getImageState(result)
++    );
++
++    expect(result.sliceIndex).toBe(3);
++    expect(inside).toBe(5 * 4);
++    expect(mismatches).toBe(0);
++  });
++
++  it('returns undefined when the view lies outside the slices', () => {
++    const viewport = makeViewport({
++      focalPoint: [2.5, 2, 40],
++      viewPlaneNormal: [0, 0, -1],
++      viewUp: [Math.sin(angle), -Math.cos(angle), 0],
++    });
++
++    expect(
++      createResampledSliceImageData(makeVolume() as never, viewport as never)
++    ).toBeUndefined();
++  });
++});
++
++describe('createResampledSliceImageData for an oblique view', () => {
++  beforeEach(() => {
++    jest.clearAllMocks();
++  });
++
++  it('takes the nearest voxel for each pixel of the view plane', () => {
++    const volume = makeVolume();
++    const focalPoint = getPointNearCenter(volume);
++    const viewport = makeViewport({
++      focalPoint,
++      viewPlaneNormal: obliqueNormal,
++      viewUp: [0, 1, 0],
++    });
++
++    const result = createResampledSliceImageData(
++      volume as never,
++      viewport as never
++    );
++    const state = getImageState(result);
++    const { mismatches, inside } = comparePixelsWithNearestVoxels(
++      volume,
++      state
++    );
++    const [width, height] = state.dimensions;
++
++    expect(inside).toBeGreaterThan(0);
++    expect(mismatches).toBe(0);
++    expect(
++      distanceToViewPlane(state, 0, 0, focalPoint, obliqueNormal)
++    ).toBeCloseTo(0);
++    expect(
++      distanceToViewPlane(
++        state,
++        width - 1,
++        height - 1,
++        focalPoint,
++        obliqueNormal
++      )
++    ).toBeCloseTo(0);
++    expect(directionDeterminant(state.direction)).toBeCloseTo(-1);
++  });
++
++  it('accepts a view normal that is not a unit vector', () => {
++    const volume = makeVolume();
++    const viewport = makeViewport({
++      focalPoint: getPointNearCenter(volume),
++      viewPlaneNormal: [3, 0, 3],
++      viewUp: [0, 1, 0],
++    });
++    const state = getImageState(
++      createResampledSliceImageData(volume as never, viewport as never)
++    );
++
++    expect(comparePixelsWithNearestVoxels(volume, state).mismatches).toBe(0);
++    expect(directionDeterminant(state.direction)).toBeCloseTo(-1);
++  });
++
++  it('gives the same slice when the view turns in its own plane', () => {
++    const volume = makeVolume();
++    const focalPoint = getPointNearCenter(volume);
++    const first = getImageState(
++      createResampledSliceImageData(
++        volume as never,
++        makeViewport({
++          focalPoint,
++          viewPlaneNormal: obliqueNormal,
++          viewUp: [0, 1, 0],
++        }) as never
++      )
++    );
++    const second = getImageState(
++      createResampledSliceImageData(
++        volume as never,
++        makeViewport({
++          focalPoint,
++          viewPlaneNormal: obliqueNormal,
++          viewUp: [-0.5, Math.SQRT1_2, 0.5],
++        }) as never
++      )
++    );
++
++    expect(second.dimensions).toEqual(first.dimensions);
++    expect(Array.from(second.scalars.getData())).toEqual(
++      Array.from(first.scalars.getData())
++    );
++  });
++
++  it('resamples a volume that is turned and shifted in the world', () => {
++    const volume = makeVolume({
++      direction: turnedDirection,
++      origin: [10, -20, 5],
++    });
++    const focalPoint = getPointNearCenter(volume);
++    const viewPlaneNormal = alongVolumeAxes(volume, obliqueNormal);
++    const viewport = makeViewport({
++      focalPoint,
++      viewPlaneNormal,
++      viewUp: alongVolumeAxes(volume, [0, 1, 0]),
++    });
++
++    const state = getImageState(
++      createResampledSliceImageData(volume as never, viewport as never)
++    );
++    const { mismatches, inside } = comparePixelsWithNearestVoxels(
++      volume,
++      state
++    );
++
++    expect(inside).toBeGreaterThan(0);
++    expect(mismatches).toBe(0);
++    expect(
++      distanceToViewPlane(state, 0, 0, focalPoint, viewPlaneNormal)
++    ).toBeCloseTo(0);
++  });
++
++  it('uses a pixel size close to the voxel size along the plane', () => {
++    const volume = makeVolume({
++      dimensions: [40, 40, 20],
++      spacing: [1, 1, 2],
++    });
++    const viewport = makeViewport({
++      focalPoint: getPointNearCenter(volume),
++      viewPlaneNormal: obliqueNormal,
++      viewUp: [0, 1, 0],
++    });
++    const state = getImageState(
++      createResampledSliceImageData(volume as never, viewport as never)
++    );
++
++    expect(state.spacing[0]).toBeGreaterThan(0.9);
++    expect(state.spacing[0]).toBeLessThanOrEqual(1);
++    expect(state.spacing[1]).toBeGreaterThan(1);
++    expect(state.spacing[1]).toBeLessThan(2);
++  });
++
++  it('limits the size of the slice image of a very long volume', () => {
++    const volume = makeVolume({
++      dimensions: [5000, 2, 2],
++      spacing: [1, 1, 1],
++    });
++    const viewport = makeViewport({
++      focalPoint: getPointNearCenter(volume),
++      viewPlaneNormal: [0, Math.SQRT1_2, Math.SQRT1_2],
++      viewUp: [1, 0, 0],
++    });
++    const state = getImageState(
++      createResampledSliceImageData(volume as never, viewport as never)
++    );
++
++    expect(state.dimensions[0]).toBe(2048);
++    expect(state.spacing[0]).toBeCloseTo(5000 / 2048);
++    expect(comparePixelsWithNearestVoxels(volume, state).mismatches).toBe(0);
++  });
++
++  it('samples a view with a small tilt on its own plane and not as one slice of voxels', () => {
++    const volume = makeVolume({ dimensions: [60, 50, 40] });
++    const focalPoint = getPointNearCenter(volume);
++    const tilt = Math.PI / 180;
++    const viewPlaneNormal: Vector = [Math.sin(tilt), 0, -Math.cos(tilt)];
++    const viewport = makeViewport({
++      focalPoint,
++      viewPlaneNormal,
++      viewUp: [0, -1, 0],
++    });
++
++    const state = getImageState(
++      createResampledSliceImageData(volume as never, viewport as never)
++    );
++    const { mismatches, inside } = comparePixelsWithNearestVoxels(
++      volume,
++      state
++    );
++    const [width, height] = state.dimensions;
++
++    expect(inside).toBeGreaterThan(0);
++    expect(mismatches).toBe(0);
++    expect(
++      distanceToViewPlane(state, 0, 0, focalPoint, viewPlaneNormal)
++    ).toBeCloseTo(0, 6);
++    expect(
++      distanceToViewPlane(
++        state,
++        width - 1,
++        height - 1,
++        focalPoint,
++        viewPlaneNormal
++      )
++    ).toBeCloseTo(0, 6);
++  });
++
++  it('keeps its precision for a volume far from the world origin', () => {
++    const volume = makeVolume({
++      spacing: [0.1, 0.1, 0.2],
++      origin: [1e6, -1e6, 1e6],
++    });
++    const focalPoint = getPointNearCenter(volume);
++    const oblique = getImageState(
++      createResampledSliceImageData(
++        volume as never,
++        makeViewport({
++          focalPoint,
++          viewPlaneNormal: obliqueNormal,
++          viewUp: [0, 1, 0],
++        }) as never
++      )
++    );
++    const rotated = getImageState(
++      createResampledSliceImageData(
++        volume as never,
++        makeViewport({
++          focalPoint: indexToWorld(volume, [2.5, 2, 1]),
++          viewPlaneNormal: [0, 0, -1],
++          viewUp: [0.5, -Math.sqrt(0.75), 0],
++        }) as never
++      )
++    );
++    const rotatedComparison = comparePixelsWithNearestVoxels(volume, rotated);
++
++    expect(comparePixelsWithNearestVoxels(volume, oblique).mismatches).toBe(0);
++    expect(rotatedComparison.inside).toBe(6 * 5);
++    expect(rotatedComparison.mismatches).toBe(0);
++  });
++
++  it('returns undefined when the view plane does not cut the volume', () => {
++    const viewport = makeViewport({
++      focalPoint: [100, 100, 100],
++      viewPlaneNormal: obliqueNormal,
++      viewUp: [0, 1, 0],
++    });
++
++    expect(
++      createResampledSliceImageData(makeVolume() as never, viewport as never)
++    ).toBeUndefined();
++    expect(
++      canCreateResampledSliceImageData(makeVolume() as never, viewport as never)
++    ).toBe(false);
++  });
++
++  it('returns undefined when the viewport reports no camera', () => {
++    const viewport = { getResolvedView: () => undefined };
++
++    expect(
++      createResampledSliceImageData(makeVolume() as never, viewport as never)
++    ).toBeUndefined();
++  });
++});
++
++describe('createPlanarSliceImageData', () => {
++  beforeEach(() => {
++    jest.clearAllMocks();
++  });
++
++  it('copies the slice of an aligned view without resampling', () => {
++    const volume = makeVolume();
++    const viewport = makeViewport({
++      focalPoint: [2.5, 2, 2],
++      viewPlaneNormal: [0, 0, -1],
++      viewUp: [0, -1, 0],
++    });
++
++    const result = createPlanarSliceImageData(
++      volume as never,
++      viewport as never
++    );
++    const state = getImageState(result);
++
++    expect(result.sliceIndex).toBe(1);
++    expect(state.dimensions).toEqual([6, 5, 1]);
++    expect(volume.voxelManager._getSliceView).not.toHaveBeenCalled();
++  });
++
++  it('samples a view with a small tilt that the aligned copy would accept', () => {
++    const volume = makeVolume({ dimensions: [60, 50, 40] });
++    const focalPoint = getPointNearCenter(volume);
++    const tilt = Math.PI / 180;
++    const viewPlaneNormal: Vector = [Math.sin(tilt), 0, -Math.cos(tilt)];
++    const viewport = makeViewport({
++      focalPoint,
++      viewPlaneNormal,
++      viewUp: [0, -1, 0],
++    });
++
++    const state = getImageState(
++      createPlanarSliceImageData(volume as never, viewport as never)
++    );
++    const [width, height] = state.dimensions;
++
++    expect(comparePixelsWithNearestVoxels(volume, state).mismatches).toBe(0);
++    expect(
++      distanceToViewPlane(
++        state,
++        width - 1,
++        height - 1,
++        focalPoint,
++        viewPlaneNormal
++      )
++    ).toBeCloseTo(0, 6);
++  });
++
++  it('copies the slice of a view rotated in its own plane', () => {
++    const volume = makeVolume();
++    const viewport = makeViewport({
++      focalPoint: [2.5, 2, 2],
++      viewPlaneNormal: [0, 0, -1],
++      viewUp: [Math.SQRT1_2, -Math.SQRT1_2, 0],
++    });
++
++    const result = createPlanarSliceImageData(
++      volume as never,
++      viewport as never
++    );
++    const { mismatches, inside } = comparePixelsWithNearestVoxels(
++      volume,
++      getImageState(result)
++    );
++
++    expect(result.sliceIndex).toBe(1);
++    expect(inside).toBe(6 * 5);
++    expect(mismatches).toBe(0);
++  });
++
++  it('resamples the slice of an oblique view', () => {
++    const volume = makeVolume();
++    const viewport = makeViewport({
++      focalPoint: getPointNearCenter(volume),
++      viewPlaneNormal: obliqueNormal,
++      viewUp: [0, 1, 0],
++    });
++
++    const result = createPlanarSliceImageData(
++      volume as never,
++      viewport as never
++    );
++
++    expect(
++      comparePixelsWithNearestVoxels(volume, getImageState(result)).mismatches
++    ).toBe(0);
++    expect(
++      canCreateResampledSliceImageData(volume as never, viewport as never)
++    ).toBe(true);
++  });
++
++  it('returns undefined when the view plane does not cut the volume', () => {
++    const viewport = makeViewport({
++      focalPoint: [100, 100, 100],
++      viewPlaneNormal: obliqueNormal,
++      viewUp: [0, 1, 0],
++    });
++
++    expect(
++      createPlanarSliceImageData(makeVolume() as never, viewport as never)
++    ).toBeUndefined();
++  });
++});
+diff --git a/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapResampledSliceData.ts b/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapResampledSliceData.ts
+new file mode 100644
+index 0000000000..27090d8b82
+--- /dev/null
++++ b/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapResampledSliceData.ts
+@@ -0,0 +1,507 @@
++import vtkDataArray from '@kitware/vtk.js/Common/Core/DataArray';
++import vtkImageData from '@kitware/vtk.js/Common/DataModel/ImageData';
++import { Enums, type Types, utilities } from '@cornerstonejs/core';
++import { vec3 } from 'gl-matrix';
++import {
++  createSliceImageData,
++  getSliceRenderingCamera,
++  getVolumeAxes,
++  matchAxis,
++  type SliceRenderingCamera,
++  type SliceRenderingViewport,
++} from './volumeLabelmapSliceData';
++
++const MAX_RESAMPLED_SLICE_SIZE = 2048;
++const SLICE_INDEX_EPSILON = 1e-6;
++const MINIMUM_PLANE_INTERSECTION_POINTS = 3;
++const EXACT_SLICE_ALIGNMENT = 1 - 1e-8;
++
++type ResampledSliceGeometry = {
++  origin: Types.Point3;
++  xDirection: Types.Point3;
++  yDirection: Types.Point3;
++  zDirection: Types.Point3;
++  spacing: Types.Point2;
++  width: number;
++  height: number;
++  sliceIndex: number;
++};
++
++type PlanarSliceImageData = {
++  imageData: vtkImageData;
++  sliceIndex: number;
++};
++
++/**
++ * Returns an empty vector that holds double precision numbers. A vector from
++ * vec3.create() holds single precision, which is too coarse for a world
++ * position and for the test of an exact alignment.
++ */
++function createVector(): vec3 {
++  return [0, 0, 0] as unknown as vec3;
++}
++
++/**
++ * Returns the volume axis that the view normal follows so closely that the
++ * view plane stays inside one slice of voxels across the whole volume.
++ * Returns undefined for any other view, also for a view with a small tilt
++ * against the slices, which has to be sampled on its own plane.
++ */
++function getExactSliceAxis(
++  volume: Types.IImageVolume,
++  viewPlaneNormal: Types.Point3
++): number | undefined {
++  const axes = getVolumeAxes(volume);
++  const sliceAxis = matchAxis(viewPlaneNormal, axes);
++
++  if (!sliceAxis) {
++    return;
++  }
++
++  const axisDirection = axes[sliceAxis.axis] as unknown as vec3;
++  const alignment =
++    Math.abs(vec3.dot(viewPlaneNormal as unknown as vec3, axisDirection)) /
++    (vec3.length(viewPlaneNormal as unknown as vec3) *
++      vec3.length(axisDirection));
++
++  return alignment >= EXACT_SLICE_ALIGNMENT ? sliceAxis.axis : undefined;
++}
++
++/**
++ * Returns the point reached from a start point after a step along a direction.
++ */
++function stepAlong(
++  start: Types.Point3,
++  direction: Types.Point3,
++  distance: number
++): Types.Point3 {
++  return vec3.scaleAndAdd(
++    createVector(),
++    start as unknown as vec3,
++    direction as unknown as vec3,
++    distance
++  ) as Types.Point3;
++}
++
++/**
++ * Returns the points where a plane crosses the edges of the box that holds
++ * every voxel of the volume. Fewer than three points mean that the plane does
++ * not cut the volume.
++ */
++function getPlaneVolumeIntersectionPoints(
++  volume: Types.IImageVolume,
++  planePoint: Types.Point3,
++  planeNormal: Types.Point3
++): Types.Point3[] {
++  const { dimensions, imageData } = volume;
++  const corners: Types.Point3[] = [];
++  const distances: number[] = [];
++
++  for (let cornerIndex = 0; cornerIndex < 8; cornerIndex++) {
++    const corner = utilities.transformIndexToWorld(imageData, [
++      cornerIndex & 1 ? dimensions[0] - 0.5 : -0.5,
++      cornerIndex & 2 ? dimensions[1] - 0.5 : -0.5,
++      cornerIndex & 4 ? dimensions[2] - 0.5 : -0.5,
++    ]) as Types.Point3;
++
++    corners.push(corner);
++    distances.push(
++      vec3.dot(
++        vec3.subtract(
++          createVector(),
++          corner as unknown as vec3,
++          planePoint as unknown as vec3
++        ),
++        planeNormal as unknown as vec3
++      )
++    );
++  }
++
++  const points: Types.Point3[] = [];
++
++  for (let cornerIndex = 0; cornerIndex < 8; cornerIndex++) {
++    for (let axisBit = 1; axisBit <= 4; axisBit <<= 1) {
++      if (cornerIndex & axisBit) {
++        continue;
++      }
++
++      const otherIndex = cornerIndex | axisBit;
++      const startDistance = distances[cornerIndex];
++      const endDistance = distances[otherIndex];
++
++      if (startDistance === 0) {
++        points.push(corners[cornerIndex]);
++      }
++
++      if (endDistance === 0) {
++        points.push(corners[otherIndex]);
++      }
++
++      if (startDistance * endDistance < 0) {
++        points.push(
++          vec3.lerp(
++            createVector(),
++            corners[cornerIndex] as unknown as vec3,
++            corners[otherIndex] as unknown as vec3,
++            startDistance / (startDistance - endDistance)
++          ) as Types.Point3
++        );
++      }
++    }
++  }
++
++  return points;
++}
++
++/**
++ * Geometry of the slice when the view normal follows a volume axis but the
++ * view is rotated in its own plane. The slice keeps the voxel grid of the
++ * volume, so its pixels are an exact copy of one slice of voxels. Each row of
++ * the slice runs along the lower of the two volume axes of the plane, so that
++ * a row is read from one slice image where that is possible. The rows are in
++ * the order that gives the image the same handedness as an aligned slice.
++ */
++function getInPlaneRotatedSliceGeometry(
++  volume: Types.IImageVolume,
++  focalPoint: Types.Point3,
++  viewPlaneNormal: Types.Point3,
++  sliceAxis: number
++): ResampledSliceGeometry | undefined {
++  const { dimensions, imageData, spacing } = volume;
++  const axes = getVolumeAxes(volume);
++  const continuousIndex = utilities.transformWorldToIndexContinuous(
++    imageData,
++    focalPoint
++  );
++  const sliceIndex = Math.floor(
++    continuousIndex[sliceAxis] + 0.5 - SLICE_INDEX_EPSILON
++  );
++
++  if (sliceIndex < 0 || sliceIndex >= dimensions[sliceAxis]) {
++    return;
++  }
++
++  const [xAxis, yAxis] = [0, 1, 2].filter((axis) => axis !== sliceAxis);
++  const handedness = vec3.dot(
++    vec3.cross(
++      createVector(),
++      axes[xAxis] as unknown as vec3,
++      axes[yAxis] as unknown as vec3
++    ),
++    viewPlaneNormal as unknown as vec3
++  );
++  const rowsFollowAxis = handedness < 0;
++  const originIndex: Types.Point3 = [0, 0, 0];
++
++  originIndex[sliceAxis] = sliceIndex;
++  originIndex[yAxis] = rowsFollowAxis ? 0 : dimensions[yAxis] - 1;
++
++  return {
++    origin: utilities.transformIndexToWorld(
++      imageData,
++      originIndex
++    ) as Types.Point3,
++    xDirection: axes[xAxis],
++    yDirection: rowsFollowAxis
++      ? axes[yAxis]
++      : (vec3.negate(
++          createVector(),
++          axes[yAxis] as unknown as vec3
++        ) as Types.Point3),
++    zDirection: viewPlaneNormal,
++    spacing: [spacing[xAxis], spacing[yAxis]],
++    width: dimensions[xAxis],
++    height: dimensions[yAxis],
++    sliceIndex,
++  };
++}
++
++/**
++ * Geometry of the slice when the view plane is oblique to the volume. The
++ * slice covers the part of the view plane that cuts the volume, with a pixel
++ * size close to the voxel size along each direction of the plane. Each row of
++ * the slice is the line where the view plane meets one slice of the volume,
++ * so a row is read from one slice image, which keeps the reads close together
++ * in memory. The rows depend only on the plane, so the slice stays the same
++ * when the view turns in its own plane.
++ */
++function getObliqueSliceGeometry(
++  volume: Types.IImageVolume,
++  focalPoint: Types.Point3,
++  viewPlaneNormal: Types.Point3
++): ResampledSliceGeometry | undefined {
++  const { dimensions, imageData } = volume;
++  const sliceAxisDirection = getVolumeAxes(volume)[2];
++  const xDirection = vec3.normalize(
++    createVector(),
++    vec3.cross(
++      createVector(),
++      sliceAxisDirection as unknown as vec3,
++      viewPlaneNormal as unknown as vec3
++    )
++  ) as Types.Point3;
++  const yDirection = vec3.normalize(
++    createVector(),
++    vec3.cross(
++      createVector(),
++      xDirection as unknown as vec3,
++      viewPlaneNormal as unknown as vec3
++    )
++  ) as Types.Point3;
++  const points = getPlaneVolumeIntersectionPoints(
++    volume,
++    focalPoint,
++    viewPlaneNormal
++  );
++
++  if (points.length < MINIMUM_PLANE_INTERSECTION_POINTS) {
++    return;
++  }
++
++  const extent = {
++    minX: Infinity,
++    maxX: -Infinity,
++    minY: Infinity,
++    maxY: -Infinity,
++  };
++
++  points.forEach((point) => {
++    const offset = vec3.subtract(
++      createVector(),
++      point as unknown as vec3,
++      focalPoint as unknown as vec3
++    );
++    const x = vec3.dot(offset, xDirection as unknown as vec3);
++    const y = vec3.dot(offset, yDirection as unknown as vec3);
++
++    extent.minX = Math.min(extent.minX, x);
++    extent.maxX = Math.max(extent.maxX, x);
++    extent.minY = Math.min(extent.minY, y);
++    extent.maxY = Math.max(extent.maxY, y);
++  });
++
++  const extentX = extent.maxX - extent.minX;
++  const extentY = extent.maxY - extent.minY;
++  const width = Math.min(
++    MAX_RESAMPLED_SLICE_SIZE,
++    Math.max(
++      1,
++      Math.ceil(
++        extentX /
++          utilities.getEffectiveSpacingAlongDirection(volume, xDirection)
++      )
++    )
++  );
++  const height = Math.min(
++    MAX_RESAMPLED_SLICE_SIZE,
++    Math.max(
++      1,
++      Math.ceil(
++        extentY /
++          utilities.getEffectiveSpacingAlongDirection(volume, yDirection)
++      )
++    )
++  );
++  const pixelSpacing: Types.Point2 = [extentX / width, extentY / height];
++
++  if (!(pixelSpacing[0] > 0) || !(pixelSpacing[1] > 0)) {
++    return;
++  }
++
++  const origin = stepAlong(
++    stepAlong(focalPoint, xDirection, extent.minX + pixelSpacing[0] / 2),
++    yDirection,
++    extent.minY + pixelSpacing[1] / 2
++  );
++  const continuousIndex = utilities.transformWorldToIndexContinuous(
++    imageData,
++    focalPoint
++  );
++
++  return {
++    origin,
++    xDirection,
++    yDirection,
++    zDirection: viewPlaneNormal,
++    spacing: pixelSpacing,
++    width,
++    height,
++    sliceIndex: Math.min(
++      Math.max(Math.round(continuousIndex[2]), 0),
++      dimensions[2] - 1
++    ),
++  };
++}
++
++/**
++ * Returns the geometry of the labelmap slice for a view that is not aligned
++ * with the rows and columns of the volume, or undefined when the view plane
++ * does not cut the volume.
++ */
++function getResampledSliceGeometry(
++  viewport: SliceRenderingViewport,
++  volume: Types.IImageVolume,
++  camera: SliceRenderingCamera | undefined = getSliceRenderingCamera(viewport)
++): ResampledSliceGeometry | undefined {
++  if (!camera) {
++    return;
++  }
++
++  const viewPlaneNormal = vec3.normalize(
++    createVector(),
++    camera.viewPlaneNormal as unknown as vec3
++  ) as Types.Point3;
++  const sliceAxis = getExactSliceAxis(volume, viewPlaneNormal);
++
++  if (sliceAxis !== undefined) {
++    return getInPlaneRotatedSliceGeometry(
++      volume,
++      camera.focalPoint,
++      viewPlaneNormal,
++      sliceAxis
++    );
++  }
++
++  return getObliqueSliceGeometry(volume, camera.focalPoint, viewPlaneNormal);
++}
++
++/**
++ * Fills the pixels of the slice with the value of the nearest voxel, through
++ * the volume grid sampler of the core that the CPU volume rendering also uses.
++ * A pixel outside the volume gets the value 0.
++ */
++function sampleResampledSlice(
++  volume: Types.IImageVolume,
++  geometry: ResampledSliceGeometry
++): Types.PixelDataTypedArray {
++  const { imageData, voxelManager } = volume;
++  const { origin, xDirection, yDirection, spacing, width, height } = geometry;
++  const SliceDataConstructor = voxelManager.getConstructor();
++  const pixelData = new SliceDataConstructor(width * height);
++  const startIndex = utilities.transformWorldToIndexContinuous(
++    imageData,
++    origin
++  );
++  const afterColumn = utilities.transformWorldToIndexContinuous(
++    imageData,
++    stepAlong(origin, xDirection, spacing[0])
++  );
++  const afterRow = utilities.transformWorldToIndexContinuous(
++    imageData,
++    stepAlong(origin, yDirection, spacing[1])
++  );
++
++  utilities.sampleVolumeGrid({
++    volume,
++    pixelData,
++    width,
++    height,
++    startIndex,
++    columnStep: [0, 1, 2].map(
++      (axis) => afterColumn[axis] - startIndex[axis]
++    ) as Types.Point3,
++    rowStep: [0, 1, 2].map(
++      (axis) => afterRow[axis] - startIndex[axis]
++    ) as Types.Point3,
++    interpolationType: Enums.InterpolationType.NEAREST,
++  });
++
++  return pixelData;
++}
++
++/**
++ * Creates the labelmap slice image for a view that is not aligned with the
++ * rows and columns of the volume: a view rotated in its own plane, or an
++ * oblique view. The image lies in the view plane, in world coordinates.
++ */
++function createResampledSliceImageData(
++  volume: Types.IImageVolume,
++  viewport: SliceRenderingViewport,
++  camera: SliceRenderingCamera | undefined = getSliceRenderingCamera(viewport)
++): PlanarSliceImageData | undefined {
++  const geometry = getResampledSliceGeometry(viewport, volume, camera);
++
++  if (!geometry) {
++    return;
++  }
++
++  const pixelData = sampleResampledSlice(volume, geometry);
++  const dataType = vtkDataArray.getDataType(pixelData as never);
++  const scalarArray = vtkDataArray.newInstance({
++    dataType,
++    name: 'Pixels',
++    numberOfComponents: 1,
++    values: pixelData,
++  });
++  const imageData = vtkImageData.newInstance();
++
++  imageData.set({ dataType, numberOfComponents: 1 }, true);
++  imageData.setDimensions(geometry.width, geometry.height, 1);
++  imageData.setSpacing([geometry.spacing[0], geometry.spacing[1], 1]);
++  imageData.setDirection(
++    new Float32Array([
++      ...geometry.xDirection,
++      ...geometry.yDirection,
++      ...geometry.zDirection,
++    ])
++  );
++  imageData.setOrigin(geometry.origin);
++  imageData.getPointData().setScalars(scalarArray);
++  imageData.modified();
++
++  return {
++    imageData,
++    sliceIndex: geometry.sliceIndex,
++  };
++}
++
++/**
++ * Creates the labelmap slice image for a planar viewport. A view aligned with
++ * the rows and columns of the volume copies one slice of voxels. Any other
++ * view takes the nearest voxel for each pixel of the view plane, also a view
++ * with a small tilt that the aligned copy would accept.
++ */
++function createPlanarSliceImageData(
++  volume: Types.IImageVolume,
++  viewport: SliceRenderingViewport,
++  camera: SliceRenderingCamera | undefined = getSliceRenderingCamera(viewport)
++): PlanarSliceImageData | undefined {
++  if (!camera) {
++    return;
++  }
++
++  // Only a view plane inside one slice of voxels gets the exact copy.
++  const alignedSlice =
++    getExactSliceAxis(volume, camera.viewPlaneNormal) !== undefined
++      ? createSliceImageData(volume, viewport, camera)
++      : undefined;
++
++  if (alignedSlice) {
++    return {
++      imageData: alignedSlice.imageData,
++      sliceIndex: alignedSlice.state.sliceIndex,
++    };
++  }
++
++  return createResampledSliceImageData(volume, viewport, camera);
++}
++
++/**
++ * Whether a planar viewport can show a labelmap slice of the volume in a view
++ * that is not aligned with the rows and columns of the volume.
++ */
++function canCreateResampledSliceImageData(
++  volume: Types.IImageVolume,
++  viewport: SliceRenderingViewport,
++  camera: SliceRenderingCamera | undefined = getSliceRenderingCamera(viewport)
++): boolean {
++  return !!getResampledSliceGeometry(viewport, volume, camera);
++}
++
++export {
++  canCreateResampledSliceImageData,
++  createPlanarSliceImageData,
++  createResampledSliceImageData,
++  getResampledSliceGeometry,
++};
++export type { PlanarSliceImageData, ResampledSliceGeometry };
+diff --git a/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapSliceData.ts b/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapSliceData.ts
+index f7af83e674..9332eb4d74 100644
+--- a/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapSliceData.ts
++++ b/packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapSliceData.ts
+@@ -85,11 +85,14 @@ function matchAxis(
+   };
+ }
+ 
++type SliceRenderingCamera = Pick<
++  Types.ICamera,
++  'focalPoint' | 'viewPlaneNormal' | 'viewUp'
++>;
++
+ function getSliceRenderingCamera(
+   viewport: SliceRenderingViewport
+-):
+-  | Pick<Types.ICamera, 'focalPoint' | 'viewPlaneNormal' | 'viewUp'>
+-  | undefined {
++): SliceRenderingCamera | undefined {
+   const resolvedCamera = viewport.getResolvedView?.()?.toICamera?.();
+   const normalizedResolvedCamera =
+     normalizeSliceRenderingCamera(resolvedCamera);
+@@ -157,10 +160,9 @@ function getVolumeAxes(volume: Types.IImageVolume): Types.Point3[] {
+ 
+ function getSliceState(
+   viewport: SliceRenderingViewport,
+-  volume: Types.IImageVolume
++  volume: Types.IImageVolume,
++  camera = getSliceRenderingCamera(viewport)
+ ): ImageMapperSliceState | undefined {
+-  const camera = getSliceRenderingCamera(viewport);
+-
+   if (!camera) {
+     return;
+   }
+@@ -223,9 +225,10 @@ function getSliceState(
+ 
+ function createSliceImageData(
+   volume: Types.IImageVolume,
+-  viewport: SliceRenderingViewport
++  viewport: SliceRenderingViewport,
++  camera = getSliceRenderingCamera(viewport)
+ ): { imageData: vtkImageData; state: ImageMapperSliceState } | undefined {
+-  const state = getSliceState(viewport, volume);
++  const state = camera && getSliceState(viewport, volume, camera);
+ 
+   if (!state) {
+     return;
+@@ -267,12 +270,6 @@ function createSliceImageData(
+   const yDirection = axisVectors[state.yAxis].map(
+     (value) => value * state.ySign
+   ) as Types.Point3;
+-  const camera = getSliceRenderingCamera(viewport);
+-
+-  if (!camera) {
+-    return;
+-  }
+-
+   const zDirection = vec3.normalize(
+     vec3.create(),
+     camera.viewPlaneNormal as unknown as vec3
+@@ -316,5 +313,11 @@ export {
+   createSliceImageData,
+   getSliceRenderingCamera,
+   getSliceState,
++  getVolumeAxes,
++  matchAxis,
++};
++export type {
++  ImageMapperSliceState,
++  SliceRenderingCamera,
++  SliceRenderingViewport,
+ };
+-export type { ImageMapperSliceState, SliceRenderingViewport };

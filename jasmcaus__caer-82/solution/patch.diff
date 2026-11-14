@@ -1,0 +1,274 @@
+diff --git a/caer/color/_luv.py b/caer/color/_luv.py
+index 5d6ec2fe..69fc18bc 100644
+--- a/caer/color/_luv.py
++++ b/caer/color/_luv.py
+@@ -50,8 +50,8 @@ def luv2bgr(tens: Tensor) -> Tensor:
+             "This function converts an LUV Tensor to its BGR counterpart"
+         )
+ 
+-    img = cv.cvtColor(tens, LUV2BGR)
+-    return to_tensor(img, cspace="bgr")
++    tens = cv.cvtColor(tens, LUV2BGR)
++    return to_tensor(tens, cspace="bgr")
+ 
+ 
+ def luv2rgb(tens: Tensor) -> Tensor:
+@@ -74,8 +74,8 @@ def luv2rgb(tens: Tensor) -> Tensor:
+             "This function converts a LUV Tensor to its RGB counterpart"
+         )
+ 
+-    img = cv.cvtColor(tens, LUV2RGB)
+-    return to_tensor(img, cspace="rgb")
++    tens = cv.cvtColor(tens, LUV2RGB)
++    return to_tensor(tens, cspace="rgb")
+ 
+ 
+ def luv2gray(tens: Tensor) -> Tensor:
+@@ -98,9 +98,9 @@ def luv2gray(tens: Tensor) -> Tensor:
+             "This function converts an LUV Tensor to its GRAY counterpart"
+         )
+ 
+-    img = luv2bgr(tens)
+-    img = bgr2gray(tens)
+-    return to_tensor(img, cspace="gray")
++    tens = luv2bgr(tens)
++    tens = bgr2gray(tens)
++    return to_tensor(tens, cspace="gray")
+ 
+ 
+ def luv2hls(tens: Tensor) -> Tensor:
+@@ -123,9 +123,9 @@ def luv2hls(tens: Tensor) -> Tensor:
+             "This function converts an LUV Tensor to its HLS counterpart"
+         )
+ 
+-    img = luv2bgr(tens)
+-    img = bgr2hls(tens)
+-    return to_tensor(img, cspace="hls")
++    tens = luv2bgr(tens)
++    tens = bgr2hls(tens)
++    return to_tensor(tens, cspace="hls")
+ 
+ 
+ def luv2hsv(tens: Tensor) -> Tensor:
+@@ -148,9 +148,9 @@ def luv2hsv(tens: Tensor) -> Tensor:
+             "This function converts an LUV Tensor to its HSV counterpart"
+         )
+ 
+-    img = luv2bgr(tens)
+-    img = bgr2hsv(tens)
+-    return to_tensor(img, cspace="hsv")
++    tens = luv2bgr(tens)
++    tens = bgr2hsv(tens)
++    return to_tensor(tens, cspace="hsv")
+ 
+ 
+ def luv2lab(tens: Tensor) -> Tensor:
+@@ -173,9 +173,9 @@ def luv2lab(tens: Tensor) -> Tensor:
+             "This function converts an LUV Tensor to its LAB counterpart"
+         )
+ 
+-    img = luv2bgr(tens)
+-    img = bgr2lab(tens)
+-    return to_tensor(img, cspace="lab")
++    tens = luv2bgr(tens)
++    tens = bgr2lab(tens)
++    return to_tensor(tens, cspace="lab")
+ 
+ 
+ def luv2yuv(tens: Tensor) -> Tensor:
+@@ -198,6 +198,6 @@ def luv2yuv(tens: Tensor) -> Tensor:
+             "This function converts an LUV Tensor to its YUV counterpart"
+         )
+ 
+-    img = luv2bgr(tens)
+-    img = bgr2yuv(tens)
+-    return to_tensor(img, cspace="yuv")
++    tens = luv2bgr(tens)
++    tens = bgr2yuv(tens)
++    return to_tensor(tens, cspace="yuv")
+diff --git a/caer/color/_yuv.py b/caer/color/_yuv.py
+index 6af0865c..b628dfd5 100644
+--- a/caer/color/_yuv.py
++++ b/caer/color/_yuv.py
+@@ -50,8 +50,8 @@ def yuv2bgr(tens: Tensor) -> Tensor:
+             "This function converts an YUV Tensor to its BGR counterpart"
+         )
+ 
+-    img = cv.cvtColor(tens, YUV2BGR)
+-    return to_tensor(img, cspace="bgr")
++    tens = cv.cvtColor(tens, YUV2BGR)
++    return to_tensor(tens, cspace="bgr")
+ 
+ 
+ def yuv2rgb(tens: Tensor) -> Tensor:
+@@ -74,8 +74,8 @@ def yuv2rgb(tens: Tensor) -> Tensor:
+             "This function converts a YUV Tensor to its RGB counterpart"
+         )
+ 
+-    img = cv.cvtColor(tens, YUV2RGB)
+-    return to_tensor(img, cspace="rgb")
++    tens = cv.cvtColor(tens, YUV2RGB)
++    return to_tensor(tens, cspace="rgb")
+ 
+ 
+ def yuv2gray(tens: Tensor) -> Tensor:
+@@ -98,9 +98,9 @@ def yuv2gray(tens: Tensor) -> Tensor:
+             "This function converts an YUV Tensor to its GRAY counterpart"
+         )
+ 
+-    img = yuv2bgr(tens)
+-    img = bgr2gray(tens)
+-    return to_tensor(img, cspace="gray")
++    tens = yuv2bgr(tens)
++    tens = bgr2gray(tens)
++    return to_tensor(tens, cspace="gray")
+ 
+ 
+ def yuv2hls(tens: Tensor) -> Tensor:
+@@ -123,9 +123,9 @@ def yuv2hls(tens: Tensor) -> Tensor:
+             "This function converts an YUV Tensor to its HLS counterpart"
+         )
+ 
+-    img = yuv2bgr(tens)
+-    img = bgr2hls(tens)
+-    return to_tensor(img, cspace="hls")
++    tens = yuv2bgr(tens)
++    tens = bgr2hls(tens)
++    return to_tensor(tens, cspace="hls")
+ 
+ 
+ def yuv2hsv(tens: Tensor) -> Tensor:
+@@ -148,9 +148,9 @@ def yuv2hsv(tens: Tensor) -> Tensor:
+             "This function converts an YUV Tensor to its HSV counterpart"
+         )
+ 
+-    img = yuv2bgr(tens)
+-    img = bgr2hsv(tens)
+-    return to_tensor(img, cspace="hsv")
++    tens = yuv2bgr(tens)
++    tens = bgr2hsv(tens)
++    return to_tensor(tens, cspace="hsv")
+ 
+ 
+ def yuv2lab(tens: Tensor) -> Tensor:
+@@ -173,9 +173,9 @@ def yuv2lab(tens: Tensor) -> Tensor:
+             "This function converts an YUV Tensor to its LAB counterpart"
+         )
+ 
+-    img = yuv2bgr(tens)
+-    img = bgr2lab(tens)
+-    return to_tensor(img, cspace="lab")
++    tens = yuv2bgr(tens)
++    tens = bgr2lab(tens)
++    return to_tensor(tens, cspace="lab")
+ 
+ 
+ def yuv2luv(tens: Tensor) -> Tensor:
+@@ -198,6 +198,6 @@ def yuv2luv(tens: Tensor) -> Tensor:
+             "This function converts an YUV Tensor to its LUV counterpart"
+         )
+ 
+-    img = yuv2bgr(tens)
+-    img = bgr2luv(tens)
+-    return to_tensor(img, cspace="luv")
++    tens = yuv2bgr(tens)
++    tens = bgr2luv(tens)
++    return to_tensor(tens, cspace="luv")
+diff --git a/tests/color/test_luv.py b/tests/color/test_luv.py
+index 4b29dcf1..d7d8a26c 100644
+--- a/tests/color/test_luv.py
++++ b/tests/color/test_luv.py
+@@ -12,6 +12,7 @@
+ import caer
+ import cv2 as cv
+ import os
++import numpy as np
+ 
+ here = os.path.dirname(os.path.dirname(__file__))
+ tens_path = os.path.join(here, 'data', 'green_fish.jpg')
+@@ -50,6 +51,7 @@ def test_luv2gray():
+     assert len(gray.shape) == 2 or (len(gray.shape) == 3 and gray.shape[-1] == 1)
+     assert isinstance(gray, caer.Tensor)
+     assert gray.is_gray()
++    assert np.all(gray == cv.cvtColor(cv.cvtColor(cv_luv, cv.COLOR_LUV2BGR), cv.COLOR_BGR2GRAY))
+ 
+ 
+ def test_luv2hsv():
+@@ -61,6 +63,7 @@ def test_luv2hsv():
+     assert len(hsv.shape) == 3
+     assert isinstance(hsv, caer.Tensor)
+     assert hsv.is_hsv()
++    assert np.all(hsv == cv.cvtColor(cv.cvtColor(cv_luv, cv.COLOR_LUV2BGR), cv.COLOR_BGR2HSV))
+ 
+ 
+ def test_luv2hls():
+@@ -72,6 +75,7 @@ def test_luv2hls():
+     assert len(hls.shape) == 3
+     assert isinstance(hls, caer.Tensor)
+     assert hls.is_hls()
++    assert np.all(hls == cv.cvtColor(cv.cvtColor(cv_luv, cv.COLOR_LUV2BGR), cv.COLOR_BGR2HLS))
+ 
+ 
+ def test_luv2lab():
+@@ -83,6 +87,7 @@ def test_luv2lab():
+     assert len(lab.shape) == 3
+     assert isinstance(lab, caer.Tensor)
+     assert lab.is_lab()
++    assert np.all(lab == cv.cvtColor(cv.cvtColor(cv_luv, cv.COLOR_LUV2BGR), cv.COLOR_BGR2LAB))
+ 
+ 
+ def test_luv2yuv():
+@@ -94,3 +99,4 @@ def test_luv2yuv():
+     assert len(yuv.shape) == 3
+     assert isinstance(yuv, caer.Tensor)
+     assert yuv.is_yuv()
++    assert np.all(yuv == cv.cvtColor(cv.cvtColor(cv_luv, cv.COLOR_LUV2BGR), cv.COLOR_BGR2YUV))
+diff --git a/tests/color/test_yuv.py b/tests/color/test_yuv.py
+index 7bdf27f1..84752fab 100644
+--- a/tests/color/test_yuv.py
++++ b/tests/color/test_yuv.py
+@@ -12,6 +12,7 @@
+ import caer
+ import cv2 as cv
+ import os
++import numpy as np
+ 
+ here = os.path.dirname(os.path.dirname(__file__))
+ tens_path = os.path.join(here, 'data', 'green_fish.jpg')
+@@ -50,6 +51,7 @@ def test_yuv2gray():
+     assert len(gray.shape) == 2 or (len(gray.shape) == 3 and gray.shape[-1] == 1)
+     assert isinstance(gray, caer.Tensor)
+     assert gray.is_gray()
++    assert np.all(gray == cv.cvtColor(cv.cvtColor(cv_yuv, cv.COLOR_YUV2BGR), cv.COLOR_BGR2GRAY))
+ 
+ 
+ def test_yuv2hsv():
+@@ -61,6 +63,7 @@ def test_yuv2hsv():
+     assert len(hsv.shape) == 3
+     assert isinstance(hsv, caer.Tensor)
+     assert hsv.is_hsv()
++    assert np.all(hsv == cv.cvtColor(cv.cvtColor(cv_yuv, cv.COLOR_YUV2BGR), cv.COLOR_BGR2HSV))
+ 
+ 
+ def test_yuv2hls():
+@@ -72,6 +75,7 @@ def test_yuv2hls():
+     assert len(hls.shape) == 3
+     assert isinstance(hls, caer.Tensor)
+     assert hls.is_hls()
++    assert np.all(hls == cv.cvtColor(cv.cvtColor(cv_yuv, cv.COLOR_YUV2BGR), cv.COLOR_BGR2HLS))
+ 
+ 
+ def test_yuv2lab():
+@@ -83,6 +87,7 @@ def test_yuv2lab():
+     assert len(lab.shape) == 3
+     assert isinstance(lab, caer.Tensor)
+     assert lab.is_lab()
++    assert np.all(lab == cv.cvtColor(cv.cvtColor(cv_yuv, cv.COLOR_YUV2BGR), cv.COLOR_BGR2LAB))
+ 
+ 
+ def test_yuv2luv():
+@@ -94,3 +99,4 @@ def test_yuv2luv():
+     assert len(luv.shape) == 3
+     assert isinstance(luv, caer.Tensor)
+     assert luv.is_luv()
++    assert np.all(luv == cv.cvtColor(cv.cvtColor(cv_yuv, cv.COLOR_YUV2BGR), cv.COLOR_BGR2LUV))

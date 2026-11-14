@@ -1,0 +1,77 @@
+diff --git a/config/global.json b/config/global.json
+index d96be70..f2004ae 100644
+--- a/config/global.json
++++ b/config/global.json
+@@ -319,7 +319,6 @@
+             "dependencies": [
+                 "numpy",
+                 "Path",
+-                "Union",
+                 "pyyaml",
+                 "opencv-contrib-python-headless",
+                 "torch",
+@@ -481,7 +480,6 @@
+             "dependencies": [
+                 "numpy",
+                 "Path",
+-                "Union",
+                 "pyyaml",
+                 "opencv-contrib-python-headless",
+                 "torch",
+@@ -1941,7 +1939,6 @@
+             "dependencies": [
+                 "numpy",
+                 "Path",
+-                "Union",
+                 "pyyaml",
+                 "opencv-contrib-python-headless",
+                 "torch",
+@@ -2101,7 +2098,6 @@
+             "dependencies": [
+                 "numpy",
+                 "Path",
+-                "Union",
+                 "pyyaml",
+                 "opencv-contrib-python-headless",
+                 "torch",
+@@ -2265,7 +2261,6 @@
+             "dependencies": [
+                 "numpy",
+                 "Path",
+-                "Union",
+                 "pyyaml",
+                 "opencv-contrib-python-headless",
+                 "torch",
+@@ -2429,7 +2424,6 @@
+             "dependencies": [
+                 "numpy",
+                 "Path",
+-                "Union",
+                 "pyyaml",
+                 "opencv-contrib-python-headless",
+                 "torch",
+diff --git a/templates/examples/__init__.py b/templates/examples/__init__.py
+index b61a5d3..756cd9d 100644
+--- a/templates/examples/__init__.py
++++ b/templates/examples/__init__.py
+@@ -131,7 +131,7 @@ def __init__(
+                 padding=1,
+                 bias=self.bias,
+             ),
+-            nn.Tanh()
++            nn.Tanh(),
+             # state size. (nc) x 128 x 128
+         )
+ 
+diff --git a/tests/fid.py b/tests/fid.py
+index 9829346..a16a891 100644
+--- a/tests/fid.py
++++ b/tests/fid.py
+@@ -8,6 +8,7 @@
+ Usage:
+     python fid.py dir1 dir2 
+ """
++
+ import argparse
+ import os
+ 

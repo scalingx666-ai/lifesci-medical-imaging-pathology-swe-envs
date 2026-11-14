@@ -1,0 +1,69 @@
+version = "1.0"
+
+[task]
+name = "default/EIDOSLAB__torchstain-66"
+description = "feat: Implemented support for MultiMacenkoNormalizer across all backends"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "torchstain",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "EIDOSLAB/torchstain"
+ref = "3e10af2299998fe9e2e3e5072294bc08ffebb6c1"
+reference = "https://github.com/EIDOSLAB/torchstain/pull/66"
+source_access = "auto"
+built_at = "2026-11-14T07:13:24.711484+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:7dfb8c0aa045da72582f878ac87707a9da33497058f813ca8fb15a8621f181e9"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2025-11-12T15:16:50Z"
+diff_format = "unified"
+context_files = [
+    "README.md",
+    "tests/test_tf.py",
+    "tests/test_torch.py",
+    "torchstain/base/normalizers/multitarget.py",
+    "torchstain/numpy/normalizers/__init__.py",
+    "torchstain/numpy/normalizers/multitarget.py",
+    "torchstain/tf/normalizers/__init__.py",
+    "torchstain/tf/normalizers/multitarget.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 332
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

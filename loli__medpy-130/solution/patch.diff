@@ -1,0 +1,94 @@
+diff --git a/CHANGES.txt b/CHANGES.txt
+index 08a8d46..80143b3 100644
+--- a/CHANGES.txt
++++ b/CHANGES.txt
+@@ -1,4 +1,5 @@
+-v0.5.0, 2024-04-XX -- Addressed all depreciation warnings and incompatabilities
++v0.5.1, 2024-04-03 -- Hotfixes
++v0.5.0, 2024-04-03 -- Addressed all depreciation warnings and incompatabilities
+                       Updated documentation
+                       Updated and fixed tests
+                       Added github workflows as system
+diff --git a/doc/source/conf.py b/doc/source/conf.py
+index d6ced6a..bc8a6ae 100644
+--- a/doc/source/conf.py
++++ b/doc/source/conf.py
+@@ -50,7 +50,7 @@
+ # The short X.Y version.
+ version = "0.5"
+ # The full version, including alpha/beta/rc tags.
+-release = "0.5.0"
++release = "0.5.1"
+ 
+ # Automatically created autosummary entries (thus no need to call sphinx-autogen)
+ autosummary_generate = True
+diff --git a/doc/source/installation/graphcutsupport.rst b/doc/source/installation/graphcutsupport.rst
+index a857c78..b632ff3 100644
+--- a/doc/source/installation/graphcutsupport.rst
++++ b/doc/source/installation/graphcutsupport.rst
+@@ -23,7 +23,7 @@ Troubleshooting
+ ---------------
+ 
+ If you experience an error like `ModuleNotFoundError: No module named 'medpy.graphcut.maxflow'`, this usually means
+-that the `graphcut`` module has not been compiled successfully. To check the error log, try re-installing **MedPy** with:
++that the `graphcut` module has not been compiled successfully. To check the error log, try re-installing **MedPy** with:
+ 
+ .. code-block:: bash
+ 
+@@ -31,7 +31,7 @@ that the `graphcut`` module has not been compiled successfully. To check the err
+ 
+ In the logs, you might see the following warning:
+ 
+-.. code-block:: bash
++::
+ 
+ 	2021-06-30T11:07:32,684   ***************************************************************************
+ 	2021-06-30T11:07:32,685   WARNING: The medpy.graphcut.maxflow external C++ package could not be compiled, all graphcut functionality will be disabled. You might be missing Boost.Python or some build essentials like g++.
+@@ -41,11 +41,12 @@ In the logs, you might see the following warning:
+ 
+ The error should be detailed in the lines just above.
+ 
+-Usually, it is a problem with the linking of the `(lib)boost_python3`` lib.
++Usually, it is a problem with the linking of the `(lib)boost_python3` lib.
+ There are some inconsistent naming conventions around, rendering the file undiscoverable to **MedPy**.
+ 
+ On Ubuntu, you should be able to locate your *libboost_python3x.so* under `/usr/lib/x86_64-linux-gnu/`.
+ If your shared library file is named differently than **MedPy** expects, you might have to create a softlink like, e.g.:
+ 
+ .. code-block:: bash
++
+ 	sudo ln -s libboost_python38.so libboost_python3.so
+diff --git a/medpy/__init__.py b/medpy/__init__.py
+index 58ae6ca..0e79643 100644
+--- a/medpy/__init__.py
++++ b/medpy/__init__.py
+@@ -23,4 +23,5 @@
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ """
+-__version__ = "0.5.0"
++
++__version__ = "0.5.1"
+diff --git a/setup.py b/setup.py
+index 0e67178..c30017d 100755
+--- a/setup.py
++++ b/setup.py
+@@ -20,7 +20,9 @@
+     "medpy.filter",
+     "medpy.graphcut",
+     "medpy.io",
++    "medpy.iterators",
+     "medpy.metric",
++    "medpy.neighbours",
+     "medpy.utilities",
+ ]
+ 
+@@ -136,7 +138,7 @@ def run_setup(with_compilation):
+ 
+     setup(
+         name="MedPy",
+-        version="0.5.0",  # major.minor.micro
++        version="0.5.1",  # major.minor.micro
+         description="Medical image processing in Python",
+         author="Oskar Maier",
+         author_email="oskar.maier@gmail.com",

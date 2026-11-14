@@ -1,0 +1,63 @@
+version = "1.0"
+
+[task]
+name = "default/open-mmlab__mmsegmentation-3596"
+description = "[Fix] bugfix/avoid-runner-iter-in-vis-hook-test-mode  "
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "mmsegmentation",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "open-mmlab/mmsegmentation"
+ref = "b6770816e539afcc6a4ed629df0a5bb1cefc2df7"
+reference = "https://github.com/open-mmlab/mmsegmentation/pull/3596"
+source_access = "auto"
+built_at = "2026-11-14T07:04:27.517115+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:3ada65836b39f45ce0608e0734eeee1522a9a9041fd40c6eb8b990b772d2cfee"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2024-03-22T10:04:17Z"
+diff_format = "unified"
+context_files = [
+    "mmseg/engine/hooks/visualization_hook.py",
+    "tests/test_engine/test_visualization_hook.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 85
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

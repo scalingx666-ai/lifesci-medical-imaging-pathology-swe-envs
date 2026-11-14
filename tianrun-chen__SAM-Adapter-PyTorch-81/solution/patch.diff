@@ -1,0 +1,1652 @@
+diff --git a/README.md b/README.md
+index d0cd01c..4d7f51e 100644
+--- a/README.md
++++ b/README.md
+@@ -1,28 +1,7 @@
+-## SAM-Adapter: Adapting SAM in Underperformed Scenes (Now Support SAM2!)
+-
+-Tianrun Chen, Lanyun Zhu, Chaotao Ding, Runlong Cao, Yan Wang, Shangzhan Zhang, Zejian Li, Lingyun Sun, Papa Mao, Ying Zang
+-
+-<a href='https://www.kokoni3d.com/'> KOKONI, Moxin Technology (Huzhou) Co., LTD </a>, Zhejiang University, Singapore University of Technology and Design, Huzhou University, Beihang University.
+-
+-In Proceedings of the IEEE/CVF International Conference on Computer Vision (pp. 3367-3375).
+-
+-  <a href='https://tianrun-chen.github.io/SAM-Adaptor/'><img src='https://img.shields.io/badge/Project-Page-Green'></a>
+-## 
+-
+-<a href='https://arxiv.org/abs/2304.09148'><img src='https://img.shields.io/badge/ArXiv-2304.09148-red' /></a> 
+-
+-Update on 8 Aug, 2024: We add support for adapting with SAM2 (Segment Anything 2), a more powerful backbone! Please refer our <a href="https://www.researchgate.net/publication/382940773_SAM2-Adapter_Evaluating_Adapting_Segment_Anything_2_in_Downstream_Tasks_Camouflage_Shadow_Medical_Image_Segmentation_and_More">new technical report!</a>
+-
+-Update on 24 July, 2024: The link of pre-trained model is updated.
+-
+-Update on 30 August 2023: This paper will be prsented at ICCV 2023. 
+-
+-Update on 28 April 2023: We tested the performance of polyp segmentation to show our approach can also work on medical datasets.
+-<img src='https://tianrun-chen.github.io/SAM-Adaptor/static/images/polyp.jpg'>
+-Update on 22 April: We report our SOTA result based on ViT-H version of SAM (use demo.yaml). We have also uploaded the yaml config for ViT-L and ViT-B version of SAM, suitable  GPU with smaller memory (e.g. NVIDIA Tesla V-100), although they may compromise on accuracy.
++## SAM2-Adapter: Evaluating & Adapting Segment Anything 2 in Downstream Tasks: Camouflage, Shadow, Medical Image Segmentation, and More
+ 
+ ## Environment
+-This code was implemented with Python 3.8 and PyTorch 1.13.0. You can install all the requirements via:
++This code was implemented with Python 3.11 and PyTorch 2.3.0. You can install all the requirements via:
+ ```bash
+ pip install -r requirements.txt
+ ```
+@@ -30,10 +9,10 @@ pip install -r requirements.txt
+ 
+ ## Quick Start
+ 1. Download the dataset and put it in ./load.
+-2. Download the pre-trained [SAM(Segment Anything)](https://github.com/facebookresearch/segment-anything) and put it in ./pretrained.
++2. Download the pre-trained [SAM 2(Segment Anything)](https://github.com/facebookresearch/segment-anything-2) and put it in ./pretrained.
+ 3. Training:
+ ```bash
+-CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nnodes 1 --nproc_per_node 4 loadddptrain.py --config configs/demo.yaml
++CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.run --nnodes 1 --nproc_per_node 4 loadddptrain.py --config configs/demo.yaml
+ ```
+ !Please note that the SAM model consume much memory. We use 4 x A100 graphics card for training. If you encounter the memory issue, please try to use graphics cards with larger memory!
+ 
+@@ -45,13 +24,7 @@ python test.py --config [CONFIG_PATH] --model [MODEL_PATH]
+ 
+ ## Train
+ ```bash
+-CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch train.py --nnodes 1 --nproc_per_node 4 --config [CONFIG_PATH]
+-```
+-Updates on 30 July. As mentioned by @YunyaGaoTree in issue #39
+-You can also try to use the code below to gain (probably) faster training.
+-```bash
+-!torchrun train.py --config configs/demo.yaml
+-CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nnodes 1 --nproc_per_node 4 loadddptrain.py --config configs/demo.yaml
++CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.run train.py --nnodes 1 --nproc_per_node 4 --config [CONFIG_PATH]
+ ```
+ 
+ ## Test
+@@ -59,9 +32,6 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nnodes 1 --npr
+ python test.py --config [CONFIG_PATH] --model [MODEL_PATH]
+ ```
+ 
+-## Pre-trained Models
+-https://drive.google.com/file/d/13JilJT7dhxwMIgcdtnvdzr08vcbREFlR/view?usp=sharing
+-
+ 
+ ## Dataset
+ 
+@@ -76,22 +46,3 @@ https://drive.google.com/file/d/13JilJT7dhxwMIgcdtnvdzr08vcbREFlR/view?usp=shari
+ ### Polyp Segmentation - Medical Applications
+ - **[Kvasir](https://datasets.simula.no/kvasir-seg/)**
+ 
+-## Citation
+-
+-If you find our work useful in your research, please consider citing:
+-
+-```
+-@misc{chen2023sam,
+-      title={SAM Fails to Segment Anything? -- SAM-Adapter: Adapting SAM in Underperformed Scenes: Camouflage, Shadow, and More}, 
+-      author={Tianrun Chen and Lanyun Zhu and Chaotao Ding and Runlong Cao and Shangzhan Zhang and Yan Wang and Zejian Li and Lingyun Sun and Papa Mao and Ying Zang},
+-      year={2023},
+-      eprint={2304.09148},
+-      archivePrefix={arXiv},
+-      primaryClass={cs.CV}
+-}
+-```
+-
+-## Acknowledgements
+-The part of the code is derived from Explicit Visual Prompt   <a href='https://nifangbaage.github.io/Explicit-Visual-Prompt/'><img src='https://img.shields.io/badge/Project-Page-Green'></a> by 
+-Weihuang Liu, [Xi Shen](https://xishen0220.github.io/), [Chi-Man Pun](https://www.cis.um.edu.mo/~cmpun/), and [Xiaodong Cun](https://vinthony.github.io/) by University of Macau and Tencent AI Lab.
+-
+diff --git a/configs/cod-sam-vit-b.yaml b/configs/cod-sam-vit-b.yaml
+index 6ad3f02..6905711 100644
+--- a/configs/cod-sam-vit-b.yaml
++++ b/configs/cod-sam-vit-b.yaml
+@@ -2,8 +2,8 @@ train_dataset:
+   dataset:
+     name: paired-image-folders
+     args:
+-      root_path_1: /public2/home/chaotao/datasets/codDataset/train/img
+-      root_path_2: /public2/home/chaotao/datasets/codDataset/train/gt
++      root_path_1: /public2/home/dww/lak/SAM2-Adapter-PyTorch-main/load/codDataset/train/img
++      root_path_2: /public2/home/dww/lak/SAM2-Adapter-PyTorch-main/load/codDataset/train/gt
+       cache: none
+       split_key: train
+   wrapper:
+@@ -17,8 +17,8 @@ val_dataset:
+   dataset:
+     name: paired-image-folders
+     args:
+-      root_path_1: /public2/home/chaotao/datasets/COD/TestDataset/COD10K/Imgs
+-      root_path_2: /public2/home/chaotao/datasets/COD/TestDataset/COD10K/GT
++      root_path_1: /public2/home/dww/lak/SAM2-Adapter-PyTorch-main/load/COD/TestDataset/COD10K/Imgs
++      root_path_2: /public2/home/dww/lak/SAM2-Adapter-PyTorch-main/load/COD/TestDataset/COD10K/GT
+       cache: none
+       split_key: test
+   wrapper:
+@@ -31,8 +31,8 @@ test_dataset:
+   dataset:
+     name: paired-image-folders
+     args:
+-      root_path_1: /public2/home/chaotao/datasets/COD/TestDataset/COD10K/Imgs
+-      root_path_2: /public2/home/chaotao/datasets/COD/TestDataset/COD10K/GT
++      root_path_1: /public2/home/dww/lak/SAM2-Adapter-PyTorch-main/load/COD/TestDataset/COD10K/Imgs
++      root_path_2: /public2/home/dww/lak/SAM2-Adapter-PyTorch-main/load/COD/TestDataset/COD10K/GT
+       cache: none
+       split_key: test
+   wrapper:
+@@ -42,7 +42,7 @@ test_dataset:
+   batch_size: 1
+ 
+ eval_type: cod
+-sam_checkpoint: ./pretrained/sam_vit_b_01ec64.pth
++sam_checkpoint: ./pretrained/sam2_hiera_base_plus.pt
+ data_norm:
+   inp:
+     sub:
+diff --git a/configs/cod-sam-vit-l.yaml b/configs/cod-sam-vit-l.yaml
+index b087e31..3fb7589 100644
+--- a/configs/cod-sam-vit-l.yaml
++++ b/configs/cod-sam-vit-l.yaml
+@@ -2,8 +2,8 @@ train_dataset:
+   dataset:
+     name: paired-image-folders
+     args:
+-      root_path_1: /public2/home/chaotao/datasets/codDataset/train/img
+-      root_path_2: /public2/home/chaotao/datasets/codDataset/train/gt
++      root_path_1: /public2/home/dww/lak/SAM2-Adapter-PyTorch-main/load/codDataset/train/img
++      root_path_2: /public2/home/dww/lak/SAM2-Adapter-PyTorch-main/load/codDataset/train/gt
+       cache: none
+       split_key: train
+   wrapper:
+@@ -17,8 +17,8 @@ val_dataset:
+   dataset:
+     name: paired-image-folders
+     args:
+-      root_path_1: /public2/home/chaotao/datasets/COD/TestDataset/COD10K/Imgs
+-      root_path_2: /public2/home/chaotao/datasets/COD/TestDataset/COD10K/GT
++      root_path_1: /public2/home/dww/lak/SAM2-Adapter-PyTorch-main/load/COD/TestDataset/COD10K/Imgs
++      root_path_2: /public2/home/dww/lak/SAM2-Adapter-PyTorch-main/load/COD/TestDataset/COD10K/GT
+       cache: none
+       split_key: test
+   wrapper:
+@@ -31,8 +31,8 @@ test_dataset:
+   dataset:
+     name: paired-image-folders
+     args:
+-      root_path_1: /public2/home/chaotao/datasets/COD/TestDataset/COD10K/Imgs
+-      root_path_2: /public2/home/chaotao/datasets/COD/TestDataset/COD10K/GT
++      root_path_1: /public2/home/dww/lak/SAM2-Adapter-PyTorch-main/load/COD/TestDataset/COD10K/Imgs
++      root_path_2: /public2/home/dww/lak/SAM2-Adapter-PyTorch-main/load/COD/TestDataset/COD10K/GT
+       cache: none
+       split_key: test
+   wrapper:
+@@ -42,7 +42,7 @@ test_dataset:
+   batch_size: 1
+ 
+ eval_type: cod
+-sam_checkpoint: ./pretrained/sam_vit_l_0b3195.pth
++sam_checkpoint: /public2/home/dww/lak/SAM2-Adapter-PyTorch-main/pretrained/sam2_hiera_large.pt
+ data_norm:
+   inp:
+     sub:
+@@ -95,7 +95,7 @@ optimizer:
+   args:
+     lr: 0.0002
+ lr_min: 1.0e-7
+-epoch_max: 20
++epoch_max: 100
+ 
+ multi_step_lr:
+   milestones:
+diff --git a/configs/demo.yaml b/configs/demo.yaml
+index 4f6881d..679b8f2 100644
+--- a/configs/demo.yaml
++++ b/configs/demo.yaml
+@@ -42,7 +42,7 @@ test_dataset:
+   batch_size: 1
+ 
+ eval_type: cod
+-sam_checkpoint: ./pretrained/sam_vit_l_0b3195.pth
++sam_checkpoint: ./pretrained/sam2_hiera_base_plus.pt
+ data_norm:
+   inp:
+     sub:
+@@ -66,6 +66,18 @@ model:
+     loss: iou
+     encoder_mode:
+       name: sam
++      stages: [2, 6, 36, 4]
++      global_att_blocks: [23, 33, 43]
++      window_pos_embed_bkg_spatial_size: [7, 7]
++      window_spec: [8, 4, 16, 8]
++      num_pos_feats: 256
++      normalize: true
++      scale: null
++      temperature: 10000
++      d_model: 256
++      backbone_channel_list: [1152, 576, 288, 144]
++      fpn_top_down_levels: [2, 3]
++      fpn_interp_model: nearest
+       img_size: 1024
+       mlp_ratio: 4
+       patch_size: 16
+@@ -82,9 +94,9 @@ model:
+       handcrafted_tune: true
+       embedding_tune: true
+       adaptor: adaptor
+-      embed_dim: 1280
++      embed_dim: 144
+       depth: 32
+-      num_heads: 16
++      num_heads: 2
+       global_attn_indexes:
+       - 7
+       - 15
+diff --git a/datasets/__pycache__/__init__.cpython-311.pyc b/datasets/__pycache__/__init__.cpython-311.pyc
+new file mode 100644
+index 0000000..ac87073
+Binary files /dev/null and b/datasets/__pycache__/__init__.cpython-311.pyc differ
+diff --git a/datasets/__pycache__/datasets.cpython-311.pyc b/datasets/__pycache__/datasets.cpython-311.pyc
+new file mode 100644
+index 0000000..7b6dcd3
+Binary files /dev/null and b/datasets/__pycache__/datasets.cpython-311.pyc differ
+diff --git a/datasets/__pycache__/image_folder.cpython-311.pyc b/datasets/__pycache__/image_folder.cpython-311.pyc
+new file mode 100644
+index 0000000..89aa086
+Binary files /dev/null and b/datasets/__pycache__/image_folder.cpython-311.pyc differ
+diff --git a/datasets/__pycache__/transform_custom.cpython-311.pyc b/datasets/__pycache__/transform_custom.cpython-311.pyc
+new file mode 100644
+index 0000000..07d3a53
+Binary files /dev/null and b/datasets/__pycache__/transform_custom.cpython-311.pyc differ
+diff --git a/datasets/__pycache__/wrappers.cpython-311.pyc b/datasets/__pycache__/wrappers.cpython-311.pyc
+new file mode 100644
+index 0000000..bf72647
+Binary files /dev/null and b/datasets/__pycache__/wrappers.cpython-311.pyc differ
+diff --git a/datasets/transform_custom.py b/datasets/transform_custom.py
+new file mode 100644
+index 0000000..80c257d
+--- /dev/null
++++ b/datasets/transform_custom.py
+@@ -0,0 +1,166 @@
++import torch
++import random
++import numpy as np
++
++from PIL import Image, ImageOps, ImageFilter
++
++class Normalize(object):
++    """Normalize a tensor image with mean and standard deviation.
++    Args:
++        mean (tuple): means for each channel.
++        std (tuple): standard deviations for each channel.
++    """
++    def __init__(self, mean=(0., 0., 0.), std=(1., 1., 1.)):
++        self.mean = mean
++        self.std = std
++
++    def __call__(self, sample):
++        img = sample['image']
++        mask = sample['label']
++        img = np.array(img).astype(np.float32)
++        mask = np.array(mask).astype(np.float32)
++        img /= 255.0
++        img -= self.mean
++        img /= self.std
++        mask /= 255.0
++
++        return {'image': img,
++                'label': mask}
++
++
++class ToTensor(object):
++    """Convert ndarrays in sample to Tensors."""
++
++    def __call__(self, sample):
++        # swap color axis because
++        # numpy image: H x W x C
++        # torch image: C X H X W
++        img = sample['image']
++        mask = sample['label']
++        img = np.array(img).astype(np.float32).transpose((2, 0, 1))
++        mask = np.array(mask).astype(np.float32)
++
++        img = torch.from_numpy(img).float()
++        mask = torch.from_numpy(mask).float()
++
++        return {'image': img,
++                'label': mask}
++
++
++class RandomHorizontalFlip(object):
++    def __call__(self, sample):
++        img = sample['image']
++        mask = sample['label']
++        if random.random() < 0.5:
++            img = img.transpose(Image.FLIP_LEFT_RIGHT)
++            mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
++
++        return {'image': img,
++                'label': mask}
++
++
++class RandomRotate(object):
++    def __init__(self, degree):
++        self.degree = degree
++
++    def __call__(self, sample):
++        img = sample['image']
++        mask = sample['label']
++        rotate_degree = random.uniform(-1*self.degree, self.degree)
++        img = img.rotate(rotate_degree, Image.BILINEAR)
++        mask = mask.rotate(rotate_degree, Image.NEAREST)
++
++        return {'image': img,
++                'label': mask}
++
++
++class RandomGaussianBlur(object):
++    def __call__(self, sample):
++        img = sample['image']
++        mask = sample['label']
++        if random.random() < 0.5:
++            img = img.filter(ImageFilter.GaussianBlur(
++                radius=random.random()))
++
++        return {'image': img,
++                'label': mask}
++
++
++class RandomScaleCrop(object):
++    def __init__(self, base_size, crop_size, fill=0):
++        self.base_size = base_size
++        self.crop_size = crop_size
++        self.fill = fill
++
++    def __call__(self, sample):
++        img = sample['image']
++        mask = sample['label']
++        # random scale (short edge)
++        short_size = random.randint(int(self.base_size * 0.5), int(self.base_size * 2.0))
++        w, h = img.size
++        if h > w:
++            ow = short_size
++            oh = int(1.0 * h * ow / w)
++        else:
++            oh = short_size
++            ow = int(1.0 * w * oh / h)
++        img = img.resize((ow, oh), Image.BILINEAR)
++        mask = mask.resize((ow, oh), Image.NEAREST)
++        # pad crop
++        if short_size < self.crop_size:
++            padh = self.crop_size - oh if oh < self.crop_size else 0
++            padw = self.crop_size - ow if ow < self.crop_size else 0
++            img = ImageOps.expand(img, border=(0, 0, padw, padh), fill=0)
++            mask = ImageOps.expand(mask, border=(0, 0, padw, padh), fill=self.fill)
++        # random crop crop_size
++        w, h = img.size
++        x1 = random.randint(0, w - self.crop_size)
++        y1 = random.randint(0, h - self.crop_size)
++        img = img.crop((x1, y1, x1 + self.crop_size, y1 + self.crop_size))
++        mask = mask.crop((x1, y1, x1 + self.crop_size, y1 + self.crop_size))
++
++        return {'image': img,
++                'label': mask}
++
++
++class FixScaleCrop(object):
++    def __init__(self, crop_size):
++        self.crop_size = crop_size
++
++    def __call__(self, sample):
++        img = sample['image']
++        mask = sample['label']
++        w, h = img.size
++        if w > h:
++            oh = self.crop_size
++            ow = int(1.0 * w * oh / h)
++        else:
++            ow = self.crop_size
++            oh = int(1.0 * h * ow / w)
++        img = img.resize((ow, oh), Image.BILINEAR)
++        mask = mask.resize((ow, oh), Image.NEAREST)
++        # center crop
++        w, h = img.size
++        x1 = int(round((w - self.crop_size) / 2.))
++        y1 = int(round((h - self.crop_size) / 2.))
++        img = img.crop((x1, y1, x1 + self.crop_size, y1 + self.crop_size))
++        mask = mask.crop((x1, y1, x1 + self.crop_size, y1 + self.crop_size))
++
++        return {'image': img,
++                'label': mask}
++
++class FixedResize(object):
++    def __init__(self, size):
++        self.size = (size, size)  # size: (h, w)
++
++    def __call__(self, sample):
++        img = sample['image']
++        mask = sample['label']
++
++        assert img.size == mask.size
++
++        img = img.resize(self.size, Image.BILINEAR)
++        mask = mask.resize(self.size, Image.NEAREST)
++
++        return {'image': img,
++                'label': mask}
+\ No newline at end of file
+diff --git a/datasets/wrappers.py b/datasets/wrappers.py
+index 8877acc..6721f7e 100644
+--- a/datasets/wrappers.py
++++ b/datasets/wrappers.py
+@@ -1,108 +1,116 @@
+-
+-import functools
+-import random
+-import math
+-from PIL import Image
+-
+-import numpy as np
+-import torch
+-from torch.utils.data import Dataset
+-from torchvision import transforms
+-import torchvision
+-
+-from datasets import register
+-import cv2
+-from math import pi
+-from torchvision.transforms import InterpolationMode
+-
+-import torch.nn.functional as F
+-def to_mask(mask):
+-    return transforms.ToTensor()(
+-        transforms.Grayscale(num_output_channels=1)(
+-            transforms.ToPILImage()(mask)))
+-
+-
+-def resize_fn(img, size):
+-    return transforms.ToTensor()(
+-        transforms.Resize(size)(
+-            transforms.ToPILImage()(img)))
+-
+-
+-@register('val')
+-class ValDataset(Dataset):
+-    def __init__(self, dataset, inp_size=None, augment=False):
+-        self.dataset = dataset
+-        self.inp_size = inp_size
+-        self.augment = augment
+-
+-        self.img_transform = transforms.Compose([
+-                transforms.Resize((inp_size, inp_size)),
+-                transforms.ToTensor(),
+-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+-                                     std=[0.229, 0.224, 0.225])
+-            ])
+-        self.mask_transform = transforms.Compose([
+-                transforms.Resize((inp_size, inp_size), interpolation=Image.NEAREST),
+-                transforms.ToTensor(),
+-            ])
+-
+-    def __len__(self):
+-        return len(self.dataset)
+-
+-    def __getitem__(self, idx):
+-        img, mask = self.dataset[idx]
+-
+-        return {
+-            'inp': self.img_transform(img),
+-            'gt': self.mask_transform(mask)
+-        }
+-
+-
+-@register('train')
+-class TrainDataset(Dataset):
+-    def __init__(self, dataset, size_min=None, size_max=None, inp_size=None,
+-                 augment=False, gt_resize=None):
+-        self.dataset = dataset
+-        self.size_min = size_min
+-        if size_max is None:
+-            size_max = size_min
+-        self.size_max = size_max
+-        self.augment = augment
+-        self.gt_resize = gt_resize
+-
+-        self.inp_size = inp_size
+-        self.img_transform = transforms.Compose([
+-                transforms.Resize((self.inp_size, self.inp_size)),
+-                transforms.ToTensor(),
+-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+-                                     std=[0.229, 0.224, 0.225])
+-            ])
+-        self.inverse_transform = transforms.Compose([
+-                transforms.Normalize(mean=[0., 0., 0.],
+-                                     std=[1/0.229, 1/0.224, 1/0.225]),
+-                transforms.Normalize(mean=[-0.485, -0.456, -0.406],
+-                                     std=[1, 1, 1])
+-            ])
+-        self.mask_transform = transforms.Compose([
+-                transforms.Resize((self.inp_size, self.inp_size)),
+-                transforms.ToTensor(),
+-            ])
+-
+-    def __len__(self):
+-        return len(self.dataset)
+-
+-    def __getitem__(self, idx):
+-        img, mask = self.dataset[idx]
+-
+-        # random filp
+-        if random.random() < 0.5:
+-            img = img.transpose(Image.FLIP_LEFT_RIGHT)
+-            mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
+-
+-        img = transforms.Resize((self.inp_size, self.inp_size))(img)
+-        mask = transforms.Resize((self.inp_size, self.inp_size), interpolation=InterpolationMode.NEAREST)(mask)
+-
+-        return {
+-            'inp': self.img_transform(img),
+-            'gt': self.mask_transform(mask)
++
++import functools
++import random
++import math
++from PIL import Image
++
++import numpy as np
++import torch
++from torch.utils.data import Dataset
++from torchvision import transforms
++import torchvision
++
++from datasets import register
++import cv2
++from math import pi
++from torchvision.transforms import InterpolationMode
++from datasets.transform_custom import *
++
++import torch.nn.functional as F
++def to_mask(mask):
++    return transforms.ToTensor()(
++        transforms.Grayscale(num_output_channels=1)(
++            transforms.ToPILImage()(mask)))
++
++
++def resize_fn(img, size):
++    return transforms.ToTensor()(
++        transforms.Resize(size)(
++            transforms.ToPILImage()(img)))
++
++
++@register('val')
++class ValDataset(Dataset):
++    def __init__(self, dataset, inp_size=None, augment=False):
++        self.dataset = dataset
++        self.inp_size = inp_size
++        self.augment = augment
++
++        self.img_transform = transforms.Compose([
++                transforms.Resize((inp_size, inp_size)),
++                transforms.ToTensor(),
++                transforms.Normalize(mean=[0.485, 0.456, 0.406],
++                                     std=[0.229, 0.224, 0.225])
++            ])
++        self.mask_transform = transforms.Compose([
++                transforms.Resize((inp_size, inp_size), interpolation=Image.NEAREST),
++                transforms.ToTensor(),
++            ])
++        self.rgb_transform = transforms.Compose([
++                transforms.Resize((inp_size, inp_size), interpolation=Image.NEAREST),
++                transforms.ToTensor(),
++            ])
++
++    def __len__(self):
++        return len(self.dataset)
++
++    def __getitem__(self, idx):
++        img, mask = self.dataset[idx]
++
++        return {
++            'inp': self.img_transform(img),
++            'gt': self.mask_transform(mask),
++            'inp_rgb': self.rgb_transform(img),
++        }
++
++
++@register('train')
++class TrainDataset(Dataset):
++    def __init__(self, dataset, size_min=None, size_max=None, inp_size=None,
++                 augment=False, gt_resize=None):
++        self.dataset = dataset
++        self.size_min = size_min
++        if size_max is None:
++            size_max = size_min
++        self.size_max = size_max
++        self.augment = augment
++        self.gt_resize = gt_resize
++
++        self.inp_size = inp_size
++        self.transform = transforms.Compose([
++                RandomHorizontalFlip(),
++                RandomScaleCrop(base_size=self.inp_size, crop_size=self.inp_size),
++                RandomGaussianBlur(),
++                Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
++                ToTensor(),
++            ])
++        self.inverse_transform = transforms.Compose([
++                transforms.Normalize(mean=[0., 0., 0.],
++                                     std=[1/0.229, 1/0.224, 1/0.225]),
++                transforms.Normalize(mean=[-0.485, -0.456, -0.406],
++                                     std=[1, 1, 1])
++            ])
++        self.mask_transform = transforms.Compose([
++                transforms.Resize((self.inp_size, self.inp_size)),
++                transforms.ToTensor(),
++            ])
++
++    def __len__(self):
++        return len(self.dataset)
++
++    def __getitem__(self, idx):
++        img, mask = self.dataset[idx]
++
++        # random filp
++        if random.random() < 0.5:
++            img = img.transpose(Image.FLIP_LEFT_RIGHT)
++            mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
++
++        img = transforms.Resize((1280, 1280))(img)
++        mask = transforms.Resize((1280, 1280), interpolation=InterpolationMode.NEAREST)(mask)
++        sample = {"image": img, "label": mask}
++        sample = self.transform(sample)
++        return {
++            'inp': sample["image"],
++            'gt': sample["label"][None]
+         }
+\ No newline at end of file
+diff --git a/requirements.txt b/requirements.txt
+index 6d27486..057ffef 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -1,23 +1,17 @@
+-imageio==2.9.0
+-ipython~=8.11.0
+-matplotlib~=3.1.2
+-opencv-python~=4.7.0.72
+-PyYAML~=6.0
+-scikit-learn~=1.2.2
+-scipy~=1.10.1
++imageio==2.34.1
++matplotlib~=3.9.0
++opencv-python~=4.8.0.74
++PyYAML~=6.0.1
++scikit-learn~= 1.5.1
++scipy~=1.11.2
+ 
+-tqdm~=4.51.0
+-torch~=1.13.0+cu116
+-numpy~=1.20.3
+-typing~=3.7.4.3
+-terminaltables~=3.1.10
++tqdm~=4.64.1
++torch~=2.3.0+cu121
++numpy~=1.24.2
++typing_extensions~=4.11.0
+ Pillow~=9.4.0
+-torchvision~=0.14.0+cu116
+-tensorboardX~=2.6
+-onnxruntime~=1.14.1
+-setuptools~=67.6.1
+-timm~=0.3.2
+-easydict~=1.10
+-attr~=0.3.2
+-thop~=0.1.1.post2209072238
+-torchsummary~=1.5.1
+\ No newline at end of file
++torchvision~=0.18.0+cu121
++tensorboardX~=2.6.2.2
++setuptools~=69.5.1
++timm~=0.4.12
++attrs~=23.2.0
+\ No newline at end of file
+diff --git a/test.py b/test.py
+index 81439f7..82ecc7c 100644
+--- a/test.py
++++ b/test.py
+@@ -58,6 +58,9 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
+     elif eval_type == 'cod':
+         metric_fn = utils.calc_cod
+         metric1, metric2, metric3, metric4 = 'sm', 'em', 'wfm', 'mae'
++    elif eval_type == 'kvasir':
++        metric_fn = utils.calc_kvasir
++        metric1, metric2, metric3, metric4 = 'dice', 'iou', 'none', 'none'
+ 
+     val_metric1 = utils.Averager()
+     val_metric2 = utils.Averager()
+@@ -65,7 +68,8 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
+     val_metric4 = utils.Averager()
+ 
+     pbar = tqdm(loader, leave=False, desc='val')
+-
++    
++    cnt = 0
+     for batch in pbar:
+         for k, v in batch.items():
+             batch[k] = v.cuda()
+@@ -73,18 +77,26 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
+         inp = batch['inp']
+ 
+         pred = torch.sigmoid(model.infer(inp))
++        pred[pred>0.5]=1
++        pred[pred<0.5]=0
+ 
+         result1, result2, result3, result4 = metric_fn(pred, batch['gt'])
+         val_metric1.add(result1.item(), inp.shape[0])
+         val_metric2.add(result2.item(), inp.shape[0])
+-        val_metric3.add(result3.item(), inp.shape[0])
+-        val_metric4.add(result4.item(), inp.shape[0])
++        try:
++            val_metric3.add(result3.item(), inp.shape[0])
++            val_metric4.add(result4.item(), inp.shape[0])
++        except:
++            pass
+ 
+         if verbose:
+             pbar.set_description('val {} {:.4f}'.format(metric1, val_metric1.item()))
+             pbar.set_description('val {} {:.4f}'.format(metric2, val_metric2.item()))
+-            pbar.set_description('val {} {:.4f}'.format(metric3, val_metric3.item()))
+-            pbar.set_description('val {} {:.4f}'.format(metric4, val_metric4.item()))
++            try:
++                pbar.set_description('val {} {:.4f}'.format(metric3, val_metric3.item()))
++                pbar.set_description('val {} {:.4f}'.format(metric4, val_metric4.item()))
++            except:
++                pass
+ 
+     return val_metric1.item(), val_metric2.item(), val_metric3.item(), val_metric4.item()
+ 
+@@ -102,12 +114,12 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
+     dataset = datasets.make(spec['dataset'])
+     dataset = datasets.make(spec['wrapper'], args={'dataset': dataset})
+     loader = DataLoader(dataset, batch_size=spec['batch_size'],
+-                        num_workers=8)
++                        num_workers=8, shuffle=False)
+ 
+     model = models.make(config['model']).cuda()
+     sam_checkpoint = torch.load(args.model, map_location='cuda:0')
+     model.load_state_dict(sam_checkpoint, strict=True)
+-    
++
+     metric1, metric2, metric3, metric4 = eval_psnr(loader, model,
+                                                    data_norm=config.get('data_norm'),
+                                                    eval_type=config.get('eval_type'),
+diff --git a/train.py b/train.py
+index 7d1bbd9..0420bf9 100644
+--- a/train.py
++++ b/train.py
+@@ -32,7 +32,7 @@ def make_data_loader(spec, tag=''):
+ 
+     sampler = torch.utils.data.distributed.DistributedSampler(dataset)
+     loader = DataLoader(dataset, batch_size=spec['batch_size'],
+-        shuffle=False, num_workers=8, pin_memory=True, sampler=sampler)
++        shuffle=False, num_workers=8, pin_memory=True, sampler=sampler,drop_last=True)
+     return loader
+ 
+ 
+@@ -57,6 +57,10 @@ def eval_psnr(loader, model, eval_type=None):
+     elif eval_type == 'cod':
+         metric_fn = utils.calc_cod
+         metric1, metric2, metric3, metric4 = 'sm', 'em', 'wfm', 'mae'
++    elif eval_type == 'kvasir':
++        metric_fn = utils.calc_kvasir
++        metric1, metric2, metric3, metric4 = 'dice', 'iou', 'none', 'none'
++        
+ 
+     if local_rank == 0:
+         pbar = tqdm(total=len(loader), leave=False, desc='val')
+@@ -65,6 +69,13 @@ def eval_psnr(loader, model, eval_type=None):
+ 
+     pred_list = []
+     gt_list = []
++    
++    val_metric1 = 0
++    val_metric2 = 0
++    val_metric3 = 0
++    val_metric4 = 0
++    cnt = 0
++    
+     for batch in loader:
+         for k, v in batch.items():
+             batch[k] = v.cuda()
+@@ -75,22 +86,30 @@ def eval_psnr(loader, model, eval_type=None):
+ 
+         batch_pred = [torch.zeros_like(pred) for _ in range(dist.get_world_size())]
+         batch_gt = [torch.zeros_like(batch['gt']) for _ in range(dist.get_world_size())]
+-
+-        dist.all_gather(batch_pred, pred)
+-        pred_list.extend(batch_pred)
+-        dist.all_gather(batch_gt, batch['gt'])
+-        gt_list.extend(batch_gt)
++        
++        result1, result2, result3, result4 = metric_fn(pred, batch['gt'])
++        val_metric1 += (result1 * pred.shape[0])
++        val_metric2 += (result2 * pred.shape[0])
++        val_metric3 += (result3 * pred.shape[0])
++        val_metric4 += (result4 * pred.shape[0])     
++        cnt += pred.shape[0]
+         if pbar is not None:
+             pbar.update(1)
+-
++    val_metric1 = torch.tensor(val_metric1).cuda()
++    val_metric2 = torch.tensor(val_metric2).cuda()
++    val_metric3 = torch.tensor(val_metric3).cuda()
++    val_metric4 = torch.tensor(val_metric4).cuda()
++    cnt = torch.tensor(cnt).cuda()
++    dist.all_reduce(val_metric1)
++    dist.all_reduce(val_metric2)
++    dist.all_reduce(val_metric3)
++    dist.all_reduce(val_metric4)
++    dist.all_reduce(cnt)
++          
+     if pbar is not None:
+         pbar.close()
+-
+-    pred_list = torch.cat(pred_list, 1)
+-    gt_list = torch.cat(gt_list, 1)
+-    result1, result2, result3, result4 = metric_fn(pred_list, gt_list)
+-
+-    return result1, result2, result3, result4, metric1, metric2, metric3, metric4
++    
++    return val_metric1.item()/cnt, val_metric2.item()/cnt, val_metric3.item()/cnt, val_metric4.item()/cnt, metric1, metric2, metric3, metric4
+ 
+ 
+ def prepare_training():
+@@ -169,7 +188,7 @@ def main(config_, save_path, args):
+     model = model.module
+ 
+     sam_checkpoint = torch.load(config['sam_checkpoint'])
+-    model.load_state_dict(sam_checkpoint, strict=False)
++    model.load_state_dict(sam_checkpoint['model'], strict=False)
+     
+     for name, para in model.named_parameters():
+         if "image_encoder" in name and "prompt_generator" not in name:
+@@ -221,8 +240,8 @@ def main(config_, save_path, args):
+                         max_val_v = result1
+                         save(config, model, save_path, 'best')
+                 else:
+-                    if result3 < max_val_v:
+-                        max_val_v = result3
++                    if result2 < max_val_v:
++                        max_val_v = result2
+                         save(config, model, save_path, 'best')
+ 
+                 t = timer.t()
+diff --git a/utils.py b/utils.py
+index f96fa9e..eb25d21 100644
+--- a/utils.py
++++ b/utils.py
+@@ -1,363 +1,404 @@
+-import os
+-import time
+-import shutil
+-
+-import torch
+-import numpy as np
+-from torch.optim import SGD, Adam, AdamW
+-from tensorboardX import SummaryWriter
+-
+-import sod_metric
+-class Averager():
+-
+-    def __init__(self):
+-        self.n = 0.0
+-        self.v = 0.0
+-
+-    def add(self, v, n=1.0):
+-        self.v = (self.v * self.n + v * n) / (self.n + n)
+-        self.n += n
+-
+-    def item(self):
+-        return self.v
+-
+-
+-class Timer():
+-
+-    def __init__(self):
+-        self.v = time.time()
+-
+-    def s(self):
+-        self.v = time.time()
+-
+-    def t(self):
+-        return time.time() - self.v
+-
+-
+-def time_text(t):
+-    if t >= 3600:
+-        return '{:.1f}h'.format(t / 3600)
+-    elif t >= 60:
+-        return '{:.1f}m'.format(t / 60)
+-    else:
+-        return '{:.1f}s'.format(t)
+-
+-
+-_log_path = None
+-
+-
+-def set_log_path(path):
+-    global _log_path
+-    _log_path = path
+-
+-
+-def log(obj, filename='log.txt'):
+-    print(obj)
+-    if _log_path is not None:
+-        with open(os.path.join(_log_path, filename), 'a') as f:
+-            print(obj, file=f)
+-
+-
+-def ensure_path(path, remove=True):
+-    basename = os.path.basename(path.rstrip('/'))
+-    if os.path.exists(path):
+-        if remove and (basename.startswith('_')
+-                or input('{} exists, remove? (y/[n]): '.format(path)) == 'y'):
+-            shutil.rmtree(path)
+-            os.makedirs(path, exist_ok=True)
+-    else:
+-        os.makedirs(path, exist_ok=True)
+-
+-
+-def set_save_path(save_path, remove=True):
+-    ensure_path(save_path, remove=remove)
+-    set_log_path(save_path)
+-    writer = SummaryWriter(os.path.join(save_path, 'tensorboard'))
+-    return log, writer
+-
+-
+-def compute_num_params(model, text=False):
+-    tot = int(sum([np.prod(p.shape) for p in model.parameters()]))
+-    if text:
+-        if tot >= 1e6:
+-            return '{:.1f}M'.format(tot / 1e6)
+-        else:
+-            return '{:.1f}K'.format(tot / 1e3)
+-    else:
+-        return tot
+-
+-
+-def make_optimizer(param_list, optimizer_spec, load_sd=False):
+-    Optimizer = {
+-        'sgd': SGD,
+-        'adam': Adam,
+-        'adamw': AdamW
+-    }[optimizer_spec['name']]
+-    optimizer = Optimizer(param_list, **optimizer_spec['args'])
+-    if load_sd:
+-        optimizer.load_state_dict(optimizer_spec['sd'])
+-    return optimizer
+-
+-
+-def make_coord(shape, ranges=None, flatten=True):
+-    """ Make coordinates at grid centers.
+-    """
+-    coord_seqs = []
+-    for i, n in enumerate(shape):
+-        if ranges is None:
+-            v0, v1 = -1, 1
+-        else:
+-            v0, v1 = ranges[i]
+-        r = (v1 - v0) / (2 * n)
+-        seq = v0 + r + (2 * r) * torch.arange(n).float()
+-        coord_seqs.append(seq)
+-    ret = torch.stack(torch.meshgrid(*coord_seqs), dim=-1)
+-    # if flatten:
+-    #     ret = ret.view(-1, ret.shape[-1])
+-
+-    return ret
+-
+-
+-
+-def calc_cod(y_pred, y_true):
+-    batchsize = y_true.shape[0]
+-
+-    metric_FM = sod_metric.Fmeasure()
+-    metric_WFM = sod_metric.WeightedFmeasure()
+-    metric_SM = sod_metric.Smeasure()
+-    metric_EM = sod_metric.Emeasure()
+-    metric_MAE = sod_metric.MAE()
+-    with torch.no_grad():
+-        assert y_pred.shape == y_true.shape
+-
+-        for i in range(batchsize):
+-            true, pred = \
+-                y_true[i, 0].cpu().data.numpy() * 255, y_pred[i, 0].cpu().data.numpy() * 255
+-
+-            metric_FM.step(pred=pred, gt=true)
+-            metric_WFM.step(pred=pred, gt=true)
+-            metric_SM.step(pred=pred, gt=true)
+-            metric_EM.step(pred=pred, gt=true)
+-            metric_MAE.step(pred=pred, gt=true)
+-
+-        fm = metric_FM.get_results()["fm"]
+-        wfm = metric_WFM.get_results()["wfm"]
+-        sm = metric_SM.get_results()["sm"]
+-        em = metric_EM.get_results()["em"]["curve"].mean()
+-        mae = metric_MAE.get_results()["mae"]
+-
+-    return sm, em, wfm, mae
+-
+-
+-from sklearn.metrics import precision_recall_curve
+-
+-
+-def calc_f1(y_pred,y_true):
+-    batchsize = y_true.shape[0]
+-    with torch.no_grad():
+-        assert y_pred.shape == y_true.shape
+-        f1, auc = 0, 0
+-        y_true = y_true.cpu().numpy()
+-        y_pred = y_pred.cpu().numpy()
+-        for i in range(batchsize):
+-            true = y_true[i].flatten()
+-            true = true.astype(np.int)
+-            pred = y_pred[i].flatten()
+-
+-            precision, recall, thresholds = precision_recall_curve(true, pred)
+-
+-            # auc
+-            auc += roc_auc_score(true, pred)
+-            # auc += roc_auc_score(np.array(true>0).astype(np.int), pred)
+-            f1 += max([(2 * p * r) / (p + r+1e-10) for p, r in zip(precision, recall)])
+-
+-    return f1/batchsize, auc/batchsize, np.array(0), np.array(0)
+-
+-def calc_fmeasure(y_pred,y_true):
+-    batchsize = y_true.shape[0]
+-
+-    mae, preds, gts = [], [], []
+-    with torch.no_grad():
+-        for i in range(batchsize):
+-            gt_float, pred_float = \
+-                y_true[i, 0].cpu().data.numpy(), y_pred[i, 0].cpu().data.numpy()
+-
+-            # # MAE
+-            mae.append(np.sum(cv2.absdiff(gt_float.astype(float), pred_float.astype(float))) / (
+-                        pred_float.shape[1] * pred_float.shape[0]))
+-            # mae.append(np.mean(np.abs(pred_float - gt_float)))
+-            #
+-            pred = np.uint8(pred_float * 255)
+-            gt = np.uint8(gt_float * 255)
+-
+-            pred_float_ = np.where(pred > min(1.5 * np.mean(pred), 255), np.ones_like(pred_float),
+-                                   np.zeros_like(pred_float))
+-            gt_float_ = np.where(gt > min(1.5 * np.mean(gt), 255), np.ones_like(pred_float),
+-                                 np.zeros_like(pred_float))
+-
+-            preds.extend(pred_float_.ravel())
+-            gts.extend(gt_float_.ravel())
+-
+-        RECALL = recall_score(gts, preds)
+-        PERC = precision_score(gts, preds)
+-
+-        fmeasure = (1 + 0.3) * PERC * RECALL / (0.3 * PERC + RECALL)
+-        MAE = np.mean(mae)
+-
+-    return fmeasure, MAE, np.array(0), np.array(0)
+-
+-from sklearn.metrics import roc_auc_score,recall_score,precision_score
+-import cv2
+-def calc_ber(y_pred, y_true):
+-    batchsize = y_true.shape[0]
+-    y_pred, y_true = y_pred.permute(0, 2, 3, 1).squeeze(-1), y_true.permute(0, 2, 3, 1).squeeze(-1)
+-    with torch.no_grad():
+-        assert y_pred.shape == y_true.shape
+-        pos_err, neg_err, ber = 0, 0, 0
+-        y_true = y_true.cpu().numpy()
+-        y_pred = y_pred.cpu().numpy()
+-        for i in range(batchsize):
+-            true = y_true[i].flatten()
+-            pred = y_pred[i].flatten()
+-
+-            TP, TN, FP, FN, BER, ACC = get_binary_classification_metrics(pred * 255,
+-                                                                         true * 255, 125)
+-            pos_err += (1 - TP / (TP + FN)) * 100
+-            neg_err += (1 - TN / (TN + FP)) * 100
+-
+-    return pos_err / batchsize, neg_err / batchsize, (pos_err + neg_err) / 2 / batchsize, np.array(0)
+-
+-def get_binary_classification_metrics(pred, gt, threshold=None):
+-    if threshold is not None:
+-        gt = (gt > threshold)
+-        pred = (pred > threshold)
+-    TP = np.logical_and(gt, pred).sum()
+-    TN = np.logical_and(np.logical_not(gt), np.logical_not(pred)).sum()
+-    FN = np.logical_and(gt, np.logical_not(pred)).sum()
+-    FP = np.logical_and(np.logical_not(gt), pred).sum()
+-    BER = cal_ber(TN, TP, FN, FP)
+-    ACC = cal_acc(TN, TP, FN, FP)
+-    return TP, TN, FP, FN, BER, ACC
+-
+-def cal_ber(tn, tp, fn, fp):
+-    return  0.5*(fp/(tn+fp) + fn/(fn+tp))
+-
+-def cal_acc(tn, tp, fn, fp):
+-    return (tp + tn) / (tp + tn + fp + fn)
+-
+-def _sigmoid(x):
+-    return 1 / (1 + np.exp(-x))
+-
+-
+-def _eval_pr(y_pred, y, num):
+-    prec, recall = torch.zeros(num), torch.zeros(num)
+-    thlist = torch.linspace(0, 1 - 1e-10, num)
+-    for i in range(num):
+-        y_temp = (y_pred >= thlist[i]).float()
+-        tp = (y_temp * y).sum()
+-        prec[i], recall[i] = tp / (y_temp.sum() + 1e-20), tp / (y.sum() +
+-                                                                1e-20)
+-    return prec, recall
+-
+-def _S_object(pred, gt):
+-    fg = torch.where(gt == 0, torch.zeros_like(pred), pred)
+-    bg = torch.where(gt == 1, torch.zeros_like(pred), 1 - pred)
+-    o_fg = _object(fg, gt)
+-    o_bg = _object(bg, 1 - gt)
+-    u = gt.mean()
+-    Q = u * o_fg + (1 - u) * o_bg
+-    return Q
+-
+-def _object(pred, gt):
+-    temp = pred[gt == 1]
+-    x = temp.mean()
+-    sigma_x = temp.std()
+-    score = 2.0 * x / (x * x + 1.0 + sigma_x + 1e-20)
+-
+-    return score
+-
+-def _S_region(pred, gt):
+-    X, Y = _centroid(gt)
+-    gt1, gt2, gt3, gt4, w1, w2, w3, w4 = _divideGT(gt, X, Y)
+-    p1, p2, p3, p4 = _dividePrediction(pred, X, Y)
+-    Q1 = _ssim(p1, gt1)
+-    Q2 = _ssim(p2, gt2)
+-    Q3 = _ssim(p3, gt3)
+-    Q4 = _ssim(p4, gt4)
+-    Q = w1 * Q1 + w2 * Q2 + w3 * Q3 + w4 * Q4
+-    return Q
+-
+-def _centroid(gt):
+-    rows, cols = gt.size()[-2:]
+-    gt = gt.view(rows, cols)
+-    if gt.sum() == 0:
+-        X = torch.eye(1) * round(cols / 2)
+-        Y = torch.eye(1) * round(rows / 2)
+-    else:
+-        total = gt.sum()
+-        i = torch.from_numpy(np.arange(0, cols)).float().cuda()
+-        j = torch.from_numpy(np.arange(0, rows)).float().cuda()
+-        X = torch.round((gt.sum(dim=0) * i).sum() / total + 1e-20)
+-        Y = torch.round((gt.sum(dim=1) * j).sum() / total + 1e-20)
+-    return X.long(), Y.long()
+-
+-
+-def _divideGT(gt, X, Y):
+-    h, w = gt.size()[-2:]
+-    area = h * w
+-    gt = gt.view(h, w)
+-    LT = gt[:Y, :X]
+-    RT = gt[:Y, X:w]
+-    LB = gt[Y:h, :X]
+-    RB = gt[Y:h, X:w]
+-    X = X.float()
+-    Y = Y.float()
+-    w1 = X * Y / area
+-    w2 = (w - X) * Y / area
+-    w3 = X * (h - Y) / area
+-    w4 = 1 - w1 - w2 - w3
+-    return LT, RT, LB, RB, w1, w2, w3, w4
+-
+-
+-def _dividePrediction(pred, X, Y):
+-    h, w = pred.size()[-2:]
+-    pred = pred.view(h, w)
+-    LT = pred[:Y, :X]
+-    RT = pred[:Y, X:w]
+-    LB = pred[Y:h, :X]
+-    RB = pred[Y:h, X:w]
+-    return LT, RT, LB, RB
+-
+-
+-def _ssim(pred, gt):
+-    gt = gt.float()
+-    h, w = pred.size()[-2:]
+-    N = h * w
+-    x = pred.mean()
+-    y = gt.mean()
+-    sigma_x2 = ((pred - x) * (pred - x)).sum() / (N - 1 + 1e-20)
+-    sigma_y2 = ((gt - y) * (gt - y)).sum() / (N - 1 + 1e-20)
+-    sigma_xy = ((pred - x) * (gt - y)).sum() / (N - 1 + 1e-20)
+-
+-    aplha = 4 * x * y * sigma_xy
+-    beta = (x * x + y * y) * (sigma_x2 + sigma_y2)
+-
+-    if aplha != 0:
+-        Q = aplha / (beta + 1e-20)
+-    elif aplha == 0 and beta == 0:
+-        Q = 1.0
+-    else:
+-        Q = 0
+-    return Q
+-
+-def _eval_e(y_pred, y, num):
+-    score = torch.zeros(num)
+-    thlist = torch.linspace(0, 1 - 1e-10, num)
+-    for i in range(num):
+-        y_pred_th = (y_pred >= thlist[i]).float()
+-        fm = y_pred_th - y_pred_th.mean()
+-        gt = y - y.mean()
+-        align_matrix = 2 * gt * fm / (gt * gt + fm * fm + 1e-20)
+-        enhanced = ((align_matrix + 1) * (align_matrix + 1)) / 4
+-        score[i] = torch.sum(enhanced) / (y.numel() - 1 + 1e-20)
+-    return score
++import os
++import time
++import shutil
++
++import torch
++import numpy as np
++from torch.optim import SGD, Adam, AdamW
++from tensorboardX import SummaryWriter
++
++import sod_metric
++class Averager():
++
++    def __init__(self):
++        self.n = 0.0
++        self.v = 0.0
++
++    def add(self, v, n=1.0):
++        self.v = (self.v * self.n + v * n) / (self.n + n)
++        self.n += n
++
++    def item(self):
++        return self.v
++
++
++class Timer():
++
++    def __init__(self):
++        self.v = time.time()
++
++    def s(self):
++        self.v = time.time()
++
++    def t(self):
++        return time.time() - self.v
++
++
++def time_text(t):
++    if t >= 3600:
++        return '{:.1f}h'.format(t / 3600)
++    elif t >= 60:
++        return '{:.1f}m'.format(t / 60)
++    else:
++        return '{:.1f}s'.format(t)
++
++
++_log_path = None
++
++
++def set_log_path(path):
++    global _log_path
++    _log_path = path
++
++
++def log(obj, filename='log.txt'):
++    print(obj)
++    if _log_path is not None:
++        with open(os.path.join(_log_path, filename), 'a') as f:
++            print(obj, file=f)
++
++
++def ensure_path(path, remove=True):
++    basename = os.path.basename(path.rstrip('/'))
++    if os.path.exists(path):
++        if remove and (basename.startswith('_')
++                or input('{} exists, remove? (y/[n]): '.format(path)) == 'y'):
++            shutil.rmtree(path)
++            os.makedirs(path, exist_ok=True)
++    else:
++        os.makedirs(path, exist_ok=True)
++
++
++def set_save_path(save_path, remove=True):
++    ensure_path(save_path, remove=remove)
++    set_log_path(save_path)
++    writer = SummaryWriter(os.path.join(save_path, 'tensorboard'))
++    return log, writer
++
++
++def compute_num_params(model, text=False):
++    tot = int(sum([np.prod(p.shape) for p in model.parameters()]))
++    if text:
++        if tot >= 1e6:
++            return '{:.1f}M'.format(tot / 1e6)
++        else:
++            return '{:.1f}K'.format(tot / 1e3)
++    else:
++        return tot
++
++
++def make_optimizer(param_list, optimizer_spec, load_sd=False):
++    Optimizer = {
++        'sgd': SGD,
++        'adam': Adam,
++        'adamw': AdamW
++    }[optimizer_spec['name']]
++    optimizer = Optimizer(param_list, **optimizer_spec['args'])
++    if load_sd:
++        optimizer.load_state_dict(optimizer_spec['sd'])
++    return optimizer
++
++
++def make_coord(shape, ranges=None, flatten=True):
++    """ Make coordinates at grid centers.
++    """
++    coord_seqs = []
++    for i, n in enumerate(shape):
++        if ranges is None:
++            v0, v1 = -1, 1
++        else:
++            v0, v1 = ranges[i]
++        r = (v1 - v0) / (2 * n)
++        seq = v0 + r + (2 * r) * torch.arange(n).float()
++        coord_seqs.append(seq)
++    ret = torch.stack(torch.meshgrid(*coord_seqs), dim=-1)
++    # if flatten:
++    #     ret = ret.view(-1, ret.shape[-1])
++
++    return ret
++
++
++
++def calc_cod(y_pred, y_true):
++    batchsize = y_true.shape[0]
++
++    metric_FM = sod_metric.Fmeasure()
++    metric_WFM = sod_metric.WeightedFmeasure()
++    metric_SM = sod_metric.Smeasure()
++    metric_EM = sod_metric.Emeasure()
++    metric_MAE = sod_metric.MAE()
++    with torch.no_grad():
++        assert y_pred.shape == y_true.shape
++
++        for i in range(batchsize):
++            true, pred = \
++                y_true[i, 0].cpu().data.numpy() * 255, y_pred[i, 0].cpu().data.numpy() * 255
++
++            metric_FM.step(pred=pred, gt=true)
++            metric_WFM.step(pred=pred, gt=true)
++            metric_SM.step(pred=pred, gt=true)
++            metric_EM.step(pred=pred, gt=true)
++            metric_MAE.step(pred=pred, gt=true)
++
++        fm = metric_FM.get_results()["fm"]
++        wfm = metric_WFM.get_results()["wfm"]
++        sm = metric_SM.get_results()["sm"]
++        em = metric_EM.get_results()["em"]["curve"].mean()
++        mae = metric_MAE.get_results()["mae"]
++
++    return sm, em, wfm, mae
++
++
++from sklearn.metrics import precision_recall_curve
++
++
++def calc_f1(y_pred,y_true):
++    batchsize = y_true.shape[0]
++    with torch.no_grad():
++        assert y_pred.shape == y_true.shape
++        f1, auc = 0, 0
++        y_true = y_true.cpu().numpy()
++        y_pred = y_pred.cpu().numpy()
++        for i in range(batchsize):
++            true = y_true[i].flatten()
++            true = true.astype(np.int)
++            pred = y_pred[i].flatten()
++
++            precision, recall, thresholds = precision_recall_curve(true, pred)
++
++            # auc
++            auc += roc_auc_score(true, pred)
++            # auc += roc_auc_score(np.array(true>0).astype(np.int), pred)
++            f1 += max([(2 * p * r) / (p + r+1e-10) for p, r in zip(precision, recall)])
++
++    return f1/batchsize, auc/batchsize, np.array(0), np.array(0)
++
++def calc_fmeasure(y_pred,y_true):
++    batchsize = y_true.shape[0]
++
++    mae, preds, gts = [], [], []
++    with torch.no_grad():
++        for i in range(batchsize):
++            gt_float, pred_float = \
++                y_true[i, 0].cpu().data.numpy(), y_pred[i, 0].cpu().data.numpy()
++
++            # # MAE
++            mae.append(np.sum(cv2.absdiff(gt_float.astype(float), pred_float.astype(float))) / (
++                        pred_float.shape[1] * pred_float.shape[0]))
++            # mae.append(np.mean(np.abs(pred_float - gt_float)))
++            #
++            pred = np.uint8(pred_float * 255)
++            gt = np.uint8(gt_float * 255)
++
++            pred_float_ = np.where(pred > min(1.5 * np.mean(pred), 255), np.ones_like(pred_float),
++                                   np.zeros_like(pred_float))
++            gt_float_ = np.where(gt > min(1.5 * np.mean(gt), 255), np.ones_like(pred_float),
++                                 np.zeros_like(pred_float))
++
++            preds.extend(pred_float_.ravel())
++            gts.extend(gt_float_.ravel())
++
++        RECALL = recall_score(gts, preds)
++        PERC = precision_score(gts, preds)
++
++        fmeasure = (1 + 0.3) * PERC * RECALL / (0.3 * PERC + RECALL)
++        MAE = np.mean(mae)
++
++    return fmeasure, MAE, np.array(0), np.array(0)
++
++from sklearn.metrics import roc_auc_score,recall_score,precision_score
++import cv2
++def calc_ber(y_pred, y_true):
++    batchsize = y_true.shape[0]
++    y_pred, y_true = y_pred.permute(0, 2, 3, 1).squeeze(-1), y_true.permute(0, 2, 3, 1).squeeze(-1)
++    with torch.no_grad():
++        assert y_pred.shape == y_true.shape
++        pos_err, neg_err, ber = 0, 0, 0
++        y_true = y_true.cpu().numpy()
++        y_pred = y_pred.cpu().numpy()
++        for i in range(batchsize):
++            true = y_true[i].flatten()
++            pred = y_pred[i].flatten()
++
++            TP, TN, FP, FN, BER, ACC = get_binary_classification_metrics(pred * 255,
++                                                                         true * 255, 125)
++            pos_err += (1 - TP / (TP + FN)) * 100
++            neg_err += (1 - TN / (TN + FP)) * 100
++
++    return pos_err / batchsize, neg_err / batchsize, (pos_err + neg_err) / 2 / batchsize, np.array(0)
++
++def get_binary_classification_metrics(pred, gt, threshold=None):
++    if threshold is not None:
++        gt = (gt > threshold)
++        pred = (pred > threshold)
++    TP = np.logical_and(gt, pred).sum()
++    TN = np.logical_and(np.logical_not(gt), np.logical_not(pred)).sum()
++    FN = np.logical_and(gt, np.logical_not(pred)).sum()
++    FP = np.logical_and(np.logical_not(gt), pred).sum()
++    BER = cal_ber(TN, TP, FN, FP)
++    ACC = cal_acc(TN, TP, FN, FP)
++    return TP, TN, FP, FN, BER, ACC
++
++def cal_ber(tn, tp, fn, fp):
++    return  0.5*(fp/(tn+fp) + fn/(fn+tp))
++
++def cal_acc(tn, tp, fn, fp):
++    return (tp + tn) / (tp + tn + fp + fn)
++
++def _sigmoid(x):
++    return 1 / (1 + np.exp(-x))
++
++
++def _eval_pr(y_pred, y, num):
++    prec, recall = torch.zeros(num), torch.zeros(num)
++    thlist = torch.linspace(0, 1 - 1e-10, num)
++    for i in range(num):
++        y_temp = (y_pred >= thlist[i]).float()
++        tp = (y_temp * y).sum()
++        prec[i], recall[i] = tp / (y_temp.sum() + 1e-20), tp / (y.sum() +
++                                                                1e-20)
++    return prec, recall
++
++def _S_object(pred, gt):
++    fg = torch.where(gt == 0, torch.zeros_like(pred), pred)
++    bg = torch.where(gt == 1, torch.zeros_like(pred), 1 - pred)
++    o_fg = _object(fg, gt)
++    o_bg = _object(bg, 1 - gt)
++    u = gt.mean()
++    Q = u * o_fg + (1 - u) * o_bg
++    return Q
++
++def _object(pred, gt):
++    temp = pred[gt == 1]
++    x = temp.mean()
++    sigma_x = temp.std()
++    score = 2.0 * x / (x * x + 1.0 + sigma_x + 1e-20)
++
++    return score
++
++def _S_region(pred, gt):
++    X, Y = _centroid(gt)
++    gt1, gt2, gt3, gt4, w1, w2, w3, w4 = _divideGT(gt, X, Y)
++    p1, p2, p3, p4 = _dividePrediction(pred, X, Y)
++    Q1 = _ssim(p1, gt1)
++    Q2 = _ssim(p2, gt2)
++    Q3 = _ssim(p3, gt3)
++    Q4 = _ssim(p4, gt4)
++    Q = w1 * Q1 + w2 * Q2 + w3 * Q3 + w4 * Q4
++    return Q
++
++def _centroid(gt):
++    rows, cols = gt.size()[-2:]
++    gt = gt.view(rows, cols)
++    if gt.sum() == 0:
++        X = torch.eye(1) * round(cols / 2)
++        Y = torch.eye(1) * round(rows / 2)
++    else:
++        total = gt.sum()
++        i = torch.from_numpy(np.arange(0, cols)).float().cuda()
++        j = torch.from_numpy(np.arange(0, rows)).float().cuda()
++        X = torch.round((gt.sum(dim=0) * i).sum() / total + 1e-20)
++        Y = torch.round((gt.sum(dim=1) * j).sum() / total + 1e-20)
++    return X.long(), Y.long()
++
++
++def _divideGT(gt, X, Y):
++    h, w = gt.size()[-2:]
++    area = h * w
++    gt = gt.view(h, w)
++    LT = gt[:Y, :X]
++    RT = gt[:Y, X:w]
++    LB = gt[Y:h, :X]
++    RB = gt[Y:h, X:w]
++    X = X.float()
++    Y = Y.float()
++    w1 = X * Y / area
++    w2 = (w - X) * Y / area
++    w3 = X * (h - Y) / area
++    w4 = 1 - w1 - w2 - w3
++    return LT, RT, LB, RB, w1, w2, w3, w4
++
++
++def _dividePrediction(pred, X, Y):
++    h, w = pred.size()[-2:]
++    pred = pred.view(h, w)
++    LT = pred[:Y, :X]
++    RT = pred[:Y, X:w]
++    LB = pred[Y:h, :X]
++    RB = pred[Y:h, X:w]
++    return LT, RT, LB, RB
++
++
++def _ssim(pred, gt):
++    gt = gt.float()
++    h, w = pred.size()[-2:]
++    N = h * w
++    x = pred.mean()
++    y = gt.mean()
++    sigma_x2 = ((pred - x) * (pred - x)).sum() / (N - 1 + 1e-20)
++    sigma_y2 = ((gt - y) * (gt - y)).sum() / (N - 1 + 1e-20)
++    sigma_xy = ((pred - x) * (gt - y)).sum() / (N - 1 + 1e-20)
++
++    aplha = 4 * x * y * sigma_xy
++    beta = (x * x + y * y) * (sigma_x2 + sigma_y2)
++
++    if aplha != 0:
++        Q = aplha / (beta + 1e-20)
++    elif aplha == 0 and beta == 0:
++        Q = 1.0
++    else:
++        Q = 0
++    return Q
++
++  
++def _eval_e(y_pred, y, num):
++    score = torch.zeros(num)
++    thlist = torch.linspace(0, 1 - 1e-10, num)
++    for i in range(num):
++        y_pred_th = (y_pred >= thlist[i]).float()
++        fm = y_pred_th - y_pred_th.mean()
++        gt = y - y.mean()
++        align_matrix = 2 * gt * fm / (gt * gt + fm * fm + 1e-20)
++        enhanced = ((align_matrix + 1) * (align_matrix + 1)) / 4
++        score[i] = torch.sum(enhanced) / (y.numel() - 1 + 1e-20)
++    return score
++
++  
++def dice_coeff(im1, im2, empty_score=1.0):
++    """Calculates the dice coefficient for the images"""
++
++    #im1 = np.asarray(im1).astype(np.bool)
++    #im2 = np.asarray(im2).astype(np.bool)
++
++    if im1.shape != im2.shape:
++        raise ValueError("Shape mismatch: im1 and im2 must have the same shape.")
++
++    im1 = im1 > 0.5
++    im2 = im2 > 0.5
++
++    im_sum = im1.sum() + im2.sum()
++    if im_sum == 0:
++        return empty_score
++
++    # Compute Dice coefficient
++    intersection = np.logical_and(im1, im2)
++    #print(im_sum)
++
++    return 2. * intersection.sum() / im_sum
++
++
++def iou(pred, target, eps=1e-6):
++    dims = tuple(range(1, pred.ndim))
++    intersect = np.sum(pred * target, axis=dims)
++    union = np.sum(pred + target - pred * target, axis=dims) + eps
++    return np.sum(intersect / union) / intersect.size
++
++
++def calc_kvasir(pred, target):
++  	#print("======================================================",pred.shape)
++    #print("======================================================",target.shape)
++    pred_np = pred.detach().cpu().numpy()
++    target_np = target.detach().cpu().numpy()
++    v_iou = iou(pred_np, target_np)
++    v_dice = dice_coeff(pred_np, target_np)
++    return v_dice, v_iou, 0, 0
+\ No newline at end of file

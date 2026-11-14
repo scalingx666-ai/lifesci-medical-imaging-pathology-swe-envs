@@ -1,0 +1,39 @@
+diff --git a/settings.py b/settings.py
+index 681ba36..8a2720b 100644
+--- a/settings.py
++++ b/settings.py
+@@ -2,6 +2,8 @@
+ COMPUTER_NAME = os.environ['COMPUTERNAME']
+ print("Computer: ", COMPUTER_NAME)
+ 
++WORKER_POOL_SIZE = 8
++
+ TARGET_VOXEL_MM = 1.00
+ MEAN_PIXEL_VALUE_NODULE = 41
+ LUNA_SUBSET_START_INDEX = 1
+diff --git a/step1_preprocess_luna16.py b/step1_preprocess_luna16.py
+index dabb5a2..436848c 100644
+--- a/step1_preprocess_luna16.py
++++ b/step1_preprocess_luna16.py
+@@ -617,7 +617,7 @@ def process_images(delete_existing=False, only_process_patient=None):
+         src_paths = glob.glob(src_dir + "*.mhd")
+ 
+         if only_process_patient is None and True:
+-            pool = multiprocessing.Pool(6)
++            pool = multiprocessing.Pool(settings.WORKER_POOL_SIZE)
+             pool.map(process_image, src_paths)
+         else:
+             for src_path in src_paths:
+diff --git a/step1_preprocess_ndsb.py b/step1_preprocess_ndsb.py
+index 72ff736..0a58b12 100644
+--- a/step1_preprocess_ndsb.py
++++ b/step1_preprocess_ndsb.py
+@@ -105,7 +105,7 @@ def extract_dicom_images(clean_targetdir_first=False, only_patient_id=None):
+     if only_patient_id is None:
+         dirs = os.listdir(settings.NDSB3_RAW_SRC_DIR)
+         if True:
+-            pool = Pool(8)
++            pool = Pool(settings.WORKER_POOL_SIZE)
+             pool.map(extract_dicom_images_patient, dirs)
+         else:
+             for dir_entry in dirs:

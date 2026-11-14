@@ -1,0 +1,88 @@
+diff --git a/.gitignore b/.gitignore
+index 3db7b9c..8f00fc6 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -56,3 +56,4 @@ docs/_build/
+ /results/
+ /metadata/
+ /examples/hugging_face_data/
++.DS_Store
+diff --git a/portpy/photon/clinical_criteria.py b/portpy/photon/clinical_criteria.py
+index c0d5747..b4f7a16 100644
+--- a/portpy/photon/clinical_criteria.py
++++ b/portpy/photon/clinical_criteria.py
+@@ -140,34 +140,38 @@ def get_criteria(self, type: str = None) -> List[dict]:
+         return all_criteria
+ 
+     def check_criterion_exists(self, criterion, return_ind:bool = False):
+-        criterion_exist = False
+-        criterion_ind = None
+-        for ind, crit in enumerate(self.clinical_criteria_dict['criteria']):
+-            if (crit['type'] == criterion['type']) and crit['parameters'] == criterion['parameters']:
+-                for constraint in crit['constraints']:
+-                    if constraint == criterion['constraints']:
+-                        criterion_exist = True
+-                        criterion_ind = ind
+-        if return_ind:
+-            return criterion_exist,criterion_ind
+-        else:
+-            return criterion_exist
++            criterion_exist = False
++            criterion_ind = None
++            for ind, crit in enumerate(self.clinical_criteria_dict['criteria']):
++                if (crit['type'] == criterion['type']) and crit['parameters'] == criterion['parameters']:
++                    for constraint in crit['constraints']:
++                        for key, _ in criterion['constraints'].items():
++                            if constraint == key:
++                                criterion_exist = True
++                                criterion_ind = ind
++            if return_ind:
++                return criterion_exist,criterion_ind
++            else:
++                return criterion_exist
+ 
+     def modify_criterion(self, criterion):
+         """
+-        Modify the criterion the clinical criteria
+-
+-
++        Update constraints for an existing criterion.
++        Only updates keys that already exist in the original constraint dict.
+         """
+-        criterion_found = False
+         for ind, crit in enumerate(self.clinical_criteria_dict['criteria']):
+-            if (crit['type'] == criterion['type']) and crit['parameters'] == criterion['parameters']:
+-                for constraint in crit['constraints']:
+-                    if constraint == criterion['constraints']:
+-                        self.clinical_criteria_dict['criteria'][ind]['constraints'][constraint] = criterion['constraints']
+-                        criterion_found = True
+-        if not criterion_found:
+-            raise Warning('No criteria  for {}'.format(criterion))
++
++            if crit['type'] == criterion['type'] and crit['parameters'] == criterion['parameters']:
++                existing_keys = crit['constraints']
++                updated = False
++                for key, value in criterion.get('constraints', {}).items():
++                    if key in existing_keys:
++                        existing_keys[key] = value
++                        updated = True
++                if updated:
++                    return
++
++        raise Warning(f"No criteria found for {criterion}")
+ 
+ 
+     def get_num(self, string: Union[str, float]):
+diff --git a/portpy/photon/vmat_scp/vmat_scp_optimization.py b/portpy/photon/vmat_scp/vmat_scp_optimization.py
+index 7ba71e5..758c83e 100644
+--- a/portpy/photon/vmat_scp/vmat_scp_optimization.py
++++ b/portpy/photon/vmat_scp/vmat_scp_optimization.py
+@@ -1178,7 +1178,7 @@ def create_cvxpy_intermediate_problem_prediction(self, pred_dose_1d, final_dose_
+             + cp.multiply(bound_v_r, card_bound_inds_r)]
+         # generic constraints for relation between interior and boundary beamlets
+         constraints += [leaf_pos_mu_r - leaf_pos_mu_l >= int_v[map_int_v]]
+-        constraints += [int_v >= self.vmat_params['mu_min']]
++        constraints += [int_v*100 >= self.vmat_params['mu_min']] # multiply it by 100 to match eclipse mu
+         constraints += [bound_v_l <= int_v[map_int_v]]
+         constraints += [bound_v_r <= int_v[map_int_v]]
+         if 'minimum_dynamic_leaf_gap_mm' in self.vmat_params:

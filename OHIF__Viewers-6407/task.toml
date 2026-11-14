@@ -1,0 +1,76 @@
+version = "1.0"
+
+[task]
+name = "default/OHIF__Viewers-6407"
+description = "chore(release): Release OHIF 3.13.14 - all security focused"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "Viewers",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "OHIF/Viewers"
+ref = "1fa151f5133934c953a2ab4c0056ca91f929c32f"
+reference = "https://github.com/OHIF/Viewers/pull/6407"
+source_access = "auto"
+built_at = "2026-11-14T07:04:46.777843+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:52bf881a4e4ce575b5be6e7b1eb3bb15e453a6a80da817c14a716159c1d68092"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-03T19:57:51Z"
+diff_format = "unified"
+context_files = [
+    ".circleci/config.yml",
+    ".github/workflows/build-docs.yml",
+    ".github/workflows/github-release.yml",
+    ".github/workflows/playwright.yml",
+    ".node-version",
+    "Dockerfile",
+    "extensions/default/package.json",
+    "netlify.toml",
+    "platform/app/package.json",
+    "platform/app/preinstall.js",
+    "platform/core/package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "preinstall.js",
+    "version.txt",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 178
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,70 @@
+version = "1.0"
+
+[task]
+name = "default/histolab__histolab-859"
+description = "Restore CI "
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "histolab",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "histolab/histolab"
+ref = "d189008b6da9b959d0a532d68479f3d86d4925a4"
+reference = "https://github.com/histolab/histolab/pull/859"
+source_access = "auto"
+built_at = "2026-11-14T07:10:51.231951+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:a96a18e3a751f9dc7a35dc70057d7534bc6ae3403869920fbaa79c73d35ef375"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-09T17:17:12Z"
+diff_format = "unified"
+context_files = [
+    ".github/ISSUE_TEMPLATE/bug_report.md",
+    ".github/workflows/benchmarks.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/tests.yml",
+    "CONTRIBUTING.md",
+    "docs/contributing.rst",
+    "poetry.lock",
+    "pyproject.toml",
+    "readthedocs.yml",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 178
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

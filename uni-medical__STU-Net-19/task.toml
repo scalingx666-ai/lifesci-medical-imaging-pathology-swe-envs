@@ -1,0 +1,67 @@
+version = "1.0"
+
+[task]
+name = "default/uni-medical__STU-Net-19"
+description = "The scripts for direct inference"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "STU-Net",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "uni-medical/STU-Net"
+ref = "82ba14eeb2067ed6d1985f50d44bef4148274ead"
+reference = "https://github.com/uni-medical/STU-Net/pull/19"
+source_access = "auto"
+built_at = "2026-11-14T07:11:43.770454+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:418e65eda55ce3c02ca0d499b43f17ed027d4a88d694517a762243f51b6997a1"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2023-10-30T02:03:23Z"
+diff_format = "unified"
+context_files = [
+    "direct_inference/direct_inference.py",
+    "direct_inference/example/Task032_AMOS22_Task1/dataset.json",
+    "direct_inference/example/Task032_AMOS22_Task1/imagesTr/amos_0001_0000.nii.gz",
+    "direct_inference/example/Task032_AMOS22_Task1/labelsTr/amos_0001.nii.gz",
+    "direct_inference/label_sys.py",
+    "direct_inference/readme.md",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 2444
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

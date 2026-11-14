@@ -1,0 +1,168 @@
+diff --git a/DICOMcloud/DICOMcloud/UncompressedPixelData.cs b/DICOMcloud/DICOMcloud/UncompressedPixelData.cs
+index 23c2b74..057a1ea 100644
+--- a/DICOMcloud/DICOMcloud/UncompressedPixelData.cs
++++ b/DICOMcloud/DICOMcloud/UncompressedPixelData.cs
+@@ -23,8 +23,8 @@ public UncompressedPixelDataWrapper ( fo.DicomDataset ds )
+                 // pull uncompressed frame from source pixel data
+                 Dataset = ds ;
+             }
+-            
+-            PixelData = DicomPixelData.Create (Dataset) ;
++
++            PixelData = DicomPixelData.Create(Dataset);
+         }
+ 
+         public fo.DicomDataset Dataset { get; private set; }
+diff --git a/DICOMcloud/Media/Writers/DicomMediaWriterBase.cs b/DICOMcloud/Media/Writers/DicomMediaWriterBase.cs
+index 8bd4283..83549e4 100644
+--- a/DICOMcloud/Media/Writers/DicomMediaWriterBase.cs
++++ b/DICOMcloud/Media/Writers/DicomMediaWriterBase.cs
+@@ -4,6 +4,7 @@
+ using Dicom.Imaging ;
+ using DICOMcloud.IO;
+ using DICOMcloud.Media ;
++using Dicom;
+ 
+ namespace DICOMcloud.Media
+ {
+@@ -26,6 +27,11 @@ public abstract string MediaType
+             get ;
+         }
+ 
++        public virtual bool CanUpload (DicomDataset ds, int frame)
++        {
++            return true;
++        }
++
+         public IList<IStorageLocation> CreateMedia
+         (
+             DicomMediaWriterParameters mediaParameters
+@@ -46,8 +52,9 @@ ILocationProvider sotrageProvider
+                 List<IStorageLocation> locations      = new List<IStorageLocation> ( ) ;
+                 var                    dataset        = GetMediaDataset ( mediaParameters.Dataset, mediaParameters.MediaInfo ) ;
+                 string                 transferSyntax = ( !string.IsNullOrWhiteSpace (mediaParameters.MediaInfo.TransferSyntax ) ) ? ( mediaParameters.MediaInfo.TransferSyntax ) : "" ;
++                var                    pixelDataItem  = dataset.GetDicomItem<DicomItem>(fo.DicomTag.PixelData);
+ 
+-                if ( StoreMultiFrames )
++                if (StoreMultiFrames && pixelDataItem != null)
+                 {
+                     DicomPixelData pd ;
+ 
+@@ -58,12 +65,15 @@ ILocationProvider sotrageProvider
+                 
+                 for ( int frame = 1; frame <= framesCount; frame++ )
+                 {
+-                    var storeLocation = sotrageProvider.GetLocation ( MediaFactory.Create ( mediaParameters.Dataset, frame, MediaType, transferSyntax ));
+-                    
+-                    
+-                    Upload ( dataset, frame, storeLocation, mediaParameters.MediaInfo ) ;
+-                
+-                    locations.Add ( storeLocation ) ;
++                    if (CanUpload(dataset, frame))
++                    {
++                        var storeLocation = sotrageProvider.GetLocation(MediaFactory.Create(mediaParameters.Dataset, frame, MediaType, transferSyntax));
++
++
++                        Upload(dataset, frame, storeLocation, mediaParameters.MediaInfo);
++
++                        locations.Add(storeLocation);
++                    }
+                 }
+ 
+                 return locations ;
+@@ -94,12 +104,15 @@ int[] frameList
+ 
+             foreach ( int frame in frameList )
+             {
+-                var storeLocation = storageProvider.GetLocation ( MediaFactory.Create ( mediaParameters.Dataset, frame, MediaType, transferSyntax ));
+-                    
+-                    
+-                Upload ( mediaParameters.Dataset, frame, storeLocation, mediaParameters.MediaInfo ) ;
+-                
+-                locations.Add ( storeLocation ) ;
++                if (CanUpload(dataset, frame))
++                {
++                    var storeLocation = storageProvider.GetLocation(MediaFactory.Create(mediaParameters.Dataset, frame, MediaType, transferSyntax));
++
++
++                    Upload(mediaParameters.Dataset, frame, storeLocation, mediaParameters.MediaInfo);
++
++                    locations.Add(storeLocation);
++                }
+             }
+ 
+             return locations ;
+diff --git a/DICOMcloud/Media/Writers/JpegMediaWriter.cs b/DICOMcloud/Media/Writers/JpegMediaWriter.cs
+index ea6e5b2..f916499 100644
+--- a/DICOMcloud/Media/Writers/JpegMediaWriter.cs
++++ b/DICOMcloud/Media/Writers/JpegMediaWriter.cs
+@@ -8,6 +8,7 @@
+ using Dicom.Imaging.Codec ;
+ using DICOMcloud.IO;
+ using System.IO;
++using Dicom;
+ 
+ namespace DICOMcloud.Media
+ {
+@@ -33,6 +34,12 @@ protected override bool StoreMultiFrames
+             }
+         }
+ 
++        public override bool CanUpload(DicomDataset ds, int frame)
++        {
++            var pixelDataItem = ds.GetDicomItem<DicomItem>(fo.DicomTag.PixelData);
++
++            return pixelDataItem != null;
++        }
+ 
+         protected override fo.DicomDataset GetMediaDataset ( fo.DicomDataset data, DicomMediaProperties mediaInfo )
+         {
+@@ -48,12 +55,12 @@ DicomMediaProperties mediaProperties
+         )
+         {
+             var frameIndex = frame - 1 ;
+-            var dicomImage = new DicomImage (dicomObject, frameIndex);
+-            var bitmap = dicomImage.RenderImage (frameIndex).AsSharedBitmap();
++            var dicomImage = new DicomImage(dicomObject, frameIndex);
++            var bitmap = dicomImage.RenderImage(frameIndex).AsSharedBitmap();
+             var stream = new MemoryStream ( ) ;
+-            
+-            bitmap.Save (stream, System.Drawing.Imaging.ImageFormat.Jpeg );
+-            
++
++            bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Jpeg);
++
+             stream.Position = 0 ;
+ 
+             storeLocation.Upload ( stream, MediaType ) ;
+diff --git a/DICOMcloud/Media/Writers/UncompressedMediaWriter.cs b/DICOMcloud/Media/Writers/UncompressedMediaWriter.cs
+index 8e80f07..6dbbebc 100644
+--- a/DICOMcloud/Media/Writers/UncompressedMediaWriter.cs
++++ b/DICOMcloud/Media/Writers/UncompressedMediaWriter.cs
+@@ -7,6 +7,7 @@
+ using Dicom.Imaging;
+ using DICOMcloud.IO;
+ using Dicom.IO.Buffer;
++using Dicom;
+ 
+ namespace DICOMcloud.Media
+ {
+@@ -32,10 +33,17 @@ protected override bool StoreMultiFrames
+             }
+         }
+ 
++        public override bool CanUpload(DicomDataset ds, int frame)
++        {
++            var pixelDataItem = ds.GetDicomItem<DicomItem>(fo.DicomTag.PixelData);
++
++            return pixelDataItem != null;
++        }
++
+         protected override void Upload ( fo.DicomDataset dicomDataset, int frame, IStorageLocation storeLocation, DicomMediaProperties mediaProperties)
+         {
+             var uncompressedData = new UncompressedPixelDataWrapper ( dicomDataset ) ;
+-            var buffer           = uncompressedData.PixelData.GetFrame ( frame - 1 ) ;
++            var buffer           = uncompressedData.PixelData.GetFrame(frame - 1);
+             var  data            = new byte[0] ;
+             
+             

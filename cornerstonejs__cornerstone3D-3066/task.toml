@@ -1,0 +1,72 @@
+version = "1.0"
+
+[task]
+name = "default/cornerstonejs__cornerstone3D-3066"
+description = "fix(segmentation): keep the slice-rendered labelmap on rotated and oblique planar views"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "cornerstone3D",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "cornerstonejs/cornerstone3D"
+ref = "34c5aad882d779e001b9ed6ffd2bd0e64fcff36e"
+reference = "https://github.com/cornerstonejs/cornerstone3D/pull/3066"
+source_access = "auto"
+built_at = "2026-11-14T07:07:00.323674+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:6dbfc43240fb355b7634df8aa7175782d502136aef5d107df3bd0e1791c35a16"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-13T12:55:53Z"
+diff_format = "unified"
+context_files = [
+    "packages/core/src/RenderingEngine/GenericViewport/Planar/PlanarCPUVolumeSampler.ts",
+    "packages/core/src/utilities/index.ts",
+    "packages/core/src/utilities/sampleVolumeGrid.ts",
+    "packages/core/test/sampleVolumeGrid.jest.js",
+    "packages/tools/src/stateManagement/segmentation/helpers/labelmapImageMapperSupport.spec.ts",
+    "packages/tools/src/stateManagement/segmentation/helpers/labelmapImageMapperSupport.ts",
+    "packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapImageMapper.spec.ts",
+    "packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapImageMapper.ts",
+    "packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapResampledSliceData.spec.ts",
+    "packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapResampledSliceData.ts",
+    "packages/tools/src/tools/displayTools/Labelmap/volumeLabelmapSliceData.ts",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 2597
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

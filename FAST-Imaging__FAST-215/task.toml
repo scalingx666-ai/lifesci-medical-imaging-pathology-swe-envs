@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/FAST-Imaging__FAST-215"
+description = "Fix ARM64 Build By Updating Path to Clarius Lib"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "FAST",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "FAST-Imaging/FAST"
+ref = "ca98d6010d52b8376bd4fc99762f152b78a3c7cf"
+reference = "https://github.com/FAST-Imaging/FAST/pull/215"
+source_access = "auto"
+built_at = "2026-11-14T07:10:25.366788+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:5259395602f2997829c70ed14c1068367fc3f9c4fc803ac70e1d6c961a60c048"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2024-11-29T12:43:12Z"
+diff_format = "unified"
+context_files = [
+    "cmake/ExternalClarius.cmake",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 2
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

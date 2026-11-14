@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/ome__bioformats-4501"
+description = "Update `macos-14` to `macos-15`"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "bioformats",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "ome/bioformats"
+ref = "3f52d063ce38fccb251a922bab50fca802b9b077"
+reference = "https://github.com/ome/bioformats/pull/4501"
+source_access = "auto"
+built_at = "2026-11-14T07:11:00.350305+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:c20330f5937e4206349d33d04f46be63f5ffcb10b3f03a1ce635a805996c16b5"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-10T19:57:40Z"
+diff_format = "unified"
+context_files = [
+    ".github/workflows/maven.yml",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 3
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

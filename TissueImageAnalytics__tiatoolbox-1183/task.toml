@@ -1,0 +1,65 @@
+version = "1.0"
+
+[task]
+name = "default/TissueImageAnalytics__tiatoolbox-1183"
+description = ":technologist: pre-commit autoupdate"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "tiatoolbox",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "TissueImageAnalytics/tiatoolbox"
+ref = "bdbf4232fce339e9b4d8816860e13e6fbcc90c12"
+reference = "https://github.com/TissueImageAnalytics/tiatoolbox/pull/1183"
+source_access = "auto"
+built_at = "2026-11-14T07:10:04.595131+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:63ccd7edc595be6deffcc99770974599b81edc40912f94d26be67ee5debe06d8"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-06T10:47:00Z"
+diff_format = "unified"
+context_files = [
+    ".github/workflows/python-package.yml",
+    ".pre-commit-config.yaml",
+    "pyproject.toml",
+    "tiatoolbox/utils/image.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 8
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

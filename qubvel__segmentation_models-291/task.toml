@@ -1,0 +1,66 @@
+version = "1.0"
+
+[task]
+name = "default/qubvel__segmentation_models-291"
+description = "Allow passing keyword arguments to backbone models (#230)"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "segmentation_models",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "qubvel/segmentation_models"
+ref = "a6fbf2d5ea21081929df634d095d389211e649ef"
+reference = "https://github.com/qubvel/segmentation_models/pull/291"
+source_access = "auto"
+built_at = "2026-11-14T07:04:46.870450+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:6483b62ba8e30416b42278c7b7bdac1da05a21e155fe37741063ff87ffd4ecf4"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2020-04-17T09:51:20Z"
+diff_format = "unified"
+context_files = [
+    "segmentation_models/models/_utils.py",
+    "segmentation_models/models/fpn.py",
+    "segmentation_models/models/linknet.py",
+    "segmentation_models/models/pspnet.py",
+    "segmentation_models/models/unet.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 26
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

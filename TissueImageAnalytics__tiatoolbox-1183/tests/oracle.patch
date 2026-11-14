@@ -1,0 +1,52 @@
+diff --git a/.github/workflows/python-package.yml b/.github/workflows/python-package.yml
+index e35b6c81b..e1f3f4ab0 100644
+--- a/.github/workflows/python-package.yml
++++ b/.github/workflows/python-package.yml
+@@ -33,7 +33,7 @@ jobs:
+         sudo apt update
+         sudo apt-get install -y libopenjp2-7 libopenjp2-tools
+         python -m pip install --upgrade pip
+-        python -m pip install ruff==0.16.10 pytest pytest-cov pytest-runner
++        python -m pip install ruff==0.17.3 pytest pytest-cov pytest-runner
+         pip install uv
+         uv pip install --system torch torchvision --index-url https://download.pytorch.org/whl/cpu
+         uv pip install --system -e .
+diff --git a/.pre-commit-config.yaml b/.pre-commit-config.yaml
+index e12f3a0c8..b8b607f97 100644
+--- a/.pre-commit-config.yaml
++++ b/.pre-commit-config.yaml
+@@ -62,7 +62,7 @@ repos:
+       - id: rst-inline-touching-normal # Detect mistake of inline code touching normal text in rst.
+   - repo: https://github.com/astral-sh/ruff-pre-commit
+     # Ruff version.
+-    rev: v0.16.10
++    rev: v0.17.3
+     hooks:
+       - id: ruff
+         args: [--fix, --exit-non-zero-on-fix]
+diff --git a/pyproject.toml b/pyproject.toml
+index a3ec388a6..3246a562e 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -81,7 +81,7 @@ dev = [
+   "pytest-cov>=4.0.0",
+   "pytest-runner>=6.0",
+   "pytest-xdist[psutil]",
+-  "ruff==0.16.10",
++  "ruff==0.17.3",
+   "toml>=0.10.2",
+   "twine>=4.0.1",
+   "wheel>=0.37.1",
+diff --git a/tiatoolbox/utils/image.py b/tiatoolbox/utils/image.py
+index 9b15aa675..584239b87 100644
+--- a/tiatoolbox/utils/image.py
++++ b/tiatoolbox/utils/image.py
+@@ -442,7 +442,7 @@ def safe_padded_read(
+     )
+ 
+ 
+-def sub_pixel_read(  # skipcq: PY-R1000  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917, E501
++def sub_pixel_read(  # skipcq: PY-R1000  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
+     image: np.ndarray,
+     bounds: IntBounds,
+     output_size: tuple[int, int] | np.ndarray,

@@ -1,0 +1,35 @@
+diff --git a/Python/site-packages/sv_rom_extract_results/post.py b/Python/site-packages/sv_rom_extract_results/post.py
+index 7af863613..33b6357ab 100644
+--- a/Python/site-packages/sv_rom_extract_results/post.py
++++ b/Python/site-packages/sv_rom_extract_results/post.py
+@@ -403,6 +403,8 @@ def project_centerline_to_3d(self):
+         """
+         Map 1D results on centerline to volume mesh
+         """
++        last_time = self.params.times[-1]
++  
+         # get 1d -> 3d map
+         map_ids, map_iter, map_rad = self.get_centerline_3d_map()
+ 
+@@ -413,6 +415,10 @@ def project_centerline_to_3d(self):
+         for name, array in arrays_cent.items():
+             add_array(self.geos['vol'], name, array[map_ids])
+ 
++            # add last time step 'Pressue' array to volume mesh for svMultiPhysics 
++            if name == "pressure_"+str(last_time):
++                add_array(self.geos['vol'], 'Pressure', array[map_ids])
++
+         # add mapping to volume mesh
+         for name, array in zip(['MapIds', 'MapIters'], [map_ids, map_iter]):
+             add_array(self.geos['vol'], name, array)
+@@ -454,6 +460,10 @@ def project_centerline_to_3d(self):
+                 # add to volume mesh
+                 add_array(self.geos['vol'], a.replace('flow', 'velocity'), velocity)
+ 
++                # add last time step 'Velocity' array to volume mesh for svMultiPhysics 
++                if a == "flow_"+str(last_time):
++                    add_array(self.geos['vol'],  'Velocity', velocity)
++
+         # write to file
+         f_out = os.path.join(self.params.output_directory, self.params.output_file_name + '.vtu')
+         write_geo(f_out, self.geos['vol'])

@@ -1,0 +1,64 @@
+version = "1.0"
+
+[task]
+name = "default/rmaphoh__RETFound-3"
+description = "Streamline setup"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "RETFound",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "rmaphoh/RETFound"
+ref = "ef069f94a90ed7b9779776fd033dae328a05ff84"
+reference = "https://github.com/rmaphoh/RETFound/pull/3"
+source_access = "auto"
+built_at = "2026-11-14T07:09:01.828013+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:94213f7c6d23781d48395312646ec38322931d5e81cb3bc97aa810bbaca07767"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2023-09-16T08:44:00Z"
+diff_format = "unified"
+context_files = [
+    ".gitignore",
+    "README.md",
+    "requirement.txt",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 32
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

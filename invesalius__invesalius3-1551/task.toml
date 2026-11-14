@@ -1,0 +1,66 @@
+version = "1.0"
+
+[task]
+name = "default/invesalius__invesalius3-1551"
+description = "Feat/eeg import without registration json"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "invesalius3",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "invesalius/invesalius3"
+ref = "b16bf03c01bccb0c4af4400b8ca172563f0ef4bc"
+reference = "https://github.com/invesalius/invesalius3/pull/1551"
+source_access = "auto"
+built_at = "2026-11-14T07:08:16.284612+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:fc2f2571de595809fd307d9befe937464371f4174b90781d1f8f2d3a32de7dd9"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-09T11:53:04Z"
+diff_format = "unified"
+context_files = [
+    "invesalius/data/eeg.py",
+    "invesalius/data/markers/surface_geometry.py",
+    "invesalius/gui/data_notebook.py",
+    "invesalius/gui/dialogs.py",
+    "invesalius/navigation/eeg_electrodes.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 378
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

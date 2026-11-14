@@ -1,0 +1,68 @@
+version = "1.0"
+
+[task]
+name = "default/rapidsai__cucim-1236"
+description = "Avoid CMake 4.5 CUDA target export incompatibility"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "cucim",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "rapidsai/cucim"
+ref = "da1bba43c6808c04d245b32edd576911399bb330"
+reference = "https://github.com/rapidsai/cucim/pull/1236"
+source_access = "auto"
+built_at = "2026-11-14T07:10:43.903463+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:899f12e7c4dbf759cde34731ab218a0781ebd8151e76a6e82511b817029ae855"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-14T01:17:15Z"
+diff_format = "unified"
+context_files = [
+    "conda/environments/all_cuda-129_arch-aarch64.yaml",
+    "conda/environments/all_cuda-129_arch-x86_64.yaml",
+    "conda/environments/all_cuda-134_arch-aarch64.yaml",
+    "conda/environments/all_cuda-134_arch-x86_64.yaml",
+    "conda/recipes/cucim/conda_build_config.yaml",
+    "conda/recipes/libcucim/conda_build_config.yaml",
+    "dependencies.yaml",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 14
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

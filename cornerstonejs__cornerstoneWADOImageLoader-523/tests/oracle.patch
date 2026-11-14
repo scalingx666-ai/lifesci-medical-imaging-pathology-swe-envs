@@ -1,0 +1,48 @@
+diff --git a/src/imageLoader/wadors/metaData/NMHelpers.js b/src/imageLoader/wadors/metaData/NMHelpers.js
+index fd974dac..df534ccb 100644
+--- a/src/imageLoader/wadors/metaData/NMHelpers.js
++++ b/src/imageLoader/wadors/metaData/NMHelpers.js
+@@ -32,7 +32,6 @@ function getImageTypeSubItemFromMetadata(metaData, index) {
+  * Extracts the orientation from NM multiframe metadata, if image type
+  * equal to RECON TOMO or RECON GATED TOMO
+  * @param {*} metaData
+- * @returns
+  */
+ function extractOrientationFromNMMultiframeMetadata(metaData) {
+   let imageOrientationPatient;
+@@ -42,7 +41,6 @@ function extractOrientationFromNMMultiframeMetadata(metaData) {
+     const detectorInformationSequence = getTagValue(metaData['00540022']);
+ 
+     if (detectorInformationSequence) {
+-      debugger;
+       imageOrientationPatient = getNumberValues(
+         detectorInformationSequence['00200037'],
+         6
+@@ -57,7 +55,6 @@ function extractOrientationFromNMMultiframeMetadata(metaData) {
+  * Extracts the position from NM multiframe dataset, if image type
+  * equal to RECON TOMO or RECON GATED TOMO
+  * @param {*} metaData
+- * @returns
+  */
+ function extractPositionFromNMMultiframeMetadata(metaData) {
+   let imagePositionPatient;
+diff --git a/src/imageLoader/wadors/metaData/extractPositioningFromMetadata.js b/src/imageLoader/wadors/metaData/extractPositioningFromMetadata.js
+index 1e4644ed..d68df1ad 100644
+--- a/src/imageLoader/wadors/metaData/extractPositioningFromMetadata.js
++++ b/src/imageLoader/wadors/metaData/extractPositioningFromMetadata.js
+@@ -10,7 +10,6 @@ import {
+  * from the Detector Information Sequence (for NM images) if image type equal
+  * to RECON TOMO or RECON GATED TOMO
+  * @param {*} metaData
+- * @returns
+  */
+ function extractOrientationFromMetadata(metaData) {
+   let imageOrientationPatient = getNumberValues(metaData['00200037'], 6);
+@@ -32,7 +31,6 @@ function extractOrientationFromMetadata(metaData) {
+  * from the Detector Information Sequence (for NM images) if image type equal
+  * to RECON TOMO or RECON GATED TOMO
+  * @param {*} metaData
+- * @returns
+  */
+ function extractPositionFromMetadata(metaData) {
+   let imagePositionPatient = getNumberValues(metaData['00200032'], 3);

@@ -1,0 +1,106 @@
+diff --git a/EvilDICOM/EvilDICOM/Anonymization/Anonymizers/StudyIdAnonymizer.cs b/EvilDICOM/EvilDICOM/Anonymization/Anonymizers/StudyIdAnonymizer.cs
+index 8ac905d0..cbfb625a 100644
+--- a/EvilDICOM/EvilDICOM/Anonymization/Anonymizers/StudyIdAnonymizer.cs
++++ b/EvilDICOM/EvilDICOM/Anonymization/Anonymizers/StudyIdAnonymizer.cs
+@@ -135,6 +135,7 @@ public static DICOMFileType GetFileType(DICOMObject d)
+                     case "1.2.840.10008.5.1.4.1.1.4": return DICOMFileType.MRI_IMAGE;
+                     case "1.2.840.10008.5.1.4.1.1.77.1.5.2": return DICOMFileType.PET_IMAGE;
+                     case "1.2.840.10008.5.1.4.1.1.481.5": return DICOMFileType.RT_PLAN;
++                    case "1.2.246.352.70.1.70": return DICOMFileType.RT_PLAN;
+                     case "1.2.840.10008.5.1.4.1.1.481.3": return DICOMFileType.RT_STRUCT;
+                     case "1.2.840.10008.5.1.4.1.1.481.2": return DICOMFileType.RT_DOSE;
+                     default: return DICOMFileType.OTHER;
+diff --git a/EvilDICOM/EvilDICOM/Core/Extensions/IDICOMElementExtensions.cs b/EvilDICOM/EvilDICOM/Core/Extensions/IDICOMElementExtensions.cs
+index 8f43f2f8..d08ea5c5 100644
+--- a/EvilDICOM/EvilDICOM/Core/Extensions/IDICOMElementExtensions.cs
++++ b/EvilDICOM/EvilDICOM/Core/Extensions/IDICOMElementExtensions.cs
+@@ -50,7 +50,7 @@ public static bool IsVR(this IDICOMElement elem, VR vr)
+                 case VR.Time:
+                     return elem is Time;
+                 case VR.DateTime:
+-                    return elem is DateTime;
++                    return elem is EvilDICOM.Core.Element.DateTime;
+                 case VR.AgeString:
+                     return elem is AgeString;
+                 case VR.IntegerString:
+diff --git a/EvilDICOM/EvilDICOM/Core/Helpers/AbstractSyntax.cs b/EvilDICOM/EvilDICOM/Core/Helpers/AbstractSyntax.cs
+index f16412f2..69bf6e23 100644
+--- a/EvilDICOM/EvilDICOM/Core/Helpers/AbstractSyntax.cs
++++ b/EvilDICOM/EvilDICOM/Core/Helpers/AbstractSyntax.cs
+@@ -42,6 +42,7 @@ public class AbstractSyntax :SOPClassUID
+             RTStructureSetStorage,
+             RTBeamsTreatmentRecordStorage,
+             RTPlanStorage,
++            HalcyonRTPlanStorage,
+             RTBrachyTreatmentRecordStorage,
+             RTBrachyApplicationSetupDeliveryInstructionStorage,
+             ComputedRadiographyImageStorage,
+diff --git a/EvilDICOM/EvilDICOM/Core/Helpers/SOPClassUID.cs b/EvilDICOM/EvilDICOM/Core/Helpers/SOPClassUID.cs
+index 4cfe7b0b..4f46bc20 100644
+--- a/EvilDICOM/EvilDICOM/Core/Helpers/SOPClassUID.cs
++++ b/EvilDICOM/EvilDICOM/Core/Helpers/SOPClassUID.cs
+@@ -130,6 +130,7 @@ public partial class SOPClassUID
+         public const String RTStructureSetStorage = "1.2.840.10008.5.1.4.1.1.481.3";
+         public const String RTBeamsTreatmentRecordStorage = "1.2.840.10008.5.1.4.1.1.481.4";
+         public const String RTPlanStorage = "1.2.840.10008.5.1.4.1.1.481.5";
++        public const String HalcyonRTPlanStorage = "1.2.246.352.70.1.70";
+         public const String RTBrachyTreatmentRecordStorage = "1.2.840.10008.5.1.4.1.1.481.6";
+         public const String RTTreatmentSummaryRecordStorage = "1.2.840.10008.5.1.4.1.1.481.7";
+         public const String RTIonPlanStorage = "1.2.840.10008.5.1.4.1.1.481.8";
+diff --git a/EvilDICOM/EvilDICOM/Core/IO/Data/DataComposer.cs b/EvilDICOM/EvilDICOM/Core/IO/Data/DataComposer.cs
+index 4cf80194..905630bc 100644
+--- a/EvilDICOM/EvilDICOM/Core/IO/Data/DataComposer.cs
++++ b/EvilDICOM/EvilDICOM/Core/IO/Data/DataComposer.cs
+@@ -148,7 +148,7 @@ public static byte[] GetStringBytes(VR vr, IDICOMElement el, StringEncoding enc)
+                     unpadded = GetEncodedBytes(data, enc);
+                     return DataRestriction.EnforceEvenLength(unpadded, vr);
+                 case VR.DateTime:
+-                    var dt = el as DateTime;
++                    var dt = el as EvilDICOM.Core.Element.DateTime;
+                     data = StringDataComposer.ComposeDateTimes(dt.Data_);
+                     unpadded = GetEncodedBytes(data, enc);
+                     return DataRestriction.EnforceEvenLength(unpadded, vr);
+diff --git a/EvilDICOM_CodeGen/CodeGenerator/CodeGenerator/Enums/SOPClass.cs b/EvilDICOM_CodeGen/CodeGenerator/CodeGenerator/Enums/SOPClass.cs
+index 1262cff6..3014a222 100644
+--- a/EvilDICOM_CodeGen/CodeGenerator/CodeGenerator/Enums/SOPClass.cs
++++ b/EvilDICOM_CodeGen/CodeGenerator/CodeGenerator/Enums/SOPClass.cs
+@@ -19,6 +19,7 @@ public enum SOPClass
+         RT_Reg,
+         RT_Structure,
+         RT_Plan,
++        HALCYON_RT_Plan,
+         RT_Brachy_Record,
+         RT_Treatment_Record,
+         RT_IonPlan,
+diff --git a/EvilDICOM_CodeGen/CodeGenerator/CodeGenerator/Helpers/AbstractSyntax.cs b/EvilDICOM_CodeGen/CodeGenerator/CodeGenerator/Helpers/AbstractSyntax.cs
+index 93653a4c..d5c68ffe 100644
+--- a/EvilDICOM_CodeGen/CodeGenerator/CodeGenerator/Helpers/AbstractSyntax.cs
++++ b/EvilDICOM_CodeGen/CodeGenerator/CodeGenerator/Helpers/AbstractSyntax.cs
+@@ -38,6 +38,7 @@ public class AbstractSyntax
+         public static string RT_STRUCTURE_STORAGE = "1.2.840.10008.5.1.4.1.1.481.3";
+         public static string RT_BEAMS_TREAT_RECORD_STORAGE = "1.2.840.10008.5.1.4.1.1.481.4";
+         public static string RT_PLAN_STORAGE = "1.2.840.10008.5.1.4.1.1.481.5";
++        public static string HALCYON_RT_PLAN_STORAGE = "1.2.246.352.70.1.70";
+         public static string RT_BRACHY_TREATMENT_RECORD_STORAGE = "1.2.840.10008.5.1.4.1.1.481.6";
+         public static string RT_BRACHY_TREATMENT_SUMMARY_STORAGE = "1.2.840.10008.5.1.4.1.1.481.7";
+         public static string RT_ION_PLAN_STORAGE = "1.2.840.10008.5.1.4.1.1.481.8";
+@@ -60,6 +61,7 @@ public class AbstractSyntax
+             RT_STRUCTURE_STORAGE,
+             RT_BEAMS_TREAT_RECORD_STORAGE,
+             RT_PLAN_STORAGE,
++            HALCYON_RT_PLAN_STORAGE,
+             RT_BRACHY_TREATMENT_RECORD_STORAGE,
+             RT_BRACHY_TREATMENT_SUMMARY_STORAGE,
+             CR_IMAGE_STORAGE,
+diff --git a/EvilDICOM_CodeGen/CodeGenerator/CodeGenerator/Helpers/SOPClassHelper.cs b/EvilDICOM_CodeGen/CodeGenerator/CodeGenerator/Helpers/SOPClassHelper.cs
+index 1a244c97..0914f194 100644
+--- a/EvilDICOM_CodeGen/CodeGenerator/CodeGenerator/Helpers/SOPClassHelper.cs
++++ b/EvilDICOM_CodeGen/CodeGenerator/CodeGenerator/Helpers/SOPClassHelper.cs
+@@ -33,6 +33,7 @@ private static void Initialize()
+             new KeyValuePair<string,SOPClass>(AbstractSyntax.RT_DOSE_STORAGE, SOPClass.RT_Dose),
+             new KeyValuePair<string,SOPClass>(AbstractSyntax.RT_IMAGE_STORAGE, SOPClass.RT_Image),
+             new KeyValuePair<string,SOPClass>(AbstractSyntax.RT_PLAN_STORAGE, SOPClass.RT_Plan),
++            new KeyValuePair<string,SOPClass>(AbstractSyntax.HALCYON_RT_PLAN_STORAGE, SOPClass.HALCYON_RT_Plan),
+             new KeyValuePair<string,SOPClass>(AbstractSyntax.RT_STRUCTURE_STORAGE, SOPClass.RT_Structure),
+             new KeyValuePair<string,SOPClass>(AbstractSyntax.VERIFICATION, SOPClass.Verification),
+             new KeyValuePair<string,SOPClass>(AbstractSyntax.MR_IMAGE_STORAGE, SOPClass.MR),

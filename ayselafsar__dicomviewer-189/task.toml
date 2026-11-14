@@ -1,0 +1,69 @@
+version = "1.0"
+
+[task]
+name = "default/ayselafsar__dicomviewer-189"
+description = "feat(viewer): Upgrade acanio-viewer to 1.3.0"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "dicomviewer",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "ayselafsar/dicomviewer"
+ref = "56a26ce585d9fe2a7442da73ecff925b33adca4c"
+reference = "https://github.com/ayselafsar/dicomviewer/pull/189"
+source_access = "auto"
+built_at = "2026-11-14T07:12:56.403936+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:9c8a628d23a0d12a5a626dd388687e02f8d16883a2dc9a9202e5db86b0d8ca69"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-10-29T17:54:57Z"
+diff_format = "unified"
+context_files = [
+    ".github/workflows/build.yml",
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    "Makefile",
+    "README.md",
+    "acanio-viewer",
+    "package-lock.json",
+    "package.json",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 44
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

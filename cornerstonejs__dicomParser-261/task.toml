@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/cornerstonejs__dicomParser-261"
+description = "chore(deps-dev): bump @babel/traverse from 7.17.0 to 7.23.2"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "dicomParser",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "cornerstonejs/dicomParser"
+ref = "7fbbe7492ad167a676f1699dcdeb75f9df875a87"
+reference = "https://github.com/cornerstonejs/dicomParser/pull/261"
+source_access = "auto"
+built_at = "2026-11-14T07:08:42.895754+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:1b045d150b2b6cd6110b88a2b9c52e03e040faecccb657548df1316c4a232764"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2023-10-17T21:50:45Z"
+diff_format = "unified"
+context_files = [
+    "package-lock.json",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 469
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

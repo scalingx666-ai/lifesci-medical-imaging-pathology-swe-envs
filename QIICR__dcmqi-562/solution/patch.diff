@@ -1,0 +1,60 @@
+diff --git a/.github/workflows/cmake-linux.yml b/.github/workflows/cmake-linux.yml
+index ac9f97be..545b17b1 100644
+--- a/.github/workflows/cmake-linux.yml
++++ b/.github/workflows/cmake-linux.yml
+@@ -119,9 +119,11 @@ jobs:
+     - name: "Upload package as artifact (retry)"
+       if: steps.upload-artifact.outcome == 'failure'
+       uses: actions/upload-artifact@v7
++      continue-on-error: true
+       with:
+         name: dcmqi-linux-package
+         path: build/dcmqi-build/dcmqi-*-linux*.tar.gz
++        overwrite: true
+ 
+     - name: "Publish linux package"
+       # Publish tagged (stable) releases only. The rolling "latest" prerelease is
+@@ -328,9 +330,11 @@ jobs:
+     - name: "Upload package as artifact (retry)"
+       if: steps.upload-artifact.outcome == 'failure'
+       uses: actions/upload-artifact@v7
++      continue-on-error: true
+       with:
+         name: dcmqi-linux-arm64-package
+         path: dcmqi-build/dcmqi-build/dcmqi-*-linux-arm64*.tar.gz
++        overwrite: true
+ 
+     # Save the dependency cache only when the build step itself succeeded. This keeps the
+     # original intent -- cache the deps even if a *later* step (test, package) fails -- while
+diff --git a/.github/workflows/cmake-macos.yml b/.github/workflows/cmake-macos.yml
+index d20e81d7..a4e63158 100644
+--- a/.github/workflows/cmake-macos.yml
++++ b/.github/workflows/cmake-macos.yml
+@@ -180,9 +180,11 @@ jobs:
+     - name: "Upload package as artifact (retry)"
+       if: steps.upload-artifact.outcome == 'failure'
+       uses: actions/upload-artifact@v7
++      continue-on-error: true
+       with:
+         name: dcmqi-macos-${{ matrix.arch }}-package
+         path: ${{ github.workspace }}/dcmqi-build/dcmqi-build/dcmqi-*-mac*.tar.gz
++        overwrite: true
+ 
+     # Save cache even if a later step (test, package) failed, so deps don't need rebuilding next run
+     - name: Save DCMTK, ITK and ZLIB cache
+diff --git a/.github/workflows/cmake-win.yml b/.github/workflows/cmake-win.yml
+index 166bef74..8b881885 100644
+--- a/.github/workflows/cmake-win.yml
++++ b/.github/workflows/cmake-win.yml
+@@ -117,9 +117,11 @@ jobs:
+       - name: "Upload package as artifact (retry)"
+         if: steps.upload-artifact.outcome == 'failure'
+         uses: actions/upload-artifact@v7
++        continue-on-error: true
+         with:
+             name: dcmqi-build
+             path: ${{ github.workspace }}\b\dcmqi-build\dcmqi-*-win64*.zip
++            overwrite: true
+ 
+       # Save cache even if a later step (test, package) failed, so deps don't need rebuilding next run
+       - name: Save build dependencies cache

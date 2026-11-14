@@ -1,0 +1,65 @@
+version = "1.0"
+
+[task]
+name = "default/cornerstonejs__cornerstone3D-3065"
+description = "fix(planar): correct CPU image coordinates on high-DPI displays and stop the labelmap render loop at mount"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "cornerstone3D",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "cornerstonejs/cornerstone3D"
+ref = "c0fb73095512456d8b5bcfbe840537a32b12e5be"
+reference = "https://github.com/cornerstonejs/cornerstone3D/pull/3065"
+source_access = "auto"
+built_at = "2026-11-14T07:07:03.480286+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:cca4dce148c2ead7816a8a41edec07e81ca73798bf5d6820963364b0b9bfb976"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-13T00:43:01Z"
+diff_format = "unified"
+context_files = [
+    "packages/core/src/RenderingEngine/GenericViewport/Planar/CpuImageSliceRenderPath.ts",
+    "packages/core/test/planarComputedCamera.jest.js",
+    "packages/tools/src/eventListeners/segmentation/imageChangeEventListener.ts",
+    "packages/tools/test/imageChangeEventListener.jest.js",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 274
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

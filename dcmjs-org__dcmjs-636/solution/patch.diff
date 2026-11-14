@@ -1,0 +1,18 @@
+diff --git a/packages/core/src/utilities/DicomMetadataListener.js b/packages/core/src/utilities/DicomMetadataListener.js
+index 5900b3ac..c135b230 100644
+--- a/packages/core/src/utilities/DicomMetadataListener.js
++++ b/packages/core/src/utilities/DicomMetadataListener.js
+@@ -268,13 +268,6 @@ export class DicomMetadataListener {
+      */
+     _basePop() {
+         const result = this.current.pop?.() ?? this.current.dest;
+-        if (result.InlineBinary) {
+-            console.log(
+-                "********* InlineBinary already set",
+-                result,
+-                this.current
+-            );
+-        }
+         if (result.Value === null) {
+             result.Value = [];
+         } else if (

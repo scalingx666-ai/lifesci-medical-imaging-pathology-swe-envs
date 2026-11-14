@@ -1,0 +1,26 @@
+diff --git a/eval.py b/eval.py
+index 5d68e44f..ba522473 100755
+--- a/eval.py
++++ b/eval.py
+@@ -40,6 +40,8 @@
+                     help='use micro_average instead of macro_avearge for multiclass AUC')
+ parser.add_argument('--split', type=str, choices=['train', 'val', 'test', 'all'], default='test')
+ parser.add_argument('--task', type=str, choices=['task_1_tumor_vs_normal',  'task_2_tumor_subtyping'])
++parser.add_argument('--drop_out', type=float, default=0.25, help='dropout')
++parser.add_argument('--embed_dim', type=int, default=1024)
+ args = parser.parse_args()
+ 
+ device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
+diff --git a/vis_utils/heatmap_utils.py b/vis_utils/heatmap_utils.py
+index 148aa06d..ef4f938b 100644
+--- a/vis_utils/heatmap_utils.py
++++ b/vis_utils/heatmap_utils.py
+@@ -10,7 +10,7 @@
+ from math import floor
+ import matplotlib.pyplot as plt
+ from dataset_modules.wsi_dataset import Wsi_Region
+-from dataset_modules.dataset_h5 import get_eval_transforms
++from utils.transform_utils import get_eval_transforms
+ import h5py
+ from wsi_core.WholeSlideImage import WholeSlideImage
+ from scipy.stats import percentileofscore

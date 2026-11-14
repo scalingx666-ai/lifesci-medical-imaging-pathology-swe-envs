@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/AIM-Harvard__pyradiomics-926"
+description = "Build(deps): Bump the actions group with 2 updates"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "pyradiomics",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "AIM-Harvard/pyradiomics"
+ref = "9b1e030bff5241bdf9db1adb796183bb804eec25"
+reference = "https://github.com/AIM-Harvard/pyradiomics/pull/926"
+source_access = "auto"
+built_at = "2026-11-14T07:06:20.398566+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:bbc528189ab0b53ce2d93d8ff57f6512bf923f06dd12e63522f9c3f8265ac377"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2025-06-17T00:39:12Z"
+diff_format = "unified"
+context_files = [
+    ".github/workflows/cd.yml",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 4
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

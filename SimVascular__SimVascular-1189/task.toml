@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/SimVascular__SimVascular-1189"
+description = "Comment out CheckForNestedVessels()."
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "SimVascular",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "SimVascular/SimVascular"
+ref = "a66e493ad4e4d5f96d1680f8b7311028edcffc75"
+reference = "https://github.com/SimVascular/SimVascular/pull/1189"
+source_access = "auto"
+built_at = "2026-11-14T07:11:59.800611+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:b6284ec4dd2b2ba216f0ed1a9068cebed4768b8840c70bed23bdd80cf418f063"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-06-10T02:28:26Z"
+diff_format = "unified"
+context_files = [
+    "Code/Source/sv4gui/Plugins/org.sv.gui.qt.modeling/sv4gui_ModelEdit.cxx",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 5
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

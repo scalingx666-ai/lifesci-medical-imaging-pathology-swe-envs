@@ -1,0 +1,1131 @@
+diff --git a/.github/scripts/test_workflow_contracts.py b/.github/scripts/test_workflow_contracts.py
+index ad809f7b5a..fcce971418 100644
+--- a/.github/scripts/test_workflow_contracts.py
++++ b/.github/scripts/test_workflow_contracts.py
+@@ -830,6 +830,37 @@ def test_the_text_detector_evaluation_reads_only_and_keeps_its_tools_pinned(
+         )
+         self.assertEqual(len(hashes), len(pins))
+ 
++    def test_the_parametric_map_check_reads_only_and_keeps_its_tools_pinned(self):
++        text = (WORKFLOWS / "parametric-map-check-idc.yml").read_text(encoding="utf-8")
++        triggers = text.split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
++        self.assertEqual(
++            re.findall(r"(?m)^  ([a-z_]+):", triggers), ["workflow_dispatch"]
++        )
++        self.assertIn("\npermissions:\n  contents: read\n", text)
++        self.assertEqual(
++            re.findall(r"(?m)^      [a-z-]+: (?:read|write)$", text),
++            ["      contents: read"],
++        )
++        self.assertNotIn("secrets.", text)
++        self.assertEqual(text.count("persist-credentials: false"), 1)
++        run_blocks = re.findall(r"(?ms)^        run: \|\n(.*?)(?=^      - |\Z)", text)
++        self.assertTrue(run_blocks)
++        for block in run_blocks:
++            self.assertNotIn("${{", block)
++        self.assertIn(
++            "uv pip install --require-hashes --no-deps \\\n"
++            "            -r .github/text-evaluation/requirements.txt",
++            text,
++        )
++        self.assertIn("sha256sum --check --strict -", text)
++        # Both commands run redacted, and only the results leave the runner.
++        self.assertEqual(text.count("python .github/scripts/run_redacted.py"), 2)
++        self.assertEqual(
++            re.findall(r"(?m)^          path: (.*)$", text),
++            ["${{ runner.temp }}/maps/results/"],
++        )
++        self.assertNotIn("actions/cache", text)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+diff --git a/.github/text-evaluation/requirements.txt b/.github/text-evaluation/requirements.txt
+index 902b5afad6..a8b41e6a89 100644
+--- a/.github/text-evaluation/requirements.txt
++++ b/.github/text-evaluation/requirements.txt
+@@ -1,4 +1,6 @@
+ # Tools that only the text detector evaluation's CI runs install (D-056),
++# as does the pixel options' check on IDC's Parametric Maps
++# (parametric-map-check-idc.yml), which uses pyarrow and s5cmd alone,
+ # each pinned by version and by the SHA-256 of the one wheel that a
+ # GitHub-hosted Ubuntu x86-64 runner with Python 3.14 takes, and installed
+ # with --require-hashes --no-deps into the project's environment after it is
+diff --git a/.github/workflows/parametric-map-check-idc.yml b/.github/workflows/parametric-map-check-idc.yml
+new file mode 100644
+index 0000000000..50570a79f2
+--- /dev/null
++++ b/.github/workflows/parametric-map-check-idc.yml
+@@ -0,0 +1,132 @@
++name: Pixel Options on IDC Parametric Maps
++
++# On demand, run the Clean Pixel Data and Clean Recognizable Visual
++# Features Options on the 691 floating-point Parametric Maps of the
++# tcga_gbm360 analysis results in NCI's Imaging Data Commons (collection
++# TCGA-GBM, https://doi.org/10.5281/zenodo.17470190, CC BY 4.0), which the
++# pinned wheel of idc-index-data lists, and count what each does. The maps
++# are selected from IDC's index and refused unless every one is of that
++# analysis, licence, and DOI, and there are 691; they are downloaded from
++# IDC's public bucket with s5cmd, and refused unless the SHA-256 of their
++# files' SHA-256s is the one that
++# pymedphys._dicom.deidentify.parametric_map_check pins.
++#
++# These are real patients' data, and this repository's logs and artefacts
++# are public. So only counts, codes, digests, versions, the text finder's
++# method, and the data set's public identifiers leave the runner: the
++# command's standard output and error, and s5cmd's, go to files on the
++# runner, the job shows the result files instead, and a crash is reported
++# by .github/scripts/run_redacted.py as its type and code locations alone.
++# The maps are never cached, uploaded, or kept.
++on:
++  workflow_dispatch:
++
++permissions:
++  contents: read
++
++concurrency:
++  group: parametric-map-check-idc-${{ github.ref }}
++  cancel-in-progress: false
++
++jobs:
++  check:
++    name: Pixel options on IDC Parametric Maps
++    runs-on: ubuntu-latest
++    timeout-minutes: 120
++    permissions:
++      contents: read
++    env:
++      # idc-index-data 25.0.5, which holds IDC's index, and its SHA-256 as
++      # text_evaluation_idc pins it.
++      INDEX_URL: https://files.pythonhosted.org/packages/bd/10/c6391b44d1b2f6c744e1cb4018250cb1a5d80947d47ed945172d9165a3b4/idc_index_data-25.0.5-py3-none-any.whl
++      INDEX_SHA256: 1ea4ec812688759b71798249b6488eb2bce7178aabb3dccb00366b7a555de25c
++      # A re-run's artefact is named apart from the first attempt's.
++      ATTEMPT_SUFFIX: >-
++        ${{ github.run_attempt != '1'
++        && format('-attempt-{0}', github.run_attempt) || '' }}
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
++        with:
++          persist-credentials: false
++
++      # The user extra holds pydicom, NumPy, and SciPy; text-detection holds
++      # ONNX Runtime, which runs the text finder's model.
++      - uses: ./.github/actions/setup-project
++        with:
++          extras: 'user text-detection'
++
++      # pyarrow reads IDC's index and s5cmd downloads the maps, each pinned
++      # by version and hash, as the text detector evaluation installs them.
++      - name: Install the check's pinned tools
++        run: |
++          uv pip install --require-hashes --no-deps \
++            -r .github/text-evaluation/requirements.txt
++
++      - name: Prepare private and data directories
++        run: |
++          umask 077
++          mkdir -p "${RUNNER_TEMP}/maps/private" "${RUNNER_TEMP}/maps/data" \
++            "${RUNNER_TEMP}/maps/index"
++
++      - name: Download IDC's index
++        run: |
++          wheel="${RUNNER_TEMP}/maps/index/idc_index_data-25.0.5-py3-none-any.whl"
++          curl -sSfL --retry 3 --retry-all-errors --retry-delay 30 \
++            -o "${wheel}" "${INDEX_URL}"
++          echo "${INDEX_SHA256}  ${wheel}" | sha256sum --check --strict -
++
++      # Writes selection.json, with counts alone, and manifest.s5cmd, which
++      # places each series in a folder of its own.
++      - name: Select the maps
++        run: |
++          uv run --no-sync python .github/scripts/run_redacted.py \
++            --private-stdout "${RUNNER_TEMP}/maps/private/select-stdout.log" \
++            pymedphys._dicom.deidentify.parametric_map_check select \
++            "${RUNNER_TEMP}/maps/index/idc_index_data-25.0.5-py3-none-any.whl" \
++            --downloads "${RUNNER_TEMP}/maps/data" \
++            --out "${RUNNER_TEMP}/maps/selection" \
++            2> "${RUNNER_TEMP}/maps/private/select-stderr.log"
++
++      - name: Download the maps
++        timeout-minutes: 30
++        run: |
++          uv run --no-sync s5cmd --no-sign-request \
++            --endpoint-url https://s3.amazonaws.com \
++            run "${RUNNER_TEMP}/maps/selection/manifest.s5cmd" \
++            > "${RUNNER_TEMP}/maps/private/s5cmd.log" 2>&1
++          df -h /
++
++      # The command writes parametric-map-check.json and
++      # parametric-map-check.md, which hold only counts, codes, digests,
++      # versions, the finder's method, and the data set's public identifiers.
++      - name: Run the check
++        timeout-minutes: 60
++        run: |
++          results="${RUNNER_TEMP}/maps/results"
++          uv run --no-sync python .github/scripts/run_redacted.py \
++            --private-stdout "${RUNNER_TEMP}/maps/private/check-stdout.log" \
++            pymedphys._dicom.deidentify.parametric_map_check check \
++            "${RUNNER_TEMP}/maps/data" \
++            --out "${results}" \
++            2> "${RUNNER_TEMP}/maps/private/check-stderr.log"
++          echo "${GITHUB_SHA}" > "${results}/commit.txt"
++
++      - name: Show the results
++        if: ${{ !cancelled() }}
++        run: |
++          page="${RUNNER_TEMP}/maps/results/parametric-map-check.md"
++          if [[ -f "${page}" ]]; then
++            tee -a "${GITHUB_STEP_SUMMARY}" < "${page}"
++          else
++            echo "The check wrote no results; the log shows why." \
++              | tee -a "${GITHUB_STEP_SUMMARY}"
++          fi
++
++      - name: Upload the results
++        if: ${{ !cancelled() }}
++        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
++        with:
++          name: parametric-map-check-idc-results${{ env.ATTEMPT_SUFFIX }}
++          path: ${{ runner.temp }}/maps/results/
++          if-no-files-found: warn
++          retention-days: 90
+diff --git a/.github/workflows/unit-tests.yml b/.github/workflows/unit-tests.yml
+index 1ec483dc3b..838ca6c477 100644
+--- a/.github/workflows/unit-tests.yml
++++ b/.github/workflows/unit-tests.yml
+@@ -257,7 +257,8 @@ jobs:
+   # tests take about a minute and run whole.
+   narrow-extras:
+     name: Extra ${{ matrix.extra }} alone${{ matrix.part && format(' ({0})', matrix.part) || '' }}
+-    timeout-minutes: 30
++    # The standalone DICOM corpus needs the main corpus job's budget.
++    timeout-minutes: ${{ matrix.part == 'corpus-runs' && 60 || 30 }}
+     strategy:
+       fail-fast: false
+       matrix:
+diff --git a/lib/pymedphys/_dicom/deidentify/parametric_map_check.py b/lib/pymedphys/_dicom/deidentify/parametric_map_check.py
+new file mode 100644
+index 0000000000..80d36c3a5b
+--- /dev/null
++++ b/lib/pymedphys/_dicom/deidentify/parametric_map_check.py
+@@ -0,0 +1,569 @@
++# Copyright (C) 2026 Matthew Jennings
++
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++
++#     http://www.apache.org/licenses/LICENSE-2.0
++
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++"""A development check of the Clean Pixel Data Option and the Clean
++Recognizable Visual Features Option on public floating-point Parametric
++Maps, which writes only counts.
++
++NCI's Imaging Data Commons holds, in the version of its index that
++:data:`~.text_evaluation_idc.INDEX_WHEEL` pins, one source of Parametric
++Maps: the 691 maps of the ``tcga_gbm360`` analysis results of the TCGA-GBM
++collection, under CC BY 4.0, each one frame of Float Pixel Data
++(7FE0,0008). :func:`select` takes the index's Parametric Maps and refuses
++the selection unless every one is of that analysis, collection, licence,
++and DOI, is one instance, and is kept in IDC's public bucket, and there are
++:data:`SERIES` of them; :func:`manifest` writes them as an ``s5cmd``
++manifest, each series in a folder named by IDC's identifier of it.
++
++:func:`check` refuses the downloaded files unless their count and the
++SHA-256 of their sorted SHA-256s are those that :data:`SERIES` and
++:data:`FILES_SHA256` pin, then gives each file to a de-identification
++transform as a run does: under the Clean Pixel Data Option with the text
++finder, counting each outcome, whether the written file holds its pixel
++data in the element that held them with the same data type and shape, and
++how many regions were blacked out; and under the Clean Recognizable Visual
++Features Option, counting whether it is held without a verdict, whether the
++QC pack previews it and shows it whole, and whether a face verdict of
++absent, bound to the written pixel data as a reviewer's is, releases it
++with Recognizable Visual Features (0028,0302) NO. A file whose check raises
++is counted by the exception's type and place, never its message.
++
++The maps are real patients' data, and this repository's logs and artefacts
++are public, so the summary, labelled :data:`FORMAT`, and its page give only
++counts, codes, digests, versions, and the data set's public identifiers: no
++UID, name, date, path, or value of any file.
++
++Run as ``python -m pymedphys._dicom.deidentify.parametric_map_check``. It
++is not registered with the ``pymedphys`` command: nothing de-identification
++related joins the public command line before the first supported release.
++"""
++
++from __future__ import annotations
++
++import argparse
++import collections
++import dataclasses
++import hashlib
++import importlib.metadata
++import io
++import json
++import pathlib
++import platform
++import re
++import sys
++from collections.abc import Iterable, Mapping, Sequence
++from typing import Any, Protocol
++
++from pymedphys._imports import numpy as np
++from pymedphys._imports import pydicom
++
++from . import policy, qc_previews, run
++from .diagnostics import redacted_diagnostics
++from .face_review import FaceReview, contour_data_sha256, pixel_data_sha256
++from .face_validation import crash_site
++from .instance_transform import HeldEvidence, InstanceTransform
++from .keys import DeidKey
++from .run_qc import RedactionMaterial
++from .references import InstanceRecord
++from .text_detection import TextBox
++from .text_evaluation_idc import (
++    INDEX_WHEEL,
++    INDEX_WHEEL_SHA256,
++    canonical_licence,
++    index_rows,
++)
++
++FORMAT = "pymedphys-deid-parametric-map-check/1"
++SOURCE = "NCI Imaging Data Commons"
++COLLECTION_ID = "tcga_gbm"
++ANALYSIS_RESULT_ID = "tcga_gbm360"
++LICENCE = "CC BY 4.0"
++DOI = "10.5281/zenodo.17470190"
++PARAMETRIC_MAP_STORAGE = "1.2.840.10008.5.1.4.1.1.30"
++# How many maps the pinned index holds, and the SHA-256 of their files'
++# SHA-256s, each as 64 lower-case hex digits and a line feed, in order.
++SERIES = 691
++FILES_SHA256 = "610be3b8f65a128731a4d6705c0e70159315083483f39d4e4ef3f1e4d50a8a58"
++# The columns of IDC's index that a selection reads.
++COLUMNS = (
++    "collection_id",
++    "analysis_result_id",
++    "crdc_series_uuid",
++    "SOPClassUID",
++    "license_short_name",
++    "source_DOI",
++    "series_aws_url",
++    "instanceCount",
++)
++JSON_NAME = "parametric-map-check.json"
++MARKDOWN_NAME = "parametric-map-check.md"
++MANIFEST_NAME = "manifest.s5cmd"
++SELECTION_NAME = "selection.json"
++# The bins of how many regions a file's frame had blacked out.
++REGION_BINS = ((0, 0), (1, 1), (2, 2), (3, 5), (6, 10), (11, None))
++
++_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
++_BUCKET = re.compile(r"s3://idc-open-data/")
++# A key and a QC pack reference that bind nothing outside the check.
++_KEY = DeidKey(bytes(range(32)))
++_REFERENCE = "A-" + "0123456789abcdef" * 2
++_PIXEL_KEYWORDS = ("FloatPixelData", "DoubleFloatPixelData", "PixelData")
++
++
++class CheckRefused(Exception):
++    """The index, the files, or the arguments are not those the check
++    pins; the message quotes no value of them."""
++
++
++class Finder(Protocol):
++    """What finds text in a frame, as a run's finder does, and describes
++    what decides its boxes."""
++
++    @property
++    def method(self) -> Mapping[str, object]:
++        """What decides the boxes, such as the model and its parameters."""
++        raise NotImplementedError
++
++    def find(self, frame: np.ndarray) -> tuple[TextBox, ...]:
++        """Return the boxes around text in one frame."""
++        raise NotImplementedError
++
++
++@dataclasses.dataclass(frozen=True)
++class MapSeries:
++    """A Parametric Map's series in IDC's index, by IDC's identifier of its
++    files and where they are kept."""
++
++    crdc_series_uuid: str
++    aws_url: str
++
++
++def select(
++    rows: Iterable[Mapping[str, object]], series: int = SERIES
++) -> tuple[MapSeries, ...]:
++    """Return the index's Parametric Maps, ordered by IDC's identifier of
++    each.
++
++    Raises
++    ------
++    CheckRefused
++        Unless every Parametric Map is of :data:`ANALYSIS_RESULT_ID` in
++        :data:`COLLECTION_ID`, under :data:`LICENCE` and :data:`DOI`, one
++        instance, and kept in IDC's public bucket, and there are ``series``
++        of them.
++    """
++    selected = []
++    for row in rows:
++        if row.get("SOPClassUID") != PARAMETRIC_MAP_STORAGE:
++            continue
++        if (
++            row.get("analysis_result_id") != ANALYSIS_RESULT_ID
++            or row.get("collection_id") != COLLECTION_ID
++        ):
++            raise CheckRefused("A Parametric Map is of another collection or analysis.")
++        if canonical_licence(str(row.get("license_short_name"))) != LICENCE:
++            raise CheckRefused("A Parametric Map is under another licence.")
++        if row.get("source_DOI") != DOI:
++            raise CheckRefused("A Parametric Map is of another DOI.")
++        if row.get("instanceCount") != 1:
++            raise CheckRefused("A Parametric Map's series is not one instance.")
++        uuid, url = str(row.get("crdc_series_uuid")), str(row.get("series_aws_url"))
++        bucket = _BUCKET.match(url)
++        if not (
++            _UUID.fullmatch(uuid) and bucket and url[bucket.end() :] == f"{uuid}/*"
++        ):
++            raise CheckRefused("A Parametric Map's files are not IDC's own.")
++        selected.append(MapSeries(uuid, url))
++    if len({each.crdc_series_uuid for each in selected}) != len(selected):
++        raise CheckRefused("A Parametric Map's series is listed twice.")
++    if len(selected) != series:
++        raise CheckRefused("The index does not hold the pinned number of maps.")
++    return tuple(sorted(selected, key=lambda each: each.crdc_series_uuid))
++
++
++def manifest(selected: Sequence[MapSeries], destination: str) -> str:
++    """The selected series as an ``s5cmd run`` manifest: each copied to a
++    folder of its own, named by IDC's identifier of it, under
++    ``destination``."""
++    if not re.fullmatch(r"[A-Za-z0-9._/-]+", destination):
++        raise CheckRefused("The destination must be a plain path.")
++    folder = destination.rstrip("/") or "."
++    return "".join(
++        f"cp '{each.aws_url}' '{folder}/{each.crdc_series_uuid}/'\n"
++        for each in selected
++    )
++
++
++def files_sha256(paths: Iterable[pathlib.Path]) -> tuple[str, int]:
++    """The SHA-256 of the files' SHA-256s, each as 64 lower-case hex digits
++    and a line feed, in order, and the files' total size in bytes."""
++    digests, size = [], 0
++    for path in paths:
++        data = path.read_bytes()
++        digests.append(hashlib.sha256(data).hexdigest())
++        size += len(data)
++    joined = "".join(f"{each}\n" for each in sorted(digests))
++    return hashlib.sha256(joined.encode("ascii")).hexdigest(), size
++
++
++@dataclasses.dataclass
++class _Counts:
++    """The counts that :func:`check` adds up, file by file."""
++
++    elements: collections.Counter[str] = dataclasses.field(
++        default_factory=collections.Counter
++    )
++    cleaned: collections.Counter[str] = dataclasses.field(
++        default_factory=collections.Counter
++    )
++    reviewed: collections.Counter[str] = dataclasses.field(
++        default_factory=collections.Counter
++    )
++    not_previewed: collections.Counter[str] = dataclasses.field(
++        default_factory=collections.Counter
++    )
++    regions: collections.Counter[str] = dataclasses.field(
++        default_factory=collections.Counter
++    )
++    crashed: collections.Counter[str] = dataclasses.field(
++        default_factory=collections.Counter
++    )
++
++
++def check(
++    folder: pathlib.Path,
++    finder: Finder,
++    *,
++    series: int = SERIES,
++    sha256: str = FILES_SHA256,
++) -> dict[str, Any]:
++    """Check each file below ``folder``, as the module describes, and
++    return the summary.
++
++    Raises
++    ------
++    CheckRefused
++        Unless the files are ``series`` in number and the SHA-256 of their
++        SHA-256s is ``sha256``.
++    """
++    paths = sorted(path for path in folder.rglob("*") if path.is_file())
++    if len(paths) != series:
++        raise CheckRefused("The folder does not hold the pinned number of files.")
++    digest, size = files_sha256(paths)
++    if digest != sha256:
++        raise CheckRefused("The files are not the pinned ones.")
++    counts = _Counts()
++    cleaner = _transform([policy.CLEAN_PIXEL_DATA], finder=finder)
++    holder = _transform(
++        [policy.CLEAN_RECOGNIZABLE_VISUAL_FEATURES],
++        face_review=FaceReview(
++            _REFERENCE, frozenset(), frozenset(), frozenset(), frozenset()
++        ),
++    )
++    with redacted_diagnostics():
++        for path in paths:
++            data = path.read_bytes()
++            try:
++                _check_file(data, cleaner, holder, counts)
++            # Anything that a file raises is counted, by where; its message,
++            # which could quote a value, is dropped.
++            except Exception as error:  # pylint: disable = broad-exception-caught
++                counts.crashed[crash_site(error)] += 1
++    return {
++        "format": FORMAT,
++        "data": {
++            "source": SOURCE,
++            "collection_id": COLLECTION_ID,
++            "analysis_result_id": ANALYSIS_RESULT_ID,
++            "licence": LICENCE,
++            "doi": DOI,
++            "index": {"wheel": INDEX_WHEEL, "sha256": INDEX_WHEEL_SHA256},
++            "files": len(paths),
++            "bytes": size,
++            "files_sha256": digest,
++        },
++        "software": _software(),
++        "finder": dict(finder.method),
++        "pixel_data_elements": _sorted(counts.elements),
++        "clean_pixel_data": {
++            **_sorted(counts.cleaned),
++            "regions_per_file": {
++                _bin_name(low, high): counts.regions[_bin_name(low, high)]
++                for low, high in REGION_BINS
++            },
++        },
++        "clean_recognizable_visual_features": {
++            **_sorted(counts.reviewed),
++            "not_previewed": _sorted(counts.not_previewed),
++        },
++        "crashed": _sorted(counts.crashed),
++    }
++
++
++def _check_file(
++    data: bytes, cleaner: InstanceTransform, holder: InstanceTransform, counts: _Counts
++) -> None:
++    source = pydicom.dcmread(io.BytesIO(data))
++    keyword = next((each for each in _PIXEL_KEYWORDS if each in source), "none")
++    counts.elements[keyword] += 1
++    cleaned = cleaner(data, InstanceRecord.from_file(data))
++    if isinstance(cleaned, run.Sequestered):
++        for reason in cleaned.reasons:
++            counts.cleaned[f"sequestered: {reason.value}"] += 1
++    else:
++        _count_cleaned(source, keyword, cleaned, counts)
++    held = holder(data, InstanceRecord.from_file(data))
++    if isinstance(held, run.Sequestered):
++        for reason in held.reasons:
++            counts.reviewed[f"sequestered: {reason.value}"] += 1
++        return
++    if not isinstance(held.evidence, HeldEvidence):
++        counts.reviewed["released without a verdict"] += 1
++        return
++    counts.reviewed["held without a verdict"] += 1
++    previews = qc_previews.previews_of({0: held.data}, {0})
++    counts.reviewed["previewed"] += bool(previews.previews)
++    for entry in previews.not_previewed:
++        counts.not_previewed[entry.reason.value] += 1
++    if 0 not in previews.pixels_shown:
++        counts.reviewed["not shown whole"] += 1
++        return
++    counts.reviewed["shown whole"] += 1
++    released = _transform(
++        [policy.CLEAN_RECOGNIZABLE_VISUAL_FEATURES],
++        face_review=_absent(data, held.data),
++    )(data, InstanceRecord.from_file(data))
++    if isinstance(released, run.Sequestered) or isinstance(
++        released.evidence, HeldEvidence
++    ):
++        counts.reviewed["held after a face verdict of absent"] += 1
++        return
++    written = pydicom.dcmread(io.BytesIO(released.data))
++    feature = written.get("RecognizableVisualFeatures")
++    counts.reviewed[
++        "released on a face verdict of absent"
++        + (", Recognizable Visual Features NO" if feature == "NO" else "")
++    ] += 1
++
++
++def _count_cleaned(
++    source: pydicom.Dataset, keyword: str, cleaned: run.Transformed, counts: _Counts
++) -> None:
++    held = cleaned.evidence
++    reasons = (
++        [each.reason.value for each in held.held]
++        if isinstance(held, HeldEvidence)
++        else ["released"]
++    )
++    for reason in reasons:
++        counts.cleaned[f"outcome: {reason}"] += 1
++    written = pydicom.dcmread(io.BytesIO(cleaned.data))
++    others = [each for each in _PIXEL_KEYWORDS if each != keyword and each in written]
++    before, after = source.pixel_array, written.pixel_array
++    kept = keyword in written and not others and after.dtype == before.dtype
++    kept = kept and after.shape == before.shape
++    counts.cleaned[
++        "written in the element that held it, same data type and shape"
++        if kept
++        else "written otherwise"
++    ] += 1
++    if not kept:
++        return
++    changed = before.view(np.uint8) != after.view(np.uint8)
++    counts.cleaned["pixels changed" if changed.any() else "pixels unchanged"] += 1
++    regions = sum(
++        len(boxes)
++        for entry in cleaned.qc
++        if isinstance(entry, RedactionMaterial)
++        for _, boxes in entry.regions
++    )
++    for low, high in REGION_BINS:
++        if regions >= low and (high is None or regions <= high):
++            counts.regions[_bin_name(low, high)] += 1
++
++
++def _absent(source: bytes, written: bytes) -> FaceReview:
++    """A face verdict of absent on ``source``, bound to its written file's
++    pixel data and contours, as a reviewed pack's is."""
++    dataset = pydicom.dcmread(io.BytesIO(written))
++    sha = hashlib.sha256(source).digest()
++    pixels = pixel_data_sha256(dataset)
++    frames = int(dataset.get("NumberOfFrames") or 1)
++    return FaceReview(
++        _REFERENCE,
++        frozenset({sha}),
++        frozenset(),
++        frozenset({(sha, pixels)}),
++        frozenset({(sha, contour_data_sha256(dataset))}),
++        absent_frames=frozenset({(sha, pixels, frames)}),
++    )
++
++
++def _transform(options, **kwargs) -> InstanceTransform:
++    return InstanceTransform(
++        policy.compose_custom_policy(options), _KEY, unvalidated_policy=True, **kwargs
++    )
++
++
++def _bin_name(low: int, high: int | None) -> str:
++    if high is None:
++        return f"{low} or more"
++    return str(low) if low == high else f"{low} to {high}"
++
++
++def _sorted(counter: Mapping[str, int]) -> dict[str, int]:
++    return dict(sorted(counter.items()))
++
++
++def _software() -> dict[str, str]:
++    """The versions of Python and of the packages that the counts depend on."""
++    versions = {"python": platform.python_version()}
++    for package in ("pymedphys", "numpy", "scipy", "pydicom", "onnxruntime"):
++        try:
++            versions[package] = importlib.metadata.version(package)
++        except importlib.metadata.PackageNotFoundError:
++            versions[package] = "unknown"
++    return versions
++
++
++def markdown(summary: Mapping[str, Any]) -> str:
++    """Render the summary's counts as a CommonMark page, and nothing else."""
++    data = summary["data"]
++    lines = [
++        "# Pixel options on public floating-point Parametric Maps",
++        "",
++        "Each map given to a de-identification transform under the Clean "
++        "Pixel Data Option, with the text finder, and under the Clean "
++        "Recognizable Visual Features Option, then previewed and given a "
++        "face verdict of absent. Only counts are shown: no value, image, "
++        "or file of the data set.",
++        "",
++        "| About | |",
++        "| --- | --- |",
++        f"| Source | {data['source']}, `{data['collection_id']}`, analysis "
++        f"results `{data['analysis_result_id']}`, {data['licence']}, "
++        f"doi:{data['doi']} |",
++        f"| Index | `{data['index']['wheel']}`, SHA-256 `{data['index']['sha256']}` |",
++        f"| Files | {data['files']}, {data['bytes']} bytes, SHA-256 of their "
++        f"SHA-256s `{data['files_sha256']}` |",
++        "| Software | "
++        + ", ".join(
++            f"{name} {version}" for name, version in summary["software"].items()
++        )
++        + " |",
++    ]
++    if summary["finder"]:
++        lines.append(f"| Finder | `{json.dumps(summary['finder'], sort_keys=True)}` |")
++    lines += ["", *_table("Pixel data elements", summary["pixel_data_elements"])]
++    cleaned = dict(summary["clean_pixel_data"])
++    regions = cleaned.pop("regions_per_file")
++    lines += [*_table("Clean Pixel Data", cleaned)]
++    lines += [*_table("Regions blacked out per file", regions)]
++    reviewed = dict(summary["clean_recognizable_visual_features"])
++    not_previewed = reviewed.pop("not_previewed")
++    lines += [*_table("Clean Recognizable Visual Features", reviewed)]
++    if not_previewed:
++        lines += [*_table("Not previewed", not_previewed)]
++    if summary["crashed"]:
++        lines += [
++            *_table("Files whose check raised, by type and place", summary["crashed"])
++        ]
++    return "\n".join(lines).rstrip("\n") + "\n"
++
++
++def _table(title: str, counts: Mapping[str, int]) -> list[str]:
++    return [
++        f"## {title}",
++        "",
++        "| | Files |",
++        "| --- | ---: |",
++        *(f"| {name} | {count} |" for name, count in counts.items()),
++        "",
++    ]
++
++
++def _detector() -> Finder:
++    """The run's text finder."""
++    # pylint: disable-next = import-outside-toplevel
++    from .text_detection import TextDetector
++
++    return TextDetector()
++
++
++def main(argv: Sequence[str] | None = None) -> int:
++    """Select the maps from IDC's pinned index, or check the downloaded
++    maps, as the module describes.
++
++    ``select`` takes the pinned wheel of idc-index-data, ``--downloads``,
++    the folder that the manifest copies each series into, and ``--out``, a
++    directory that must not exist, and writes ``manifest.s5cmd`` and
++    ``selection.json``, which holds counts alone. ``check`` takes the
++    downloads and ``--out``, a directory that must not exist, writes
++    ``parametric-map-check.json`` and ``parametric-map-check.md``, and
++    prints the page.
++
++    Raises
++    ------
++    SystemExit
++        With a refusal's message, which quotes no value, and no traceback.
++    """
++    parser = argparse.ArgumentParser(
++        prog="python -m pymedphys._dicom.deidentify.parametric_map_check",
++        description=(
++            "Check the Clean Pixel Data and Clean Recognizable Visual Features "
++            "Options on IDC's public floating-point Parametric Maps, and write "
++            "only counts. For development only."
++        ),
++    )
++    commands = parser.add_subparsers(dest="command", required=True)
++    selecting = commands.add_parser("select", help="Write the maps' s5cmd manifest.")
++    selecting.add_argument(
++        "wheel", type=pathlib.Path, help="idc-index-data's pinned wheel."
++    )
++    selecting.add_argument(
++        "--downloads", required=True, help="Where s5cmd copies them."
++    )
++    selecting.add_argument("--out", required=True, type=pathlib.Path)
++    checking = commands.add_parser("check", help="Check the downloaded maps.")
++    checking.add_argument("downloads", type=pathlib.Path)
++    checking.add_argument("--out", required=True, type=pathlib.Path)
++    arguments = parser.parse_args(argv)
++    try:
++        if arguments.out.exists():
++            raise CheckRefused("--out must not exist.")
++        if arguments.command == "select":
++            selected = select(index_rows(arguments.wheel, columns=COLUMNS))
++            text = manifest(selected, arguments.downloads)
++            arguments.out.mkdir(parents=True)
++            (arguments.out / MANIFEST_NAME).write_text(text, encoding="utf-8")
++            described = {"format": FORMAT, "source": SOURCE, "series": len(selected)}
++            (arguments.out / SELECTION_NAME).write_text(
++                json.dumps(described, indent=2) + "\n", encoding="utf-8"
++            )
++            return 0
++        summary = check(arguments.downloads, _detector())
++    except CheckRefused as refusal:
++        raise SystemExit(str(refusal)) from None
++    page = markdown(summary)
++    arguments.out.mkdir(parents=True)
++    (arguments.out / JSON_NAME).write_text(
++        json.dumps(summary, indent=2) + "\n", encoding="utf-8"
++    )
++    (arguments.out / MARKDOWN_NAME).write_text(page, encoding="utf-8")
++    sys.stdout.write(page)
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/lib/pymedphys/_dicom/deidentify/text_evaluation_idc.py b/lib/pymedphys/_dicom/deidentify/text_evaluation_idc.py
+index 76863e091e..d036ed3aa6 100644
+--- a/lib/pymedphys/_dicom/deidentify/text_evaluation_idc.py
++++ b/lib/pymedphys/_dicom/deidentify/text_evaluation_idc.py
+@@ -63,7 +63,7 @@
+ import pathlib
+ import re
+ import zipfile
+-from collections.abc import Iterable, Iterator, Mapping
++from collections.abc import Iterable, Iterator, Mapping, Sequence
+ from types import MappingProxyType
+ 
+ from .text_evaluation_converted import ConvertedCase
+@@ -569,12 +569,14 @@ def _series(
+ 
+ 
+ def index_rows(
+-    wheel: pathlib.Path | str, sha256: str = INDEX_WHEEL_SHA256
++    wheel: pathlib.Path | str,
++    sha256: str = INDEX_WHEEL_SHA256,
++    columns: Sequence[str] = COLUMNS,
+ ) -> list[dict[str, object]]:
+-    """The rows of IDC's index, with :data:`COLUMNS` alone, from the pinned
+-    wheel of idc-index-data, which must have the SHA-256 ``sha256``; read
+-    in memory, never unpacked. Reading Parquet needs pyarrow, which only
+-    the evaluation's CI runs install."""
++    """The rows of IDC's index, with ``columns`` alone, :data:`COLUMNS` by
++    default, from the pinned wheel of idc-index-data, which must have the
++    SHA-256 ``sha256``; read in memory, never unpacked. Reading Parquet
++    needs pyarrow, which only the evaluation's CI runs install."""
+     data = pathlib.Path(wheel).read_bytes()
+     if hashlib.sha256(data).hexdigest() != sha256:
+         raise EvaluationRefused("IDC's index is not the pinned one.")
+@@ -584,7 +586,7 @@ def index_rows(
+     import pyarrow.parquet  # pylint: disable = import-outside-toplevel, import-error
+ 
+     table = pyarrow.parquet.read_table(
+-        pyarrow.BufferReader(parquet), columns=list(COLUMNS)
++        pyarrow.BufferReader(parquet), columns=list(columns)
+     )
+     return table.to_pylist()
+ 
+diff --git a/lib/pymedphys/docs/contrib/info/deidentification-design.md b/lib/pymedphys/docs/contrib/info/deidentification-design.md
+index 5decad0cc7..b024d7efea 100644
+--- a/lib/pymedphys/docs/contrib/info/deidentification-design.md
++++ b/lib/pymedphys/docs/contrib/info/deidentification-design.md
+@@ -298,7 +298,7 @@ These are the active design decisions, not statements that the code implements t
+ 
+ ### D-010: Unsupported object types
+ 
+-- **Decision.** Sequester Structured Reports other than those of the supported IODs below, Presentation States other than the softcopy ones below, instances of Private SOP Classes, and objects outside the supported scope. List them in the report and exclude them from the conformance claim. An instance is classified from its SOP Class UID, through PS3.4 Table B.5-1, and from its file's transfer syntax. Support is decided by IOD, so every Storage SOP Class that Table B.5-1 maps to a supported IOD is supported. The first supported release de-identifies instances of 60 IODs in the Implicit VR Little Endian and Explicit VR Little Endian transfer syntaxes and in the twelve transfer syntaxes that encapsulate Pixel Data that pydicom 3.0.2's decoding plugins decode (Architecture item 2): CT Image, Enhanced CT Image, Legacy Converted Enhanced CT Image, MR Image, Enhanced MR Image, Enhanced MR Color Image, Legacy Converted Enhanced MR Image, MR Spectroscopy, Positron Emission Tomography Image, Enhanced PET Image, Legacy Converted Enhanced PET Image, RT Structure Set, RT Plan, RT Dose, RT Image, Enhanced RT Image, Enhanced Continuous RT Image, RT Segment Annotation, RT Radiation Set, C-Arm Photon-Electron Radiation, Tomotherapeutic Radiation, Robotic-Arm Radiation, RT Beams Delivery Instruction, RT Brachy Application Setup Delivery Instruction, RT Radiation Set Delivery Instruction, RT Beams Treatment Record, RT Ion Plan, RT Ion Beams Treatment Record, RT Brachy Treatment Record, RT Treatment Summary Record, Spatial Registration, Deformable Spatial Registration, Segmentation, Surface Segmentation, X-Ray Radiation Dose SR, Enhanced X-Ray Radiation Dose SR, Radiopharmaceutical Radiation Dose SR, Patient Radiation Dose SR, Basic Text SR, Enhanced SR, Comprehensive SR, Comprehensive 3D SR, Extensible SR, Key Object Selection Document, Mammography CAD SR, Chest CAD SR, Colon CAD SR, Procedure Log, Spectacle Prescription Report, Macular Grid Thickness and Volume Report, Waveform Annotation SR, Parametric Map, Real World Value Mapping, Grayscale Softcopy Presentation State, Color Softcopy Presentation State, Pseudo-Color Softcopy Presentation State, Blending Softcopy Presentation State, XA/XRF Grayscale Softcopy Presentation State, Variable Modality LUT Softcopy Presentation State, and Encapsulated PDF. The For Processing SOP Classes, such as CT Image Storage - For Processing (1.2.840.10008.5.1.4.1.1.2.3) and Enhanced CT Image Storage - For Processing (1.2.840.10008.5.1.4.1.1.2.4), are among them, since Table B.5-1 maps each to its IOD. The maintainer decided on 7 October 2026 to bring MR and PET, including their enhanced variants, and Enhanced CT into the first supported release, which had covered CT Image, RT Structure Set, RT Plan, and RT Dose. That adds ten IODs: every IOD of a CT, MR, or PET image Storage SOP Class in Table B.5-1, and MR Spectroscopy. On 25 October 2026 the maintainer also decided to bring RT Beams Treatment Record, RT Image, Spatial Registration, Deformable Spatial Registration, and Segmentation into the first supported release, "so long as this is an expansion of scope". Their text, UID, and date attributes were reviewed ahead of supporting them (D-022), and each is supported in a change of its own, which settles where its plain X and its D sequester an instance (D-020, D-021). RT Beams Treatment Record, RT Image, Spatial Registration, Deformable Spatial Registration, and Segmentation are supported, which adds five IODs. The same day the maintainer added radiation dose reports, and then every other Structured Report IOD, to the target coverage; the X-Ray Radiation Dose SR and Radiopharmaceutical Radiation Dose SR are supported, which adds two IODs; the Basic Text SR, Enhanced SR, Comprehensive SR, Comprehensive 3D SR, and Extensible SR, which add five more and use no attribute and no reference site that the dose reports do not; and the Enhanced X-Ray Radiation Dose SR and Patient Radiation Dose SR, which add two more, and whose attributes were reviewed with the other two dose reports' ahead of supporting them (D-022). The Key Object Selection Document, Mammography CAD SR, Chest CAD SR, Colon CAD SR, Procedure Log, Spectacle Prescription Report, Macular Grid Thickness and Volume Report, and Waveform Annotation SR are supported too, which adds eight more. A Key Object Selection Document is not a Structured Report by its IOD's name, but its content tree is in the same Content Sequence, built from the same content items, so it is supported, cleaned, and claimed as a report is. These eight, and the other Structured Report IODs, use no attribute that the reviewed IODs do not (D-022): their IODs add the Key Object Document, Synchronization, Enhanced General Equipment, and Timezone Modules, whose attributes the reviewed IODs already use, and none of them defines Waveform Annotation Sequence (0040,B020) or Common Instance Reference. The others are sequestered, as above, until each is supported. Rendition Selection Document is among PS3.3's Structured Report IODs but has no Storage SOP Class in the pinned Table B.5-1, so no instance is classified as one, and a SOP Class UID that names it would be sequestered as not a Standard Storage SOP Class. A Procedure Log orders its entries by increasing Observation DateTime (0040,A032) (PS3.3 Section A.35.7.3.1.2), which D would give one constant, so under a policy that neither keeps nor modifies that datetime each entry takes the dummy datetime of its rank (D-021), and a log whose entries are not in that order is sequestered (D-047). On 31 October 2026 the maintainer brought the 22 other RT IODs of Table B.5-1 into the first supported release, in this order: RT Ion Plan and RT Ion Beams Treatment Record; RT Brachy Treatment Record and RT Treatment Summary Record; Enhanced RT Image and Enhanced Continuous RT Image; and the 16 second-generation RT IODs, RT Physician Intent, RT Segment Annotation, RT Radiation Set, RT Radiation Record Set, RT Radiation Salvage Record, RT Treatment Preparation, RT Patient Position Acquisition Instruction, RT Beams Delivery Instruction, RT Brachy Application Setup Delivery Instruction, RT Radiation Set Delivery Instruction, and the C-Arm Photon-Electron, Tomotherapeutic, and Robotic-Arm Radiation IODs and their Records. As for the IODs added on 25 October, each one's text, UID, and date attributes are reviewed ahead of supporting it (D-022), and each is supported in a change of its own, which settles where its plain X and its D sequester an instance (D-020, D-021); until then each is sequestered. RT Ion Plan and RT Ion Beams Treatment Record are supported, which adds two IODs. An RT Ion Plan describes a treatment with beams of protons or heavier ions, and an RT Ion Beams Treatment Record what was delivered of one; neither holds pixel data, so neither can show a face or hold burned-in text. An RT Ion Plan names its structure set, its RT Doses, and the plans related to it, in Referenced Structure Set Sequence (300C,0060), Referenced Dose Sequence (300C,0080), and Referenced RT Plan Sequence (300C,0002), and an RT Ion Beams Treatment Record names the plan that it records in Referenced RT Plan Sequence, by UIDs that the run's key replaces as it replaces the referenced instances' own (D-003), so a written record still names the written plan. Their text that Table E.1-1 omits has rules reviewed ahead of supporting them (D-022), and they add no place where the Basic Profile's actions sequester an instance beyond those that RT Plan and RT Beams Treatment Record have: Responsible Person and Responsible Organization in the Patient Module (D-020). The Institution Code Sequence of the person who resolved an interlock, here in Treatment Session Ion Beam Sequence (3008,0021), takes the reviewed dummy item that it takes in an RT Beams Treatment Record (D-021). RT Brachy Treatment Record and RT Treatment Summary Record are supported, which adds two IODs. An RT Brachy Treatment Record says what an afterloader or a manual loading delivered in one session, through each channel of each application setup of a brachytherapy plan, and an RT Treatment Summary Record totals what has been delivered of a course so far; neither holds pixel data, so neither can show a face or hold burned-in text. Each names the plan that it records in Referenced RT Plan Sequence (300C,0002), and the treatment records related to it in Referenced Treatment Record Sequence (3008,0030), by UIDs that the run's key replaces as it replaces the referenced instances' own (D-003), so a written record still names the written plan and records. Their attributes were reviewed ahead of supporting them (D-022), and they add one place where the Basic Profile's actions would sequester an instance beyond those that RT Plan and RT Beams Treatment Record have: Source Manufacturer (300A,0216), which Table E.1-1 gives X, is Type 2 in Recorded Source Sequence (3008,0100), which is Type 1 at the top level of RT Brachy Treatment Record, so every conforming record holds it and no Type 3 sequence encloses it. A plain X there would sequester every RT Brachy Treatment Record under `basic`, `basic-clean-descriptors`, and `public-release`, so it is emptied there instead, as Requested Procedure ID is in a Structured Report's Referenced Request Sequence (D-020). Beyond that, they add no place that sequesters: Responsible Person and Responsible Organization in the Patient Module (D-020) sequester as in every IOD, and RT Brachy Treatment Record has no interlock, so it holds no Institution Code Sequence for the person who resolved one. Enhanced RT Image and Enhanced Continuous RT Image are supported, which adds two IODs. Each holds projection images made before, during, or after a treatment session, acquired directly, such as a kV or MV image of the patient in the treatment position, or derived from a volume such as a CT, as a digitally reconstructed radiograph is (PS3.3 Sections A.86.1.15.1 and A.86.1.16.1); an Enhanced Continuous RT Image holds frames acquired at a high frame rate, of which its Selected Frame Functional Groups Sequence (3002,0101) describes a selection (PS3.3 Section C.7.6.29). Each is therefore treated as an RT Image is: the QC pack lists its series as able to show a face in profile, whatever its Image Type, gantry angle, or Number of Frames, and as showing the head or neck where its attributes name a region of it, for review through the series' previews, and one whose Image Type has a second value of SECONDARY is also listed as able to hold burned-in text (D-015, D-017). Its pixel data are cleaned, reviewed, and claimed under the Clean Pixel Data and Clean Recognizable Visual Features Options as any other image's are (D-037, D-046). Neither IOD defines Burned In Annotation (0028,0301) or Recognizable Visual Features (0028,0302), so an instance that claims either option gains the attribute as a standard attribute of a Standard Extended SOP Class, as an RT Plan does. PS3.3 Sections A.86.1.15.4.2 and A.86.1.16.4.2 forbid the General Image Module, which defines both, in a Standard Extended SOP Class of these IODs; the engine adds the two attributes alone, which PS3.15 E.3.1 and E.3.2 require, and none of the module's others. It names the instances that it relates to, such as the RT Plan, RT Radiation Set, or RT Radiation of the treatment that its frames image, and the images that it was derived from, by UIDs that the run's key replaces as it replaces the referenced instances' own (D-003), so a written image still names the written instances. Its Series Number is Type 1 in the Enhanced RT Series Module, so it takes its rank, as in a Segmentation (D-022). Their attributes were reviewed with their support (D-022): one text attribute that Table E.1-1 omits, Conceptual Volume Combination Expression (3010,000C), needed a rule, and they add no place where the Basic Profile's actions sequester an instance beyond those that the IODs supported before them have. Responsible Person and Responsible Organization in the Patient Module sequester as in every IOD (D-020), and the Person Identification Code Sequence in the Author Identification Sequence (3010,0019) of the Radiotherapy Common Instance Module takes the reviewed dummy item that it takes wherever Table E.1-1 gives it D (D-021). RT Segment Annotation, RT Radiation Set, and the C-Arm Photon-Electron, Tomotherapeutic, and Robotic-Arm Radiation IODs are supported, which adds five IODs. Their attributes were reviewed ahead of supporting them, with those of the other 11 second-generation RT IODs (D-022), and of the places where that review found that the Basic Profile's actions would sequester an instance, only one is in them: RT Accessory Holder Slot ID (300A,0611), which Table E.1-1 gives Z, is Type 1 in RT Accessory Holder Slot Sequence (300A,0610) of C-Arm Photon-Electron Radiation and Robotic-Arm Radiation, where it takes the dummy value (D-020). RT Beams Delivery Instruction, RT Brachy Application Setup Delivery Instruction, and RT Radiation Set Delivery Instruction are supported, which adds three IODs. A delivery instruction tells a treatment delivery system what to deliver in a session: the RT Beams Delivery Instruction which beams of an RT Plan, the RT Brachy Application Setup Delivery Instruction which application setups of an RT Plan, and the RT Radiation Set Delivery Instruction which radiations of an RT Radiation Set. None holds pixel data, so none can show a face or hold burned-in text. They name the plan in Referenced RT Plan Sequence (300C,0002), the treatment record of the session that an instruction continues in Referenced Treatment Record Sequence (3008,0030), the radiation set in Referenced RT Radiation Set Sequence (300A,0702), and its radiations to deliver or omit in Referenced RT Radiation Sequence (300A,0630), by UIDs that the run's key replaces as it replaces the referenced instances' own (D-003), so a written instruction still names the written plan, record, radiation set, and radiations. Their attributes were reviewed ahead of supporting them (D-022), and they add no place where the Basic Profile's actions sequester an instance: Responsible Person and Responsible Organization in the Patient Module (D-020) sequester as in every IOD, and the RT Radiation Set Delivery Instruction's sequences that resolve to D take the items that reviewed rules give them elsewhere, the dummy Person Identification Code Sequence item of an author or of an omitted radiation's asserter, and the keyed item of Referenced Performed Procedure Step Sequence (D-021). The RT Radiation Set Delivery Instruction's Series Number is Type 1 in its Enhanced RT Series Module, so it takes its rank, as in a Segmentation (D-022). A report's content tree is in Content Sequence (0040,A730), which the Basic Profile gives D, and a sequence has no dummy value (D-021), so a report is released only under a policy whose Clean Structured Content keeps its tree (D-047). A registration's frames of reference, including a deformable registration's Source Frame of Reference UID (0064,0003), and the images it registers are named by UIDs that the run's key replaces as it replaces the registered instances' own (D-003), so a written registration still ties the written images to their frames of reference; its matrices and deformation grids identify no one and are kept. An RT Image is a projection, such as a portal image, a simulator radiograph, or a digitally reconstructed radiograph, so a lateral one can show the face in profile: the QC pack lists every RT Image's series as able to show a face, whatever its Image Type, for review through the series' previews, and an RT Image that holds Conversion Type (0008,0064), which its IOD makes Type 2, or an Image Type whose second value is SECONDARY, is also listed as able to hold burned-in text and previewed at full resolution (D-015, D-017). Its pixel data are cleaned, reviewed, and claimed under the Clean Pixel Data and Clean Recognizable Visual Features Options as any other image's are (D-037, D-046). It names the plan that it was made for, in Referenced RT Plan Sequence (300C,0002), by a UID that the run's key replaces as it replaces the plan's own (D-003), so a written RT Image still names the written plan. Its text that Table E.1-1 omits has rules reviewed ahead of supporting it (D-022), and it adds no place where the Basic Profile's actions sequester an instance beyond those that CT Image has (D-020, D-021). Segmentation Storage and Label Map Segmentation Storage are both supported, since Table B.5-1 maps both to the Segmentation IOD, while Height Map Segmentation, which it maps to an IOD of its own, is not. A Segmentation's frames are masks of its segments, and a segment of the skin or body traces the patient's surface, as an outline's contours do, whatever its label: the QC pack lists every Segmentation as able to show a face, and shows each `BINARY` or `LABELMAP` one, as written, on a segments sheet (D-015, D-017). It claims the Clean Recognizable Visual Features Option only on a verdict given on that sheet, since the pack records the SHA-256 of its written pixel data only where the sheet shows every frame, and in a defaced CT series' frame its segments are cleared in the face block, less the kept brain, before the reviewer sees them (D-046, D-052). Its pixel data are cleaned and claimed under the Clean Pixel Data Option as any other image's are, so a `BINARY` one, whose pixels are single bits rather than whole bytes, is sequestered under that option as `uncleanable-pixel-data` (D-037). It names the series and images that it segments, in Referenced Series Sequence (0008,1115) and in its frames' Derivation Image functional groups, by UIDs that the run's key replaces as it replaces theirs (D-003), so a written Segmentation still names the written images. Its text that Table E.1-1 omits, such as Segment Label (0062,0005), has rules reviewed ahead of supporting it (D-022), and the places where the Basic Profile's actions sequester it are those of CT Image, Responsible Person, Responsible Organization, and Pixel Data Provider URL (0028,7FE0), which is present only with a JPIP transfer syntax, which the engine does not read, and, in a `PALETTE COLOR` label map, an ICC Profile that is not an RGB profile, as in the enhanced IODs (D-020, D-021). Its Series Number is Type 1, so it takes its rank, as in a Structured Report (D-022), and its Tracking UID (0062,0021), which identifies a finding tracked across instances rather than referencing one, is replaced by the run's key (D-003). On 31 October 2026 the maintainer also brought the other IODs that RT exports carry into the first supported release, "All of them, each with evidence": Surface Segmentation; Computed Radiography and Digital X-Ray; Nuclear Medicine; Parametric Map and Real World Value Mapping; the Secondary Capture IODs; the Presentation States; and Encapsulated PDF. Each family is supported in a change of its own, with its own evidence, and until then each is sequestered. Surface Segmentation, Parametric Map, and Real World Value Mapping are supported, which adds three IODs. A Surface Segmentation holds no pixel data: its segments are meshes, whose Point Coordinates Data (0066,0016) place each point in the patient, so a mesh of the skin or the body traces the face as an outline's contours do, whatever its segment's label or code says. No preview of the QC pack draws a mesh yet, so under Clean Recognizable Visual Features every Surface Segmentation, and any other instance that holds a Surface Sequence (0066,0002), is held for review as `no-face-verdict` whatever its verdict, and never released under that option, as a deformable registration's grid was before its sheets (D-017, D-046); without the option, the Basic Profile claims nothing about a face, and its meshes are kept, as an RT Structure Set's contours are. It names the series and images that its surfaces were generated from, in Segment Surface Source Instance Sequence (0066,002E) and the Common Instance Reference Module, by UIDs that the run's key replaces as it replaces theirs (D-003), so a written Surface Segmentation still names the written images. Its text that Table E.1-1 omits, Surface Comments (0066,0004) and Surface Processing Description (0066,000B), has rules reviewed ahead of supporting it: each is typed text, removed by Type and cleaned under Clean Descriptors, as Image Comments and Derivation Description are, and its segments' labels, descriptions, and algorithm names have the Segmentation IOD's rules (D-022). It shares the Segmentation Series Module, so its Series Number is Type 1 and takes its rank, and its Tracking UID is replaced by the run's key, as a Segmentation's are; it adds no place where the Basic Profile's actions sequester an instance beyond those that CT Image has, Responsible Person and Responsible Organization (D-020, D-021). A Parametric Map's frames hold a quantity derived from images of the patient, such as an apparent diffusion coefficient or a standardised uptake value, as integers in Pixel Data or as floating-point values in Float Pixel Data (7FE0,0008) or Double Float Pixel Data (7FE0,0009) (PS3.3 Section A.75), placed by its functional groups as an enhanced image's frames are. A map of the head shows its outline wherever the quantity differs from the air around it, whatever the quantity, so the QC pack lists every Parametric Map as able to show a face, whatever its Number of Frames, and one whose attributes name the head or neck as showing it (D-015, D-017). Its integer pixel data are cleaned, previewed, reviewed, and claimed under the Clean Pixel Data and Clean Recognizable Visual Features Options as an enhanced MR image's are (D-037, D-046). Both options read floating-point pixel data: Clean Pixel Data searches each frame and blacks out its text in the element that held it (D-037), and the QC pack previews it, so that a face verdict on its previews releases it under Clean Recognizable Visual Features (D-017, D-046); under a policy with neither option its pixel data are written as received, as every image's are. A Parametric Map in a defaced CT series' frame is not cleaned in the face block, as an MR image there is not, and claims the option only on a verdict that its own series' previews show no face (D-046). A Real World Value Mapping holds no pixel data, so it cannot show a face or hold burned-in text. Each item of its Referenced Image Real World Value Mapping Sequence (0040,9094) maps the stored values of the images that the item names, in Referenced Image Sequence (0008,1140), by the items of its own Real World Value Mapping Sequence (0040,9096), each to a quantity in the units of its Measurement Units Code Sequence (0040,08EA) (PS3.3 Section C.25.2), and names those images by UIDs that the run's key replaces as it replaces their own (D-003), so a written mapping still names the written images. A mapping to a standardised uptake value, with the Radionuclide Total Dose that the Basic Profile keeps in the images that it maps, may disclose the patient's weight, as a PET image's own mapping may, so the QC pack lists such an instance with that indicator (D-015). Parametric Map and Real World Value Mapping use no text, UID, date, or time attribute that the IODs supported before them do not (D-022), and the places where the Basic Profile's actions sequester them are those of the enhanced MR IODs: Responsible Person and Responsible Organization, a Parametric Map's Referenced Performed Procedure Step Sequence without a UID to replace, its Pixel Data Provider URL, and, where its Pixel Presentation (0008,9205) is `COLOR_RANGE`, an ICC Profile that is not an RGB profile (D-020, D-021). Of the Presentation States, the six softcopy Presentation State IODs of PS3.3 Sections A.33.1 to A.33.4, A.33.6, and A.33.8 are supported, which adds six IODs: Grayscale, Color, Pseudo-Color, Blending, and XA/XRF Grayscale Softcopy Presentation State, and Variable Modality LUT Softcopy Presentation State. A Presentation State says how a viewer should show images that it names, with their grey-scale or colour transforms, shutters, masks, displayed area, rotation, and flips, and graphic and text annotations drawn over them; it holds no pixel data, so it cannot show a face or hold burned-in text, but its annotations can carry text that a person typed, such as a name, and graphics that could trace text (MIDI §1.22.3). Each names the images that it presents, in the Referenced Series Sequence (0008,1115) of its Presentation State Relationship Module, which its IOD makes Type 1, or, in a Blending Softcopy Presentation State, in its Blending Sequence (0070,0402), by UIDs that the run's key replaces as it replaces the images' own (D-003), so a written Presentation State still names the written images. That Referenced Series Sequence is not the Common Instance Reference Module's sequence of the same tag, which none of these IODs includes, so it never lapses (D-022). Their attributes were reviewed ahead of supporting them (D-022), and the Basic Profile's actions sequester them at three places beyond Responsible Person and Responsible Organization: Presentation Creation Date (0070,0082) and Time (0070,0083), which Table E.1-1 gives a plain X, are Type 1 at the top level of the mandatory Presentation State Identification Module, so every Presentation State that conforms to its IOD is sequestered under `basic` and `basic-clean-descriptors`, and released under `tps-import` and `public-release`, whose Modified Dates shifts them (D-006, D-020); the Graphic Annotation Sequence (0070,0001), which holds the text and graphic objects and which Table E.1-1 gives D, is Type 1 wherever these IODs define it, and a sequence has no dummy value, so an instance that holds one is sequestered under every preset, including under Clean Graphics, which gives it its Basic Profile action (D-021, D-041); and Overlay Data (60xx,3000), which a plain X removes, is Type 1 in the Overlay Plane Module, which all but the Blending Softcopy Presentation State include as conditional, so an instance that holds an overlay is sequestered too (D-020). How an annotated Presentation State can be released is the maintainer's to decide; until then it is held in this way. The maintainer also decided on 7 October 2026 that the first supported release takes compressed input, which it had sequestered. An instance in one of the twelve compressed transfer syntaxes, lossy ones included, keeps its transfer syntax and encapsulated pixel data, without decoding and re-encoding, once the comment and application segments of its codestreams are cut and every frame is shown to decode to the same pixels as its source's (Architecture item 7); one whose pinned decoding plugin is not installed, or whose frames or codestreams fail those checks, is sequestered with its reason. A JPEG 2000 or HTJ2K frame under a lossless-only syntax that was truncated so far that it drops only whole code-blocks passes (Architecture item 2) and is written as its source labels it; since every byte of its codestream is still accounted for and its metadata segments cut, that limit concerns how its pixel data are labelled, not what they could disclose. Protocol objects, such as CT Performed Procedure Protocol, derived objects that are not specific to a modality other than Segmentation, Surface Segmentation, and Parametric Map, such as height map segmentations, spatial fiducials, and the other 8 second-generation RT IODs, stay out of scope until each is supported, as above. Within the supported IODs, the rules still sequester every Enhanced PET Image instance that conforms to its IOD under `basic` and `basic-clean-descriptors` (D-020), and any instance whose Referenced Performed Procedure Step Sequence has no UID to replace, or whose ICC Profile, where Enhanced CT Image, Enhanced MR Image, Enhanced MR Color Image, Segmentation, Parametric Map, or the Color, Pseudo-Color, Blending, or Variable Modality LUT Softcopy Presentation State requires it, is not an RGB profile (D-021), and every report whose tree is not kept (D-047). The report says why any other instance was sequestered: it had no SOP Class UID or one that is not text, its SOP Class is not a Standard Storage SOP Class of Table B.5-1, its IOD is not supported (the report names the IOD), or its transfer syntax is missing or not supported. An instance whose Specific Character Set (0008,0005) cannot be read, such as one stored with a VR other than CS, is also sequestered, with that reason. As the maintainer decided on 12 October 2026, a data set whose Specific Character Set is not supported or is invalid, such as a misspelt Defined Term, is read in the Default Character Repertoire, as one without a value is: text in ISO 646, with no byte from 0x80 and no escape, is read as the same characters by the pydicom codec of every Defined Term of PS3.3 Section C.12.1.1.2 that the engine supports, so it is read without guessing a character set, and text outside ISO 646 is handled as below. That is a property of those codecs, not of every character set: JIS X 0201 Roman, the G0 set of `ISO_IR 13`, places a yen sign and an overline at 0x5C and 0x7E (PS3.5 Section 6.1.2.3), which pydicom's codec, like the engine under a supported `ISO_IR 13`, reads as a backslash and a tilde. Specific Character Set is invalid where its values break the rules of PS3.3 Section C.12.1.1.2. `ISO_IR 6` as a single value, which is not a Defined Term, since Table C.12-2 gives the Default Character Repertoire no Defined Term, is read as that repertoire. A value of VR SH, LO, ST, PN, LT, UC, or UT that has bytes outside the Default Character Repertoire, in a data set or item to which no Specific Character Set applies, cannot be decoded reliably, since PS3.3 Table C.12-1 makes Specific Character Set "Required if an expanded or replacement character set is used" and nothing says which was used. The maintainer decided on 1 October 2026 that such text sequesters its instance only where the text would be kept or cleaned; where it is removed or replaced, the instance is de-identified, as for other content that cannot be decoded (Architecture item 2, D-027). The residual search reads such text as ISO 8859-1, in which every byte is a character (Architecture item 5). **Clarification, 2 October 2026.** The maintainer clarified that "the instance is de-identified" means that the transformation proceeds, not that the output may be released: a value read only as ISO 8859-1 is incomplete coverage for the residual search, and the release gate withholds the file or sends it to QC review by the value's kind (D-027 sets out the examples). The same day the maintainer added the other IODs that RT exports carry to the target coverage, each to be supported with its own evidence; Encapsulated PDF is supported, which adds one IOD. An Encapsulated PDF holds a document, such as a treatment summary, a plan report, or a scanned form, in Encapsulated Document (0042,0011), and PS3.3 treats the patient's identification and dates as text in it as burned-in annotation (PS3.3 Table C.24-2). Its attributes were reviewed against the IODs above (D-022), and its Encapsulated Document Series Module adds none. Its Encapsulated Document Module adds Document Title (0042,0010), which can be copied from the PDF's own Title entry, so it is removed by Type, which empties it, and cleaned as a descriptor under Clean Descriptors; MIME Type of Encapsulated Document (0042,0012), which the IOD fixes as application/pdf, and List of MIME Types (0042,0014), which name formats and are kept; Encapsulated Document Length (0042,0015) and Document Class Code Sequence (0040,E008), which take the default; and Relative URI Reference Within Encapsulated Document (0068,7005), which is removed by Type. Its SC Equipment Module describes the equipment that captured or converted the document: Secondary Capture Device ID (0018,1010), which Table E.1-1 removes and keeps under Retain Device Identity, and its manufacturer, model, and software versions, which can be a site's own system and are removed and kept under Retain Device Identity in the same way; and the formats it acquired, which are kept. Table E.1-1 gives the document D under every option, and no reviewed rule gives a document a dummy value, so every Encapsulated PDF that holds one is sequestered, under every policy, with that attribute and D as its reason, and nothing of it is written (Architecture item 7). Its Content Sequence (0040,A730), Type 3 at the top level, whose items are content items as in a report, is given D by the Basic Profile and has no dummy value, so it sequesters the instance too, as it does a report (D-021), except under Clean Structured Content, which cleans it. The other encapsulated documents, Encapsulated CDA, STL, OBJ, and MTL, are not supported.
++- **Decision.** Sequester Structured Reports other than those of the supported IODs below, Presentation States other than the softcopy ones below, instances of Private SOP Classes, and objects outside the supported scope. List them in the report and exclude them from the conformance claim. An instance is classified from its SOP Class UID, through PS3.4 Table B.5-1, and from its file's transfer syntax. Support is decided by IOD, so every Storage SOP Class that Table B.5-1 maps to a supported IOD is supported. The first supported release de-identifies instances of 60 IODs in the Implicit VR Little Endian and Explicit VR Little Endian transfer syntaxes and in the twelve transfer syntaxes that encapsulate Pixel Data that pydicom 3.0.2's decoding plugins decode (Architecture item 2): CT Image, Enhanced CT Image, Legacy Converted Enhanced CT Image, MR Image, Enhanced MR Image, Enhanced MR Color Image, Legacy Converted Enhanced MR Image, MR Spectroscopy, Positron Emission Tomography Image, Enhanced PET Image, Legacy Converted Enhanced PET Image, RT Structure Set, RT Plan, RT Dose, RT Image, Enhanced RT Image, Enhanced Continuous RT Image, RT Segment Annotation, RT Radiation Set, C-Arm Photon-Electron Radiation, Tomotherapeutic Radiation, Robotic-Arm Radiation, RT Beams Delivery Instruction, RT Brachy Application Setup Delivery Instruction, RT Radiation Set Delivery Instruction, RT Beams Treatment Record, RT Ion Plan, RT Ion Beams Treatment Record, RT Brachy Treatment Record, RT Treatment Summary Record, Spatial Registration, Deformable Spatial Registration, Segmentation, Surface Segmentation, X-Ray Radiation Dose SR, Enhanced X-Ray Radiation Dose SR, Radiopharmaceutical Radiation Dose SR, Patient Radiation Dose SR, Basic Text SR, Enhanced SR, Comprehensive SR, Comprehensive 3D SR, Extensible SR, Key Object Selection Document, Mammography CAD SR, Chest CAD SR, Colon CAD SR, Procedure Log, Spectacle Prescription Report, Macular Grid Thickness and Volume Report, Waveform Annotation SR, Parametric Map, Real World Value Mapping, Grayscale Softcopy Presentation State, Color Softcopy Presentation State, Pseudo-Color Softcopy Presentation State, Blending Softcopy Presentation State, XA/XRF Grayscale Softcopy Presentation State, Variable Modality LUT Softcopy Presentation State, and Encapsulated PDF. The For Processing SOP Classes, such as CT Image Storage - For Processing (1.2.840.10008.5.1.4.1.1.2.3) and Enhanced CT Image Storage - For Processing (1.2.840.10008.5.1.4.1.1.2.4), are among them, since Table B.5-1 maps each to its IOD. The maintainer decided on 7 October 2026 to bring MR and PET, including their enhanced variants, and Enhanced CT into the first supported release, which had covered CT Image, RT Structure Set, RT Plan, and RT Dose. That adds ten IODs: every IOD of a CT, MR, or PET image Storage SOP Class in Table B.5-1, and MR Spectroscopy. On 25 October 2026 the maintainer also decided to bring RT Beams Treatment Record, RT Image, Spatial Registration, Deformable Spatial Registration, and Segmentation into the first supported release, "so long as this is an expansion of scope". Their text, UID, and date attributes were reviewed ahead of supporting them (D-022), and each is supported in a change of its own, which settles where its plain X and its D sequester an instance (D-020, D-021). RT Beams Treatment Record, RT Image, Spatial Registration, Deformable Spatial Registration, and Segmentation are supported, which adds five IODs. The same day the maintainer added radiation dose reports, and then every other Structured Report IOD, to the target coverage; the X-Ray Radiation Dose SR and Radiopharmaceutical Radiation Dose SR are supported, which adds two IODs; the Basic Text SR, Enhanced SR, Comprehensive SR, Comprehensive 3D SR, and Extensible SR, which add five more and use no attribute and no reference site that the dose reports do not; and the Enhanced X-Ray Radiation Dose SR and Patient Radiation Dose SR, which add two more, and whose attributes were reviewed with the other two dose reports' ahead of supporting them (D-022). The Key Object Selection Document, Mammography CAD SR, Chest CAD SR, Colon CAD SR, Procedure Log, Spectacle Prescription Report, Macular Grid Thickness and Volume Report, and Waveform Annotation SR are supported too, which adds eight more. A Key Object Selection Document is not a Structured Report by its IOD's name, but its content tree is in the same Content Sequence, built from the same content items, so it is supported, cleaned, and claimed as a report is. These eight, and the other Structured Report IODs, use no attribute that the reviewed IODs do not (D-022): their IODs add the Key Object Document, Synchronization, Enhanced General Equipment, and Timezone Modules, whose attributes the reviewed IODs already use, and none of them defines Waveform Annotation Sequence (0040,B020) or Common Instance Reference. The others are sequestered, as above, until each is supported. Rendition Selection Document is among PS3.3's Structured Report IODs but has no Storage SOP Class in the pinned Table B.5-1, so no instance is classified as one, and a SOP Class UID that names it would be sequestered as not a Standard Storage SOP Class. A Procedure Log orders its entries by increasing Observation DateTime (0040,A032) (PS3.3 Section A.35.7.3.1.2), which D would give one constant, so under a policy that neither keeps nor modifies that datetime each entry takes the dummy datetime of its rank (D-021), and a log whose entries are not in that order is sequestered (D-047). On 31 October 2026 the maintainer brought the 22 other RT IODs of Table B.5-1 into the first supported release, in this order: RT Ion Plan and RT Ion Beams Treatment Record; RT Brachy Treatment Record and RT Treatment Summary Record; Enhanced RT Image and Enhanced Continuous RT Image; and the 16 second-generation RT IODs, RT Physician Intent, RT Segment Annotation, RT Radiation Set, RT Radiation Record Set, RT Radiation Salvage Record, RT Treatment Preparation, RT Patient Position Acquisition Instruction, RT Beams Delivery Instruction, RT Brachy Application Setup Delivery Instruction, RT Radiation Set Delivery Instruction, and the C-Arm Photon-Electron, Tomotherapeutic, and Robotic-Arm Radiation IODs and their Records. As for the IODs added on 25 October, each one's text, UID, and date attributes are reviewed ahead of supporting it (D-022), and each is supported in a change of its own, which settles where its plain X and its D sequester an instance (D-020, D-021); until then each is sequestered. RT Ion Plan and RT Ion Beams Treatment Record are supported, which adds two IODs. An RT Ion Plan describes a treatment with beams of protons or heavier ions, and an RT Ion Beams Treatment Record what was delivered of one; neither holds pixel data, so neither can show a face or hold burned-in text. An RT Ion Plan names its structure set, its RT Doses, and the plans related to it, in Referenced Structure Set Sequence (300C,0060), Referenced Dose Sequence (300C,0080), and Referenced RT Plan Sequence (300C,0002), and an RT Ion Beams Treatment Record names the plan that it records in Referenced RT Plan Sequence, by UIDs that the run's key replaces as it replaces the referenced instances' own (D-003), so a written record still names the written plan. Their text that Table E.1-1 omits has rules reviewed ahead of supporting them (D-022), and they add no place where the Basic Profile's actions sequester an instance beyond those that RT Plan and RT Beams Treatment Record have: Responsible Person and Responsible Organization in the Patient Module (D-020). The Institution Code Sequence of the person who resolved an interlock, here in Treatment Session Ion Beam Sequence (3008,0021), takes the reviewed dummy item that it takes in an RT Beams Treatment Record (D-021). RT Brachy Treatment Record and RT Treatment Summary Record are supported, which adds two IODs. An RT Brachy Treatment Record says what an afterloader or a manual loading delivered in one session, through each channel of each application setup of a brachytherapy plan, and an RT Treatment Summary Record totals what has been delivered of a course so far; neither holds pixel data, so neither can show a face or hold burned-in text. Each names the plan that it records in Referenced RT Plan Sequence (300C,0002), and the treatment records related to it in Referenced Treatment Record Sequence (3008,0030), by UIDs that the run's key replaces as it replaces the referenced instances' own (D-003), so a written record still names the written plan and records. Their attributes were reviewed ahead of supporting them (D-022), and they add one place where the Basic Profile's actions would sequester an instance beyond those that RT Plan and RT Beams Treatment Record have: Source Manufacturer (300A,0216), which Table E.1-1 gives X, is Type 2 in Recorded Source Sequence (3008,0100), which is Type 1 at the top level of RT Brachy Treatment Record, so every conforming record holds it and no Type 3 sequence encloses it. A plain X there would sequester every RT Brachy Treatment Record under `basic`, `basic-clean-descriptors`, and `public-release`, so it is emptied there instead, as Requested Procedure ID is in a Structured Report's Referenced Request Sequence (D-020). Beyond that, they add no place that sequesters: Responsible Person and Responsible Organization in the Patient Module (D-020) sequester as in every IOD, and RT Brachy Treatment Record has no interlock, so it holds no Institution Code Sequence for the person who resolved one. Enhanced RT Image and Enhanced Continuous RT Image are supported, which adds two IODs. Each holds projection images made before, during, or after a treatment session, acquired directly, such as a kV or MV image of the patient in the treatment position, or derived from a volume such as a CT, as a digitally reconstructed radiograph is (PS3.3 Sections A.86.1.15.1 and A.86.1.16.1); an Enhanced Continuous RT Image holds frames acquired at a high frame rate, of which its Selected Frame Functional Groups Sequence (3002,0101) describes a selection (PS3.3 Section C.7.6.29). Each is therefore treated as an RT Image is: the QC pack lists its series as able to show a face in profile, whatever its Image Type, gantry angle, or Number of Frames, and as showing the head or neck where its attributes name a region of it, for review through the series' previews, and one whose Image Type has a second value of SECONDARY is also listed as able to hold burned-in text (D-015, D-017). Its pixel data are cleaned, reviewed, and claimed under the Clean Pixel Data and Clean Recognizable Visual Features Options as any other image's are (D-037, D-046). Neither IOD defines Burned In Annotation (0028,0301) or Recognizable Visual Features (0028,0302), so an instance that claims either option gains the attribute as a standard attribute of a Standard Extended SOP Class, as an RT Plan does. PS3.3 Sections A.86.1.15.4.2 and A.86.1.16.4.2 forbid the General Image Module, which defines both, in a Standard Extended SOP Class of these IODs; the engine adds the two attributes alone, which PS3.15 E.3.1 and E.3.2 require, and none of the module's others. It names the instances that it relates to, such as the RT Plan, RT Radiation Set, or RT Radiation of the treatment that its frames image, and the images that it was derived from, by UIDs that the run's key replaces as it replaces the referenced instances' own (D-003), so a written image still names the written instances. Its Series Number is Type 1 in the Enhanced RT Series Module, so it takes its rank, as in a Segmentation (D-022). Their attributes were reviewed with their support (D-022): one text attribute that Table E.1-1 omits, Conceptual Volume Combination Expression (3010,000C), needed a rule, and they add no place where the Basic Profile's actions sequester an instance beyond those that the IODs supported before them have. Responsible Person and Responsible Organization in the Patient Module sequester as in every IOD (D-020), and the Person Identification Code Sequence in the Author Identification Sequence (3010,0019) of the Radiotherapy Common Instance Module takes the reviewed dummy item that it takes wherever Table E.1-1 gives it D (D-021). RT Segment Annotation, RT Radiation Set, and the C-Arm Photon-Electron, Tomotherapeutic, and Robotic-Arm Radiation IODs are supported, which adds five IODs. Their attributes were reviewed ahead of supporting them, with those of the other 11 second-generation RT IODs (D-022), and of the places where that review found that the Basic Profile's actions would sequester an instance, only one is in them: RT Accessory Holder Slot ID (300A,0611), which Table E.1-1 gives Z, is Type 1 in RT Accessory Holder Slot Sequence (300A,0610) of C-Arm Photon-Electron Radiation and Robotic-Arm Radiation, where it takes the dummy value (D-020). RT Beams Delivery Instruction, RT Brachy Application Setup Delivery Instruction, and RT Radiation Set Delivery Instruction are supported, which adds three IODs. A delivery instruction tells a treatment delivery system what to deliver in a session: the RT Beams Delivery Instruction which beams of an RT Plan, the RT Brachy Application Setup Delivery Instruction which application setups of an RT Plan, and the RT Radiation Set Delivery Instruction which radiations of an RT Radiation Set. None holds pixel data, so none can show a face or hold burned-in text. They name the plan in Referenced RT Plan Sequence (300C,0002), the treatment record of the session that an instruction continues in Referenced Treatment Record Sequence (3008,0030), the radiation set in Referenced RT Radiation Set Sequence (300A,0702), and its radiations to deliver or omit in Referenced RT Radiation Sequence (300A,0630), by UIDs that the run's key replaces as it replaces the referenced instances' own (D-003), so a written instruction still names the written plan, record, radiation set, and radiations. Their attributes were reviewed ahead of supporting them (D-022), and they add no place where the Basic Profile's actions sequester an instance: Responsible Person and Responsible Organization in the Patient Module (D-020) sequester as in every IOD, and the RT Radiation Set Delivery Instruction's sequences that resolve to D take the items that reviewed rules give them elsewhere, the dummy Person Identification Code Sequence item of an author or of an omitted radiation's asserter, and the keyed item of Referenced Performed Procedure Step Sequence (D-021). The RT Radiation Set Delivery Instruction's Series Number is Type 1 in its Enhanced RT Series Module, so it takes its rank, as in a Segmentation (D-022). A report's content tree is in Content Sequence (0040,A730), which the Basic Profile gives D, and a sequence has no dummy value (D-021), so a report is released only under a policy whose Clean Structured Content keeps its tree (D-047). A registration's frames of reference, including a deformable registration's Source Frame of Reference UID (0064,0003), and the images it registers are named by UIDs that the run's key replaces as it replaces the registered instances' own (D-003), so a written registration still ties the written images to their frames of reference; its matrices and deformation grids identify no one and are kept. An RT Image is a projection, such as a portal image, a simulator radiograph, or a digitally reconstructed radiograph, so a lateral one can show the face in profile: the QC pack lists every RT Image's series as able to show a face, whatever its Image Type, for review through the series' previews, and an RT Image that holds Conversion Type (0008,0064), which its IOD makes Type 2, or an Image Type whose second value is SECONDARY, is also listed as able to hold burned-in text and previewed at full resolution (D-015, D-017). Its pixel data are cleaned, reviewed, and claimed under the Clean Pixel Data and Clean Recognizable Visual Features Options as any other image's are (D-037, D-046). It names the plan that it was made for, in Referenced RT Plan Sequence (300C,0002), by a UID that the run's key replaces as it replaces the plan's own (D-003), so a written RT Image still names the written plan. Its text that Table E.1-1 omits has rules reviewed ahead of supporting it (D-022), and it adds no place where the Basic Profile's actions sequester an instance beyond those that CT Image has (D-020, D-021). Segmentation Storage and Label Map Segmentation Storage are both supported, since Table B.5-1 maps both to the Segmentation IOD, while Height Map Segmentation, which it maps to an IOD of its own, is not. A Segmentation's frames are masks of its segments, and a segment of the skin or body traces the patient's surface, as an outline's contours do, whatever its label: the QC pack lists every Segmentation as able to show a face, and shows each `BINARY` or `LABELMAP` one, as written, on a segments sheet (D-015, D-017). It claims the Clean Recognizable Visual Features Option only on a verdict given on that sheet, since the pack records the SHA-256 of its written pixel data only where the sheet shows every frame, and in a defaced CT series' frame its segments are cleared in the face block, less the kept brain, before the reviewer sees them (D-046, D-052). Its pixel data are cleaned and claimed under the Clean Pixel Data Option as any other image's are, so a `BINARY` one, whose pixels are single bits rather than whole bytes, is sequestered under that option as `uncleanable-pixel-data` (D-037). It names the series and images that it segments, in Referenced Series Sequence (0008,1115) and in its frames' Derivation Image functional groups, by UIDs that the run's key replaces as it replaces theirs (D-003), so a written Segmentation still names the written images. Its text that Table E.1-1 omits, such as Segment Label (0062,0005), has rules reviewed ahead of supporting it (D-022), and the places where the Basic Profile's actions sequester it are those of CT Image, Responsible Person, Responsible Organization, and Pixel Data Provider URL (0028,7FE0), which is present only with a JPIP transfer syntax, which the engine does not read, and, in a `PALETTE COLOR` label map, an ICC Profile that is not an RGB profile, as in the enhanced IODs (D-020, D-021). Its Series Number is Type 1, so it takes its rank, as in a Structured Report (D-022), and its Tracking UID (0062,0021), which identifies a finding tracked across instances rather than referencing one, is replaced by the run's key (D-003). On 31 October 2026 the maintainer also brought the other IODs that RT exports carry into the first supported release, "All of them, each with evidence": Surface Segmentation; Computed Radiography and Digital X-Ray; Nuclear Medicine; Parametric Map and Real World Value Mapping; the Secondary Capture IODs; the Presentation States; and Encapsulated PDF. Each family is supported in a change of its own, with its own evidence, and until then each is sequestered. Surface Segmentation, Parametric Map, and Real World Value Mapping are supported, which adds three IODs. A Surface Segmentation holds no pixel data: its segments are meshes, whose Point Coordinates Data (0066,0016) place each point in the patient, so a mesh of the skin or the body traces the face as an outline's contours do, whatever its segment's label or code says. No preview of the QC pack draws a mesh yet, so under Clean Recognizable Visual Features every Surface Segmentation, and any other instance that holds a Surface Sequence (0066,0002), is held for review as `no-face-verdict` whatever its verdict, and never released under that option, as a deformable registration's grid was before its sheets (D-017, D-046); without the option, the Basic Profile claims nothing about a face, and its meshes are kept, as an RT Structure Set's contours are. It names the series and images that its surfaces were generated from, in Segment Surface Source Instance Sequence (0066,002E) and the Common Instance Reference Module, by UIDs that the run's key replaces as it replaces theirs (D-003), so a written Surface Segmentation still names the written images. Its text that Table E.1-1 omits, Surface Comments (0066,0004) and Surface Processing Description (0066,000B), has rules reviewed ahead of supporting it: each is typed text, removed by Type and cleaned under Clean Descriptors, as Image Comments and Derivation Description are, and its segments' labels, descriptions, and algorithm names have the Segmentation IOD's rules (D-022). It shares the Segmentation Series Module, so its Series Number is Type 1 and takes its rank, and its Tracking UID is replaced by the run's key, as a Segmentation's are; it adds no place where the Basic Profile's actions sequester an instance beyond those that CT Image has, Responsible Person and Responsible Organization (D-020, D-021). A Parametric Map's frames hold a quantity derived from images of the patient, such as an apparent diffusion coefficient or a standardised uptake value, as integers in Pixel Data or as floating-point values in Float Pixel Data (7FE0,0008) or Double Float Pixel Data (7FE0,0009) (PS3.3 Section A.75), placed by its functional groups as an enhanced image's frames are. A map of the head shows its outline wherever the quantity differs from the air around it, whatever the quantity, so the QC pack lists every Parametric Map as able to show a face, whatever its Number of Frames, and one whose attributes name the head or neck as showing it (D-015, D-017). Its integer pixel data are cleaned, previewed, reviewed, and claimed under the Clean Pixel Data and Clean Recognizable Visual Features Options as an enhanced MR image's are (D-037, D-046). Both options read floating-point pixel data: Clean Pixel Data searches each frame and blacks out its text in the element that held it (D-037), and the QC pack previews it, so that a face verdict on its previews releases it under Clean Recognizable Visual Features (D-017, D-046); under a policy with neither option its pixel data are written as received, as every image's are. A development check, `pymedphys._dicom.deidentify.parametric_map_check`, which only a GitHub-hosted runner of the `Pixel Options on IDC Parametric Maps` workflow (`.github/workflows/parametric-map-check-idc.yml`), started by hand, runs on real data, gives both options the 691 floating-point Parametric Maps of the `tcga_gbm360` analysis results in NCI's Imaging Data Commons (collection TCGA-GBM, [doi:10.5281/zenodo.17470190](https://doi.org/10.5281/zenodo.17470190), CC BY 4.0, which the maintainer allowed on 1 November 2026 for public data whose licence explicitly permits its use), selected from the index that `text_evaluation_idc` pins and refused unless their files' SHA-256s hash to the one it pins, and counts, under Clean Pixel Data, each outcome, whether each map is written in its own element with its data type and shape, and the regions blacked out, and, under Clean Recognizable Visual Features, whether each is held without a verdict, previewed and shown whole, and released on a face verdict of absent bound to its written pixel data. Its summary, labelled `pymedphys-deid-parametric-map-check/1`, and its page give only counts, codes, digests, versions, the text finder's method, and the data set's public identifiers. The maps are pathology-derived AI maps of glioblastoma, not head images, so they show the options working on real floating-point data, not that a face is found. A Parametric Map in a defaced CT series' frame is not cleaned in the face block, as an MR image there is not, and claims the option only on a verdict that its own series' previews show no face (D-046). A Real World Value Mapping holds no pixel data, so it cannot show a face or hold burned-in text. Each item of its Referenced Image Real World Value Mapping Sequence (0040,9094) maps the stored values of the images that the item names, in Referenced Image Sequence (0008,1140), by the items of its own Real World Value Mapping Sequence (0040,9096), each to a quantity in the units of its Measurement Units Code Sequence (0040,08EA) (PS3.3 Section C.25.2), and names those images by UIDs that the run's key replaces as it replaces their own (D-003), so a written mapping still names the written images. A mapping to a standardised uptake value, with the Radionuclide Total Dose that the Basic Profile keeps in the images that it maps, may disclose the patient's weight, as a PET image's own mapping may, so the QC pack lists such an instance with that indicator (D-015). Parametric Map and Real World Value Mapping use no text, UID, date, or time attribute that the IODs supported before them do not (D-022), and the places where the Basic Profile's actions sequester them are those of the enhanced MR IODs: Responsible Person and Responsible Organization, a Parametric Map's Referenced Performed Procedure Step Sequence without a UID to replace, its Pixel Data Provider URL, and, where its Pixel Presentation (0008,9205) is `COLOR_RANGE`, an ICC Profile that is not an RGB profile (D-020, D-021). Of the Presentation States, the six softcopy Presentation State IODs of PS3.3 Sections A.33.1 to A.33.4, A.33.6, and A.33.8 are supported, which adds six IODs: Grayscale, Color, Pseudo-Color, Blending, and XA/XRF Grayscale Softcopy Presentation State, and Variable Modality LUT Softcopy Presentation State. A Presentation State says how a viewer should show images that it names, with their grey-scale or colour transforms, shutters, masks, displayed area, rotation, and flips, and graphic and text annotations drawn over them; it holds no pixel data, so it cannot show a face or hold burned-in text, but its annotations can carry text that a person typed, such as a name, and graphics that could trace text (MIDI §1.22.3). Each names the images that it presents, in the Referenced Series Sequence (0008,1115) of its Presentation State Relationship Module, which its IOD makes Type 1, or, in a Blending Softcopy Presentation State, in its Blending Sequence (0070,0402), by UIDs that the run's key replaces as it replaces the images' own (D-003), so a written Presentation State still names the written images. That Referenced Series Sequence is not the Common Instance Reference Module's sequence of the same tag, which none of these IODs includes, so it never lapses (D-022). Their attributes were reviewed ahead of supporting them (D-022), and the Basic Profile's actions sequester them at three places beyond Responsible Person and Responsible Organization: Presentation Creation Date (0070,0082) and Time (0070,0083), which Table E.1-1 gives a plain X, are Type 1 at the top level of the mandatory Presentation State Identification Module, so every Presentation State that conforms to its IOD is sequestered under `basic` and `basic-clean-descriptors`, and released under `tps-import` and `public-release`, whose Modified Dates shifts them (D-006, D-020); the Graphic Annotation Sequence (0070,0001), which holds the text and graphic objects and which Table E.1-1 gives D, is Type 1 wherever these IODs define it, and a sequence has no dummy value, so an instance that holds one is sequestered under every preset, including under Clean Graphics, which gives it its Basic Profile action (D-021, D-041); and Overlay Data (60xx,3000), which a plain X removes, is Type 1 in the Overlay Plane Module, which all but the Blending Softcopy Presentation State include as conditional, so an instance that holds an overlay is sequestered too (D-020). How an annotated Presentation State can be released is the maintainer's to decide; until then it is held in this way. The maintainer also decided on 7 October 2026 that the first supported release takes compressed input, which it had sequestered. An instance in one of the twelve compressed transfer syntaxes, lossy ones included, keeps its transfer syntax and encapsulated pixel data, without decoding and re-encoding, once the comment and application segments of its codestreams are cut and every frame is shown to decode to the same pixels as its source's (Architecture item 7); one whose pinned decoding plugin is not installed, or whose frames or codestreams fail those checks, is sequestered with its reason. A JPEG 2000 or HTJ2K frame under a lossless-only syntax that was truncated so far that it drops only whole code-blocks passes (Architecture item 2) and is written as its source labels it; since every byte of its codestream is still accounted for and its metadata segments cut, that limit concerns how its pixel data are labelled, not what they could disclose. Protocol objects, such as CT Performed Procedure Protocol, derived objects that are not specific to a modality other than Segmentation, Surface Segmentation, and Parametric Map, such as height map segmentations, spatial fiducials, and the other 8 second-generation RT IODs, stay out of scope until each is supported, as above. Within the supported IODs, the rules still sequester every Enhanced PET Image instance that conforms to its IOD under `basic` and `basic-clean-descriptors` (D-020), and any instance whose Referenced Performed Procedure Step Sequence has no UID to replace, or whose ICC Profile, where Enhanced CT Image, Enhanced MR Image, Enhanced MR Color Image, Segmentation, Parametric Map, or the Color, Pseudo-Color, Blending, or Variable Modality LUT Softcopy Presentation State requires it, is not an RGB profile (D-021), and every report whose tree is not kept (D-047). The report says why any other instance was sequestered: it had no SOP Class UID or one that is not text, its SOP Class is not a Standard Storage SOP Class of Table B.5-1, its IOD is not supported (the report names the IOD), or its transfer syntax is missing or not supported. An instance whose Specific Character Set (0008,0005) cannot be read, such as one stored with a VR other than CS, is also sequestered, with that reason. As the maintainer decided on 12 October 2026, a data set whose Specific Character Set is not supported or is invalid, such as a misspelt Defined Term, is read in the Default Character Repertoire, as one without a value is: text in ISO 646, with no byte from 0x80 and no escape, is read as the same characters by the pydicom codec of every Defined Term of PS3.3 Section C.12.1.1.2 that the engine supports, so it is read without guessing a character set, and text outside ISO 646 is handled as below. That is a property of those codecs, not of every character set: JIS X 0201 Roman, the G0 set of `ISO_IR 13`, places a yen sign and an overline at 0x5C and 0x7E (PS3.5 Section 6.1.2.3), which pydicom's codec, like the engine under a supported `ISO_IR 13`, reads as a backslash and a tilde. Specific Character Set is invalid where its values break the rules of PS3.3 Section C.12.1.1.2. `ISO_IR 6` as a single value, which is not a Defined Term, since Table C.12-2 gives the Default Character Repertoire no Defined Term, is read as that repertoire. A value of VR SH, LO, ST, PN, LT, UC, or UT that has bytes outside the Default Character Repertoire, in a data set or item to which no Specific Character Set applies, cannot be decoded reliably, since PS3.3 Table C.12-1 makes Specific Character Set "Required if an expanded or replacement character set is used" and nothing says which was used. The maintainer decided on 1 October 2026 that such text sequesters its instance only where the text would be kept or cleaned; where it is removed or replaced, the instance is de-identified, as for other content that cannot be decoded (Architecture item 2, D-027). The residual search reads such text as ISO 8859-1, in which every byte is a character (Architecture item 5). **Clarification, 2 October 2026.** The maintainer clarified that "the instance is de-identified" means that the transformation proceeds, not that the output may be released: a value read only as ISO 8859-1 is incomplete coverage for the residual search, and the release gate withholds the file or sends it to QC review by the value's kind (D-027 sets out the examples). The same day the maintainer added the other IODs that RT exports carry to the target coverage, each to be supported with its own evidence; Encapsulated PDF is supported, which adds one IOD. An Encapsulated PDF holds a document, such as a treatment summary, a plan report, or a scanned form, in Encapsulated Document (0042,0011), and PS3.3 treats the patient's identification and dates as text in it as burned-in annotation (PS3.3 Table C.24-2). Its attributes were reviewed against the IODs above (D-022), and its Encapsulated Document Series Module adds none. Its Encapsulated Document Module adds Document Title (0042,0010), which can be copied from the PDF's own Title entry, so it is removed by Type, which empties it, and cleaned as a descriptor under Clean Descriptors; MIME Type of Encapsulated Document (0042,0012), which the IOD fixes as application/pdf, and List of MIME Types (0042,0014), which name formats and are kept; Encapsulated Document Length (0042,0015) and Document Class Code Sequence (0040,E008), which take the default; and Relative URI Reference Within Encapsulated Document (0068,7005), which is removed by Type. Its SC Equipment Module describes the equipment that captured or converted the document: Secondary Capture Device ID (0018,1010), which Table E.1-1 removes and keeps under Retain Device Identity, and its manufacturer, model, and software versions, which can be a site's own system and are removed and kept under Retain Device Identity in the same way; and the formats it acquired, which are kept. Table E.1-1 gives the document D under every option, and no reviewed rule gives a document a dummy value, so every Encapsulated PDF that holds one is sequestered, under every policy, with that attribute and D as its reason, and nothing of it is written (Architecture item 7). Its Content Sequence (0040,A730), Type 3 at the top level, whose items are content items as in a report, is given D by the Basic Profile and has no dummy value, so it sequesters the instance too, as it does a report (D-021), except under Clean Structured Content, which cleans it. The other encapsulated documents, Encapsulated CDA, STL, OBJ, and MTL, are not supported.
+ - **Rationale.** Keeping the coded pixel data, rather than decoding and re-encoding them, changes no pixel value and degrades no lossy data further, while decoding every frame lets the engine check what it releases and show it in the QC previews. The Basic Profile gives Content Sequence D, and E.3.4 Note 2 warns of significant risk in de-identifying Structured Reports without the Clean Structured Content Option. Presentation States can carry graphic and text annotations (MIDI §1.22.3). De-identification of Private SOP Classes is not defined (E.1.1, Note 6 after Table E.1-1a). Supporting every Storage SOP Class of a supported IOD, including CT Image Storage - For Processing, is consistent with deciding support by IOD, and the benchmark data should include such instances. Text decoded with the wrong character set would defeat descriptor matching (D-009), the check of a source value against the dummy value (D-021), and the residual search (D-027). Text with bytes outside the Default Character Repertoire that no Specific Character Set applies to is handled as other content that cannot be decoded is, for consistency: removing or replacing it writes nothing of it into the output, whereas keeping or cleaning it would write or match text whose characters are unknown. The residual search still finds a copy of such text left in the output, because it encodes each source value again in several character sets, including ISO 8859-1, which gives the text's own bytes back; like every form of fewer than four characters, a shorter one is listed as not searched instead (D-027), so a copy of it is not found.
+ - **Tests.** Each type is sequestered and reported, and never written to the release output. The Storage SOP Classes of the first release's 60 IODs, including the For Processing SOP Classes, both Segmentation SOP Classes, and Surface Segmentation Storage, are supported in each supported transfer syntax, the volumetric, advanced blending, and waveform Presentation States are not, protocol objects, height map segmentations, spatial fiducials, the second-generation RT IODs not yet supported, such as RT Physician Intent and the radiation records, nuclear medicine and ultrasound images, and the other Structured Reports, among them Simplified Adult Echo SR and Acquisition Context SR, and the encapsulated documents other than PDF, are not, and each other kind of SOP Class, and each other transfer syntax, is classified with its reason. Each Structured Report IOD that the release does not support, and Rendition Selection Document, which has no Storage SOP Class, uses no attribute that the reviewed IODs do not. Under every policy, the synthetic collection's spatial registration of its MR image and deformable registration of its PET image, where released, name the collection's one frame of reference and their images by the replacements that the written instances carry, its RT Image, where released, names the written plan, its RT Ion Beams Treatment Record, where released, names the written RT Ion Plan, which, where released, names the written structure set, RT Dose, and RT Plan, and its RT Brachy Treatment Record, where released, names the written RT Plan and RT Beams Treatment Record, its RT Treatment Summary Record the written RT Plan and RT Brachy Treatment Record, its Enhanced RT Image and Enhanced Continuous RT Image, where released, the written plan, its RT Beams Delivery Instruction, where released, the written RT Plan, RT Beams Treatment Record, and RT Image, its RT Brachy Application Setup Delivery Instruction the written RT Plan, by its study, series, and instance, its RT Radiation Set Delivery Instruction the written RT Radiation Set and C-Arm Photon-Electron Radiation, its `BINARY` and `LABELMAP` Segmentations, where released, name the written CT series and slice, its Surface Segmentation, where released, names the written CT series and slice, and its Parametric Map and Real World Value Mapping, where released, name the written MR Image and PET Image. Under Clean Recognizable Visual Features, a Surface Segmentation, or any instance with a Surface Sequence, is held as `no-face-verdict` whatever its series' verdict. Every Parametric Map is listed as able to show a face, whatever its Number of Frames, and a Real World Value Mapping to a standardised uptake value as possibly disclosing body weight. Compressed instances of a synthetic collection, with identifying text planted in their codestreams' metadata segments, are released with their transfer syntax and pixels kept and none of that text. An instance whose Specific Character Set cannot be read is sequestered with that reason; a data set whose Specific Character Set is not supported, or is invalid, is read in the Default Character Repertoire, its text in ISO 646 collected and its removed text outside ISO 646 read as ISO 8859-1; and `ISO_IR 6` alone is read as the Default Character Repertoire. Text with bytes outside the Default Character Repertoire, in a data set or in an item to which no Specific Character Set applies, sequesters its instance where the text would be kept or cleaned; where it is removed or replaced, the transformation proceeds, the release gate withholds the file where the text is a person name and sends it to QC review where it is a description, and a copy of the text's bytes of at least four characters left in the output, such as in a private element, is found by the residual search, while a shorter one is listed as not searched. Under every preset, every set of the options that the presets select that a custom policy accepts (96, Clean Recognizable Visual Features among the options), and each other option that the engine applies, taken alone, an Encapsulated PDF that shows identifying text on its page, names its author in its document information dictionary, and carries a name in its Document Title is sequestered at Encapsulated Document with D alone, and a run releases the rest of its collection and writes none of that text, nor the patient's identity, to the release or the command's output.
+ 
+diff --git a/lib/pymedphys/docs/contrib/info/workflows.md b/lib/pymedphys/docs/contrib/info/workflows.md
+index a994c6c0b3..7f4d952055 100644
+--- a/lib/pymedphys/docs/contrib/info/workflows.md
++++ b/lib/pymedphys/docs/contrib/info/workflows.md
+@@ -29,6 +29,7 @@ Manual run -> face-validation.yml
+ Manual run -> face-validation-visible-human.yml
+ Manual run -> face-validation-keating.yml
+ Manual run -> face-validation-pddca.yml
++Manual run -> parametric-map-check-idc.yml
+ Manual run -> pixel-text-validation.yml
+ Manual run -> text-detection-model-pins.yml
+ Manual run -> text-detector-evaluation.yml
+@@ -709,6 +710,32 @@ organ masks of the PDDCA 1.4.1 data set, re-hosted on Zenodo in three parts
+   patients, so the data set is never cached or uploaded, and nothing else read
+   from it leaves the runner
+ 
++#### `parametric-map-check-idc.yml`
++
++Runs the Clean Pixel Data and Clean Recognizable Visual Features Options on
++the 691 floating-point Parametric Maps of the `tcga_gbm360` analysis results
++in NCI's Imaging Data Commons (collection TCGA-GBM, CC BY 4.0), and counts
++what each does.
++
++- **Triggers**: manually only
++- **Steps**: installs the project with the `user` and `text-detection`
++  extras and the pinned pyarrow and s5cmd of
++  `.github/text-evaluation/requirements.txt`, downloads the pinned wheel of
++  idc-index-data and checks its SHA-256, runs
++  `python -m pymedphys._dicom.deidentify.parametric_map_check select`, which
++  refuses the index unless its Parametric Maps are those 691 under that
++  licence and DOI, downloads them from IDC's public bucket with s5cmd, and
++  runs `python -m pymedphys._dicom.deidentify.parametric_map_check check`,
++  which refuses them unless the SHA-256 of their files' SHA-256s is the one
++  it pins, both through `.github/scripts/run_redacted.py`. Its job can only
++  read the repository
++- **Results**: the job summary shows `parametric-map-check.md`, and the
++  `parametric-map-check-idc-results` artefact, kept for 90 days, holds it
++  with `parametric-map-check.json` and `commit.txt`. They hold only counts,
++  codes, digests, versions, the text finder's method, and the data set's
++  public identifiers. The maps are of real patients, so they are never
++  cached or uploaded, and nothing else read from them leaves the runner
++
+ #### `pixel-text-validation.yml`
+ 
+ Counts the regions that the text detector of the Clean Pixel Data Option finds
+diff --git a/lib/pymedphys/tests/dicom/test_deidentify_parametric_map_check.py b/lib/pymedphys/tests/dicom/test_deidentify_parametric_map_check.py
+new file mode 100644
+index 0000000000..a625de96f0
+--- /dev/null
++++ b/lib/pymedphys/tests/dicom/test_deidentify_parametric_map_check.py
+@@ -0,0 +1,245 @@
++# Copyright (C) 2026 Matthew Jennings
++
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++
++#     http://www.apache.org/licenses/LICENSE-2.0
++
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++"""The check of the pixel options on IDC's public floating-point Parametric
++Maps, on synthetic maps: its selection, its pins, its counts, and that it
++writes nothing that names a file."""
++
++import hashlib
++import io
++import json
++
++from pymedphys._imports import numpy as np
++from pymedphys._imports import pydicom, pytest
++
++from pymedphys._dicom.deidentify import parametric_map_check as check_module
++from pymedphys._dicom.deidentify.parametric_map_check import (
++    CheckRefused,
++    MapSeries,
++    check,
++    files_sha256,
++    main,
++    manifest,
++    markdown,
++    select,
++)
++from pymedphys._dicom.deidentify.text_detection import TextBox
++
++from .test_deidentify_parametric_map_scope import _float_parametric_map
++
++UUIDS = (
++    "0b8f3a52-1c2d-4e5f-8a9b-0c1d2e3f4a5b",
++    "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
++)
++
++
++def _row(uuid=UUIDS[0], **changes):
++    row = {
++        "collection_id": "tcga_gbm",
++        "analysis_result_id": "tcga_gbm360",
++        "crdc_series_uuid": uuid,
++        "SOPClassUID": "1.2.840.10008.5.1.4.1.1.30",
++        "license_short_name": "CC-BY-4.0",
++        "source_DOI": "10.5281/zenodo.17470190",
++        "series_aws_url": f"s3://idc-open-data/{uuid}/*",
++        "instanceCount": 1,
++    }
++    row.update(changes)
++    return row
++
++
++OTHER = _row(
++    "c1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", SOPClassUID="1.2.3", collection_id="x"
++)
++
++
++def test_the_index_s_parametric_maps_are_selected_in_order_of_their_identifiers():
++    rows = [_row(UUIDS[1]), OTHER, _row(UUIDS[0])]
++
++    selected = select(rows, series=2)
++
++    assert selected == tuple(
++        MapSeries(uuid, f"s3://idc-open-data/{uuid}/*") for uuid in UUIDS
++    )
++    assert manifest(selected, "data/maps/") == "".join(
++        f"cp 's3://idc-open-data/{uuid}/*' 'data/maps/{uuid}/'\n" for uuid in UUIDS
++    )
++
++
++@pytest.mark.parametrize(
++    "changes",
++    [
++        {"analysis_result_id": "other"},
++        {"collection_id": "other"},
++        {"license_short_name": "CC BY-NC 4.0"},
++        {"source_DOI": "10.5281/zenodo.1"},
++        {"instanceCount": 2},
++        {
++            "series_aws_url": "s3://another-bucket/0b8f3a52-1c2d-4e5f-8a9b-0c1d2e3f4a5b/*"
++        },
++        {"series_aws_url": "s3://idc-open-data/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d/*"},
++        {"crdc_series_uuid": "not-a-uuid"},
++    ],
++    ids=[
++        "analysis",
++        "collection",
++        "licence",
++        "doi",
++        "instances",
++        "bucket",
++        "folder",
++        "identifier",
++    ],
++)
++def test_a_parametric_map_unlike_the_pinned_ones_refuses_the_selection(changes):
++    with pytest.raises(CheckRefused):
++        select([_row(**changes)], series=1)
++
++
++@pytest.mark.parametrize(
++    "rows", [[_row()], [_row(), _row(), _row(UUIDS[1])]], ids=["fewer", "twice"]
++)
++def test_a_selection_of_another_number_of_maps_is_refused(rows):
++    with pytest.raises(CheckRefused):
++        select(rows, series=2)
++
++
++def test_a_destination_that_is_not_a_plain_path_is_refused():
++    with pytest.raises(CheckRefused):
++        manifest(select([_row()], series=1), "data'; rm -rf /")
++
++
++class Finder:
++    """Finds a box in each frame with a value other than 0."""
++
++    method = {"model": "stub"}
++
++    def find(self, frame):
++        return (TextBox(0, 0, 1, 2),) if np.any(frame) else ()
++
++
++def _maps(folder, count=3):
++    """``count`` synthetic floating-point Parametric Maps, each in a folder
++    of its own, as the manifest places them; their files' digest."""
++    paths = []
++    for index in range(count):
++        dataset = pydicom.dcmread(io.BytesIO(_float_parametric_map(index % 2 == 1)))
++        dataset.SOPInstanceUID = f"1.2.826.0.1.3680043.10.1427.{index + 1}"
++        if index == 2:
++            # The third map's values are all 0, so the finder finds no text.
++            dataset.FloatPixelData = bytes(len(dataset.FloatPixelData))
++        stream = io.BytesIO()
++        pydicom.dcmwrite(stream, dataset, enforce_file_format=True)
++        path = folder / f"series-{index}" / "instance.dcm"
++        path.parent.mkdir(parents=True)
++        path.write_bytes(stream.getvalue())
++        paths.append(path)
++    return paths, files_sha256(sorted(paths))[0]
++
++
++@pytest.mark.pydicom
++def test_each_map_is_cleaned_previewed_and_released_and_counted(tmp_path):
++    paths, digest = _maps(tmp_path / "maps")
++
++    summary = check(
++        tmp_path / "maps",
++        Finder(),
++        series=3,
++        sha256=digest,
++    )
++
++    assert summary["format"] == "pymedphys-deid-parametric-map-check/1"
++    assert summary["data"]["files"] == 3
++    assert summary["data"]["bytes"] == sum(path.stat().st_size for path in paths)
++    assert summary["pixel_data_elements"] == {
++        "DoubleFloatPixelData": 1,
++        "FloatPixelData": 2,
++    }
++    cleaned = summary["clean_pixel_data"]
++    assert cleaned["outcome: text-blacked-out"] == 2
++    assert cleaned["outcome: no-text-found"] == 1
++    assert cleaned["written in the element that held it, same data type and shape"] == 3
++    assert cleaned["pixels changed"] == 2 and cleaned["pixels unchanged"] == 1
++    # A box in each of a map's two frames.
++    assert cleaned["regions_per_file"]["0"] == 1
++    assert cleaned["regions_per_file"]["2"] == 2
++    reviewed = summary["clean_recognizable_visual_features"]
++    assert reviewed["held without a verdict"] == 3
++    assert reviewed["previewed"] == reviewed["shown whole"] == 3
++    released = "released on a face verdict of absent, Recognizable Visual Features NO"
++    assert reviewed[released] == 3
++    assert reviewed["not_previewed"] == {}
++    assert not summary["crashed"]
++    assert summary["finder"] == {"model": "stub"}
++
++
++@pytest.mark.pydicom
++def test_files_other_than_the_pinned_ones_are_refused(tmp_path):
++    _, digest = _maps(tmp_path / "maps", count=2)
++
++    with pytest.raises(CheckRefused, match="pinned number"):
++        check(tmp_path / "maps", Finder(), series=3, sha256=digest)
++    with pytest.raises(CheckRefused, match="not the pinned ones"):
++        check(tmp_path / "maps", Finder(), series=2, sha256="0" * 64)
++
++
++def test_the_files_digest_is_of_their_sorted_digests(tmp_path):
++    first, second = tmp_path / "a", tmp_path / "b"
++    first.write_bytes(b"one")
++    second.write_bytes(b"two")
++    digests = sorted(hashlib.sha256(data).hexdigest() for data in (b"one", b"two"))
++
++    assert files_sha256([second, first]) == (
++        hashlib.sha256("".join(f"{each}\n" for each in digests).encode()).hexdigest(),
++        6,
++    )
++
++
++@pytest.mark.pydicom
++def test_the_command_writes_counts_that_name_no_file(tmp_path, monkeypatch, capsys):
++    paths, digest = _maps(tmp_path / "maps")
++    monkeypatch.setattr(check_module, "SERIES", 3)
++    monkeypatch.setattr(check_module, "FILES_SHA256", digest)
++    monkeypatch.setattr(check_module, "check", _pinned(check_module.check, digest))
++    monkeypatch.setattr(check_module, "_detector", Finder)
++
++    assert main(["check", str(tmp_path / "maps"), "--out", str(tmp_path / "out")]) == 0
++
++    page = (tmp_path / "out" / "parametric-map-check.md").read_text(encoding="utf-8")
++    text = (tmp_path / "out" / "parametric-map-check.json").read_text(encoding="utf-8")
++    assert capsys.readouterr().out == page
++    assert json.loads(text)["data"]["files"] == 3
++    assert page == markdown(json.loads(text))
++    for path in paths:
++        dataset = pydicom.dcmread(path)
++        for value in (
++            dataset.SOPInstanceUID,
++            dataset.StudyInstanceUID,
++            dataset.SeriesInstanceUID,
++            str(path),
++            path.parent.name,
++        ):
++            assert value not in page and value not in text
++
++
++def _pinned(function, digest):
++    def pinned(folder, finder, **kwargs):
++        return function(folder, finder, series=3, sha256=digest, **kwargs)
++
++    return pinned
++
++
++def test_the_command_refuses_an_existing_output(tmp_path):
++    with pytest.raises(SystemExit, match="must not exist"):
++        main(["check", str(tmp_path), "--out", str(tmp_path)])

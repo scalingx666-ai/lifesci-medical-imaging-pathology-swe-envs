@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/nroduit__Weasis-974"
+description = "build: bump the maven group with 31 updates"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "Weasis",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "nroduit/Weasis"
+ref = "7b0154a65126487c6bc26084b212e35f73537c58"
+reference = "https://github.com/nroduit/Weasis/pull/974"
+source_access = "auto"
+built_at = "2026-11-14T07:06:21.955019+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:fb771fdfbc81e80ca64455b1a1793665b96cb3253d74051227507aaa81ad8873"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-11T07:44:37Z"
+diff_format = "unified"
+context_files = [
+    "weasis-parent/pom.xml",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 52
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

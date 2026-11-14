@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/vkgo__OCRAutoScore-17"
+description = "Ensure single character recognition model respects device availability"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "OCRAutoScore",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "vkgo/OCRAutoScore"
+ref = "e6c1d71161eaf84551c5f17ee2f88d1977983509"
+reference = "https://github.com/vkgo/OCRAutoScore/pull/17"
+source_access = "auto"
+built_at = "2026-11-14T07:10:38.399214+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:07cc7b5bfaf2f23ef78b63a2f8460fc33c382399d48d94191ade63f3f10301c8"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2025-09-16T05:15:16Z"
+diff_format = "unified"
+context_files = [
+    "scoreblocks/singleCharacterRecognition.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 6
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

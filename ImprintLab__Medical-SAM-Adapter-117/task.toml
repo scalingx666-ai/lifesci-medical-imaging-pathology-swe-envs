@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/ImprintLab__Medical-SAM-Adapter-117"
+description = "Allow visualization of bounding boxes"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "Medical-SAM-Adapter",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "ImprintLab/Medical-SAM-Adapter"
+ref = "bad4500940acdaefba5e52aac1b18697617c6c0c"
+reference = "https://github.com/ImprintLab/Medical-SAM-Adapter/pull/117"
+source_access = "auto"
+built_at = "2026-11-14T07:06:45.127596+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:e7b93b5c4c052ba2a7b01b10d03ec34f34335e0cc7d2768c1e154f9b5aee2057"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2024-06-21T08:52:27Z"
+diff_format = "unified"
+context_files = [
+    "utils.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 12
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

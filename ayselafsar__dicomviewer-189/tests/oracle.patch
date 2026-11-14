@@ -1,0 +1,164 @@
+diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
+index b999000..446bde1 100644
+--- a/.github/workflows/build.yml
++++ b/.github/workflows/build.yml
+@@ -9,6 +9,7 @@ on:
+ 
+ env:
+   APP_NAME: dicomviewer
++  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+ 
+ jobs:
+   build:
+@@ -24,10 +25,13 @@ jobs:
+     name: php${{ matrix.php-versions }}-${{ matrix.server-versions }}
+ 
+     steps:
+-      - name: Use Node 20
++      - name: Use Node 24
+         uses: actions/setup-node@v4
+         with:
+-          node-version: 20
++          node-version: 24
++
++      - name: Enable pnpm through Corepack
++        run: corepack enable pnpm
+ 
+       - name: Checkout server
+         uses: actions/checkout@v4
+diff --git a/.github/workflows/lint.yml b/.github/workflows/lint.yml
+index d8d6324..085de99 100644
+--- a/.github/workflows/lint.yml
++++ b/.github/workflows/lint.yml
+@@ -17,13 +17,13 @@ jobs:
+       - name: Checkout
+         uses: actions/checkout@v2
+ 
+-      - name: Set up Node 20
++      - name: Set up Node 24
+         uses: actions/setup-node@v4
+         with:
+-          node-version: 20
++          node-version: 24
+ 
+       - name: Install dependencies
+-        run: npm install
++        run: npm ci
+ 
+       - name: Lint
+-        run: npm run lint
+\ No newline at end of file
++        run: npm run lint
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index d614f05..28fa6b5 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -13,12 +13,16 @@ jobs:
+     environment: release
+     env:
+       APP_ID: dicomviewer
++      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+     runs-on: ubuntu-latest
+     steps:
+-      - name: Use Node 20
++      - name: Use Node 24
+         uses: actions/setup-node@v4
+         with:
+-          node-version: 20
++          node-version: 24
++
++      - name: Enable pnpm through Corepack
++        run: corepack enable pnpm
+ 
+       - name: Setup PHP
+         uses: shivammathur/setup-php@v2
+diff --git a/Makefile b/Makefile
+index 2a72f35..c114008 100644
+--- a/Makefile
++++ b/Makefile
+@@ -6,7 +6,7 @@ appstore_sign_dir=/tmp/sign
+ cert_dir=$(HOME)/.nextcloud/certificates
+ 
+ build:
+-	npm install
++	npm ci
+ 	npm run build
+ 
+ appstore: build
+diff --git a/README.md b/README.md
+index 8184a7f..c6cfc0d 100644
+--- a/README.md
++++ b/README.md
+@@ -39,8 +39,8 @@ GitHub issues.
+ 
+ #### Pre-requisites
+ 
+-- [NodeJS 20+](https://nodejs.org)
+-- [Yarn](https://yarnpkg.com/lang/en/docs/install/)
++- [Node.js 24 LTS](https://nodejs.org)
++- [pnpm](https://pnpm.io/) enabled through Corepack
+ - [Nextcloud Server 28+](https://nextcloud.com/install/#instructions-server)
+   * Docker options including docker-compose is [here](https://github.com/nextcloud/docker) and Docker images are [here](https://hub.docker.com/_/nextcloud/)
+   * You can easily find VM and other options [here](https://nextcloud.com)
+@@ -63,16 +63,16 @@ git clone https://github.com/ayselafsar/dicomviewer.git
+ git submodule update --init --recursive
+ ```
+ 
+-4. Enable yarn workspaces
++4. Enable pnpm through Corepack
+ 
+ ```
+-yarn config set workspaces-experimental true
++corepack enable pnpm
+ ```
+ 
+ 5. Build the project
+ 
+ ```
+-npm install
++npm ci
+ npm run build
+ ```
+ 
+diff --git a/acanio-viewer b/acanio-viewer
+index ef74e41..bfa8291 160000
+--- a/acanio-viewer
++++ b/acanio-viewer
+@@ -1 +1 @@
+-Subproject commit ef74e4172aea612684838c4a204027b07ebac326
++Subproject commit bfa82917b2e28d9f8b74c7cbce73504f867f41d4
+diff --git a/package-lock.json b/package-lock.json
+index 1585f1c..132e96a 100755
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -38,7 +38,7 @@
+         "terser-webpack-plugin": "^5.6.1"
+       },
+       "engines": {
+-        "node": ">=20.0.0",
++        "node": ">=24.0.0",
+         "npm": ">=9.0.0"
+       }
+     },
+diff --git a/package.json b/package.json
+index 1bb1104..c74f71d 100755
+--- a/package.json
++++ b/package.json
+@@ -4,7 +4,7 @@
+   "description": "Place this app in **nextcloud/apps/**",
+   "scripts": {
+     "prebuild": "rm -rf js && npm run build:viewer",
+-    "build:viewer": "cd acanio-viewer && yarn install && yarn build:nextcloud",
++    "build:viewer": "cd acanio-viewer && pnpm install --frozen-lockfile && pnpm build:nextcloud",
+     "build": "webpack --node-env production --progress",
+     "dev": "webpack --node-env development --progress",
+     "watch": "webpack --node-env development --progress --watch",
+@@ -36,7 +36,7 @@
+     "extends @nextcloud/browserslist-config"
+   ],
+   "engines": {
+-    "node": ">=20.0.0",
++    "node": ">=24.0.0",
+     "npm": ">=9.0.0"
+   },
+   "devDependencies": {

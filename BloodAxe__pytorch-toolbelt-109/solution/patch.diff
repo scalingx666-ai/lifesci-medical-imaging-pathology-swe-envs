@@ -1,0 +1,13 @@
+diff --git a/pytorch_toolbelt/utils/torch_utils.py b/pytorch_toolbelt/utils/torch_utils.py
+index 9311cfe35..433dcf5b9 100644
+--- a/pytorch_toolbelt/utils/torch_utils.py
++++ b/pytorch_toolbelt/utils/torch_utils.py
+@@ -179,7 +179,7 @@ def to_tensor(x, dtype=None) -> torch.Tensor:
+             x = x.type(dtype)
+         return x
+     if isinstance(x, (list, tuple)):
+-        x = np.ndarray(x)
++        x = np.array(x)
+         x = torch.from_numpy(x)
+         if dtype is not None:
+             x = x.type(dtype)

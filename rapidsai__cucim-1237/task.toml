@@ -1,0 +1,68 @@
+version = "1.0"
+
+[task]
+name = "default/rapidsai__cucim-1237"
+description = "Forward-merge release/26.12 into main"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "cucim",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "rapidsai/cucim"
+ref = "b7fa698916c73936723ad5a2d5177ddf37efdae4"
+reference = "https://github.com/rapidsai/cucim/pull/1237"
+source_access = "auto"
+built_at = "2026-11-14T07:10:38.500886+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:be33d969a88efc56b6df1d53a4ac71dd403110a73fe9100601affc726070c6f5"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-14T01:17:20Z"
+diff_format = "unified"
+context_files = [
+    "conda/environments/all_cuda-129_arch-aarch64.yaml",
+    "conda/environments/all_cuda-129_arch-x86_64.yaml",
+    "conda/environments/all_cuda-134_arch-aarch64.yaml",
+    "conda/environments/all_cuda-134_arch-x86_64.yaml",
+    "conda/recipes/cucim/conda_build_config.yaml",
+    "conda/recipes/libcucim/conda_build_config.yaml",
+    "dependencies.yaml",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 14
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

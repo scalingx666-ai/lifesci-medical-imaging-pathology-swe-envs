@@ -1,0 +1,13 @@
+diff --git a/medicaltorch/models.py b/medicaltorch/models.py
+index 7497184..67d5f25 100644
+--- a/medicaltorch/models.py
++++ b/medicaltorch/models.py
+@@ -168,7 +168,7 @@ def forward(self, x):
+         amort = self.amort_drop(amort)
+ 
+         predictions = self.prediction(amort)
+-        predictions = F.sigmoid(predictions)
++        predictions = torch.sigmoid(predictions)
+ 
+         return predictions
+ 

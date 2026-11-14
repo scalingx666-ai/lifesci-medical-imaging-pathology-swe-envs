@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/AIM-Harvard__pyradiomics-923"
+description = "Build(deps): Bump codecov/codecov-action from 5.4.2 to 5.4.3 in the actions group"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "pyradiomics",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "AIM-Harvard/pyradiomics"
+ref = "7a5fea79ebea06670f547ec39ed9f81813e5a5b0"
+reference = "https://github.com/AIM-Harvard/pyradiomics/pull/923"
+source_access = "auto"
+built_at = "2026-11-14T07:06:23.078751+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:702ab4c3d7248f9aab8db49851bf4b57bc8aab467637e9a7bf4eea8104cde8cb"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2025-05-20T14:49:03Z"
+diff_format = "unified"
+context_files = [
+    ".github/workflows/ci.yml",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 2
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,68 @@
+version = "1.0"
+
+[task]
+name = "default/ahmetozlu__signature_extractor-4"
+description = "Re-formatting the code and adding docstrings to the functions"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "signature_extractor",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "ahmetozlu/signature_extractor"
+ref = "626709e2e85859ed514134292929a46ce88cb3dd"
+reference = "https://github.com/ahmetozlu/signature_extractor/pull/4"
+source_access = "auto"
+built_at = "2026-11-14T07:10:20.547612+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:3297fec6f5cde3bd8b88e74e7d142b66b0aec80908449fc6405535162239035b"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2019-07-31T16:18:47Z"
+diff_format = "unified"
+context_files = [
+    "sample_project/color_correlation.py",
+    "sample_project/dewapper.py",
+    "sample_project/main.py",
+    "sample_project/signature_extractor.py",
+    "sample_project/unsharpen.py",
+    "sample_project/utils/transform.py",
+    "signature_extractor.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 573
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

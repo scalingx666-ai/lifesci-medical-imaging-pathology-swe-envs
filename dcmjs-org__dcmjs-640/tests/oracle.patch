@@ -1,0 +1,44 @@
+diff --git a/packages/legacy/src/AsyncDicomReader.js b/packages/legacy/src/AsyncDicomReader.js
+index e731ddb6..18172542 100644
+--- a/packages/legacy/src/AsyncDicomReader.js
++++ b/packages/legacy/src/AsyncDicomReader.js
+@@ -287,7 +287,7 @@ export class AsyncDicomReader {
+             }
+             if (tagObj.group() === 0 || tag === TagHex.DataSetTrailingPadding) {
+                 // Group length
+-                stream.increment(tagObj.length);
++                stream.increment(length);
+                 continue;
+             }
+             const addTagResult = listener.addTag(tag, tagInfo);
+diff --git a/test/issues/pr597-async-reader-skip.test.js b/test/issues/pr597-async-reader-skip.test.js
+new file mode 100644
+index 00000000..d66bab6d
+--- /dev/null
++++ b/test/issues/pr597-async-reader-skip.test.js
+@@ -0,0 +1,25 @@
++/**
++ * PR #597: https://github.com/dcmjs-org/dcmjs/pull/597
++ *   AsyncDicomReader skipped a command group (0000,xxxx) element with
++ *   stream.increment(tagObj.length); Tag has no length, so the offset
++ *   became NaN and the read stopped silently, dropping all later tags.
++ */
++import dcmjs from "../../src/index.js";
++import { createSampleDicom } from "../helper/sampleDicomPart10.js";
++import { TagHex } from "../../src/constants/dicom.js";
++
++const { AsyncDicomReader } = dcmjs.async;
++
++it("async reader skips a command group element and reads the tags after it", async () => {
++    const buffer = createSampleDicom({
++        dict: { "00000002": { vr: "UI", Value: ["1.2.3"] } }
++    });
++    const reader = new AsyncDicomReader();
++    reader.stream.addBuffer(buffer);
++    reader.stream.setComplete();
++    const { dict } = await reader.readFile();
++
++    expect(dict["00000002"]).toBeUndefined();
++    expect(dict[TagHex.Rows]).toBeDefined();
++    expect(dict[TagHex.PixelData]).toBeDefined();
++});

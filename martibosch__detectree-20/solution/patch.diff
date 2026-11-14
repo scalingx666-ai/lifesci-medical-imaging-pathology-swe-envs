@@ -1,0 +1,13 @@
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 470212a..f3d8f3d 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -71,7 +71,7 @@ jobs:
+           tag: ${{ github.ref_name }}
+ 
+       - name: create Release
+-        uses: ncipollo/release-action@v1.12.0
++        uses: ncipollo/release-action@v1.14.0
+         with:
+           allowUpdates: true
+           draft: false

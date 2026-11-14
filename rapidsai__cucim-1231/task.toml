@@ -1,0 +1,66 @@
+version = "1.0"
+
+[task]
+name = "default/rapidsai__cucim-1231"
+description = "Update to 27.02"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "cucim",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "rapidsai/cucim"
+ref = "12e69a22e459979a52225bdb31254378c7f16417"
+reference = "https://github.com/rapidsai/cucim/pull/1231"
+source_access = "auto"
+built_at = "2026-11-14T07:10:46.884148+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:ed477eff8d54b050bef97785925a06547fd52e2f9baa5ef19b629f1b50bdd23c"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-11T00:29:39Z"
+diff_format = "unified"
+context_files = [
+    ".github/workflows/build.yaml",
+    ".github/workflows/pr.yaml",
+    "VERSION",
+    "cucim.code-workspace",
+    "dependencies.yaml",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 18
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,9 @@
+diff --git a/segmentation_models/__version__.py b/segmentation_models/__version__.py
+index 96bfa14f..c52547de 100644
+--- a/segmentation_models/__version__.py
++++ b/segmentation_models/__version__.py
+@@ -1,3 +1,3 @@
+-VERSION = (1, 0, 0)
++VERSION = (1, 0, 1)
+ 
+ __version__ = '.'.join(map(str, VERSION))

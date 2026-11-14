@@ -1,0 +1,13 @@
+diff --git a/components/formats-bsd/pom.xml b/components/formats-bsd/pom.xml
+index 8e39d4439d6..5e4dda2bc7c 100644
+--- a/components/formats-bsd/pom.xml
++++ b/components/formats-bsd/pom.xml
+@@ -113,7 +113,7 @@
+     <dependency>
+       <groupId>org.json</groupId>
+       <artifactId>json</artifactId>
+-      <version>20231013</version>
++      <version>20260719</version>
+     </dependency>
+ 
+ 

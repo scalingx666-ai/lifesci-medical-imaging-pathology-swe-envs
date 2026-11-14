@@ -1,0 +1,423 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 0f7d332a..794675e3 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,10 @@
+ 
+ ## [Unreleased]
+ 
++## [6.3.0] - 2026-11-10
++
++**Re-check one review suggestion:** before 6.3.0, `/peer-review` and `/self-review` (probe AO2) suggested rewording an unsupported "outperforms" as "comparable to". A non-significant difference is not evidence of similarity, so a review or manuscript drafted with an earlier version that carries that wording should report the difference with its CI instead, and keep "comparable" for a pre-specified margin.
++
+ ### Fixed
+ 
+ - **`/peer-review`, `/self-review`: probe statements that pushed reviews the wrong way.**
+diff --git a/CITATION.cff b/CITATION.cff
+index 6bf22bf7..821c24c7 100644
+--- a/CITATION.cff
++++ b/CITATION.cff
+@@ -21,8 +21,8 @@ authors:
+ repository-code: "https://github.com/Aperivue/medsci-skills"
+ url: "https://github.com/Aperivue/medsci-skills"
+ license: MIT
+-version: "6.2.0"
+-date-released: "2026-11-01"
++version: "6.3.0"
++date-released: "2026-11-10"
+ doi: "10.5281/zenodo.20155321"
+ identifiers:
+   - description: "Concept DOI (always points to the latest version)"
+diff --git a/MIGRATION-v6.md b/MIGRATION-v6.md
+index 2db85223..67c9b975 100644
+--- a/MIGRATION-v6.md
++++ b/MIGRATION-v6.md
+@@ -70,7 +70,7 @@ it are gone (kept in the backup if you had changed that skill). Running it again
+ - **Claude Code plugin marketplace:** the marketplace follows the repository's `main` branch.
+   Auto-update for third-party marketplaces is off by default, so turn it on or run a manual plugin
+   update from `/plugin`. Plugins are managed by Claude Code, not by the MedSci Skills installer,
+-  so no backup is made. To stay on v6.2.0 rather than follow `main`, add the marketplace with that
++  so no backup is made. To stay on v6.3.0 rather than follow `main`, add the marketplace with that
+   tag; see [the plugin section](docs/install.md#claude-code-plugin-marketplace).
+ - **GitHub CLI (`gh skill`, a preview feature):** `gh skill update --all` updates the skills you
+   already have. The three new skills are not among them, so install each by name with the same
+diff --git a/README.ko.md b/README.ko.md
+index a0614fac..776a4c6f 100644
+--- a/README.ko.md
++++ b/README.ko.md
+@@ -2,9 +2,9 @@
+ 
+ # MedSci Skills
+ 
+-[English](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/README.md) | [简体中文](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/README.zh-CN.md) | 한국어
++[English](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/README.md) | [简体中文](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/README.zh-CN.md) | 한국어
+ 
+-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/LICENSE)
++[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/LICENSE)
+ [![Release](https://img.shields.io/github/v/release/Aperivue/medsci-skills?style=flat-square&color=blue)](https://github.com/Aperivue/medsci-skills/releases/latest)
+ ![Skills](https://img.shields.io/badge/Skills-54-brightgreen?style=flat-square)
+ [![npm](https://img.shields.io/npm/v/medsci-skills?style=flat-square&label=npm&color=cb3837)](https://www.npmjs.com/package/medsci-skills)
+@@ -16,7 +16,7 @@
+ 
+ </div>
+ 
+-> 이 문서는 영문 [README](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/README.md)를 짧게 요약한 한국어판입니다. 내용이 다르면 영문 README를 따릅니다.
++> 이 문서는 영문 [README](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/README.md)를 짧게 요약한 한국어판입니다. 내용이 다르면 영문 README를 따릅니다.
+ 
+ ## 무엇이고, 누구를 위한 것인가
+ 
+@@ -26,7 +26,7 @@ Claude Code, Codex, Cursor, GitHub Copilot에서 일하는 의사와 의생명·
+ 
+ ## 설치
+ 
+-**터미널 없이**(Windows, macOS): [classroom 설치 파일](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/install.md#classroom-installer-no-terminal)을 내려받아 압축을 풀고 안에 있는 설치 파일을 더블클릭하세요. 업데이트 알림도 함께 켜지고, 바탕화면에 **Update MedSci Skills** 아이콘이 생깁니다. Claude Code, Python, Node를 아직 설치하지 않았다면 Mac·Windows [설치 안내](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/setup/README.md)(영문)를 차례대로 따라 하면 됩니다.
++**터미널 없이**(Windows, macOS): [classroom 설치 파일](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/install.md#classroom-installer-no-terminal)을 내려받아 압축을 풀고 안에 있는 설치 파일을 더블클릭하세요. 업데이트 알림도 함께 켜지고, 바탕화면에 **Update MedSci Skills** 아이콘이 생깁니다. Claude Code, Python, Node를 아직 설치하지 않았다면 Mac·Windows [설치 안내](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/setup/README.md)(영문)를 차례대로 따라 하면 됩니다.
+ 
+ **터미널에서** 실행합니다(Node 18+와 Python 3.9+ 필요).
+ 
+@@ -38,7 +38,7 @@ npx medsci-skills install
+ agent를 다시 시작하고 `/orchestrate`를 입력한 뒤 하려는 일을 설명하면 알맞은 스킬로 연결해 줍니다.
+ 새 버전이 나올 때 알림을 받고 싶다면 `--enable-update-notify`를 붙이세요. Claude Code 세션을 시작할 때 한 줄 알림이 뜹니다. 기본값은 꺼짐이고 telemetry는 없습니다.
+ 
+-터미널 없이 쓰는 classroom 설치 파일, Claude Code plugin, GitHub CLI(`gh skill`), git clone 같은 다른 설치 방법과 업데이트 방법, 일부 스킬에 필요한 도구(pandoc, R, PyTorch)는 [docs/install.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/install.md)(영문)에 있습니다.
++터미널 없이 쓰는 classroom 설치 파일, Claude Code plugin, GitHub CLI(`gh skill`), git clone 같은 다른 설치 방법과 업데이트 방법, 일부 스킬에 필요한 도구(pandoc, R, PyTorch)는 [docs/install.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/install.md)(영문)에 있습니다.
+ 
+ ## 처음 써 볼 세 가지 워크플로
+ 
+@@ -48,17 +48,17 @@ agent를 다시 시작하고 `/orchestrate`를 입력한 뒤 하려는 일을 
+ - **`/analyze-stats`**: 비식별화한 데이터 파일(CSV, Excel, TSV)과 연구 질문을 받아 분석 계획을 먼저 확인받은 뒤, Python(또는 R) 코드를 실행해 표, figure, manifest를 만듭니다.
+ - **`/verify-refs`**: 참고문헌마다 PubMed, CrossRef, OpenAlex를 조회해 OK, MISMATCH, UNVERIFIED, FABRICATED로 표시하고 `qc/reference_audit.json`에 기록합니다. 보고만 하고 참고문헌을 고치지는 않습니다.
+ 
+-더 긴 흐름(투고 전 점검, 데이터에서 원고까지, systematic review)은 [docs/workflows.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/workflows.md)에, 공개 데이터셋으로 처음부터 끝까지 돌려 본 예제 다섯 개는 [docs/demos.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/demos.md)에 있습니다.
++더 긴 흐름(투고 전 점검, 데이터에서 원고까지, systematic review)은 [docs/workflows.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/workflows.md)에, 공개 데이터셋으로 처음부터 끝까지 돌려 본 예제 다섯 개는 [docs/demos.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/demos.md)에 있습니다.
+ 
+ ## 스킬 목록
+ 
+-54개 스킬 전체를 연구 단계별로 묶은 표는 영문 README의 [Skills 절](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/README.md#skills)에 있습니다. 스킬 이름마다 설명 페이지가 연결되어 있습니다. 터미널에서는 `npx medsci-skills list`로 같은 분류를 볼 수 있습니다. 어떤 스킬을 써야 할지 모르겠다면 `/orchestrate`부터 시작하세요.
++54개 스킬 전체를 연구 단계별로 묶은 표는 영문 README의 [Skills 절](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/README.md#skills)에 있습니다. 스킬 이름마다 설명 페이지가 연결되어 있습니다. 터미널에서는 `npx medsci-skills list`로 같은 분류를 볼 수 있습니다. 어떤 스킬을 써야 할지 모르겠다면 `/orchestrate`부터 시작하세요.
+ 
+-v6에서 이름이 바뀐 스킬(옛 이름은 v7 전까지 계속 동작): `imaging-data` ← `preprocess-imaging`, `profile-imaging`; `model-assessment` ← `explainability`, `model-evaluation`, `model-validation`, `uncertainty-imaging`; `model-selection` ← `architecture-zoo`, `model-sourcing`. v5에서 업그레이드한다면 [MIGRATION-v6.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/MIGRATION-v6.md)(영문)를 보세요.
++v6에서 이름이 바뀐 스킬(옛 이름은 v7 전까지 계속 동작): `imaging-data` ← `preprocess-imaging`, `profile-imaging`; `model-assessment` ← `explainability`, `model-evaluation`, `model-validation`, `uncertainty-imaging`; `model-selection` ← `architecture-zoo`, `model-sourcing`. v5에서 업그레이드한다면 [MIGRATION-v6.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/MIGRATION-v6.md)(영문)를 보세요.
+ 
+ ## 환자 데이터와 안전
+ 
+-식별 가능한 환자 데이터를 agent에 넘기지 마세요. `/deidentify`는 네트워크 연결이나 AI 호출 없이 로컬에서 실행됩니다. 정규식과 휴리스틱(12개국 locale pack)으로 protected health information(PHI)을 찾고, 사용자가 대화형으로 검토한 뒤 가명화합니다. `/analyze-stats`는 원자료 파일을 사용하기 전에 환자 식별정보가 들어 있는지 묻습니다. 이 스킬들은 연구 생산성 도구이지 clinical decision support가 아닙니다. 임상적으로 검증되지 않았고 전문가 검토를 대신하지 못하므로, 논문이나 임상 현장에서 사용하기 전에 자격을 갖춘 연구자가 모든 결과물을 확인해야 합니다. 93개의 deterministic detector는 정해진 항목(참고문헌 메타데이터, 산술, 체크리스트 항목, data leakage)을 다시 계산하거나 교차 확인합니다. 아무것도 걸리지 않았다는 것은 그 점검들이 문제를 찾지 못했다는 뜻일 뿐, 원고가 옳다는 뜻은 아닙니다. detector별 목록과 정식 평가 여부는 [MEDSCI_AUDIT.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/MEDSCI_AUDIT.md)에, 참고문헌 조회에 쓰는 API 키 없는 공개 API는 [docs/connectors.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/connectors.md)에 정리되어 있습니다.
++식별 가능한 환자 데이터를 agent에 넘기지 마세요. `/deidentify`는 네트워크 연결이나 AI 호출 없이 로컬에서 실행됩니다. 정규식과 휴리스틱(12개국 locale pack)으로 protected health information(PHI)을 찾고, 사용자가 대화형으로 검토한 뒤 가명화합니다. `/analyze-stats`는 원자료 파일을 사용하기 전에 환자 식별정보가 들어 있는지 묻습니다. 이 스킬들은 연구 생산성 도구이지 clinical decision support가 아닙니다. 임상적으로 검증되지 않았고 전문가 검토를 대신하지 못하므로, 논문이나 임상 현장에서 사용하기 전에 자격을 갖춘 연구자가 모든 결과물을 확인해야 합니다. 93개의 deterministic detector는 정해진 항목(참고문헌 메타데이터, 산술, 체크리스트 항목, data leakage)을 다시 계산하거나 교차 확인합니다. 아무것도 걸리지 않았다는 것은 그 점검들이 문제를 찾지 못했다는 뜻일 뿐, 원고가 옳다는 뜻은 아닙니다. detector별 목록과 정식 평가 여부는 [MEDSCI_AUDIT.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/MEDSCI_AUDIT.md)에, 참고문헌 조회에 쓰는 API 키 없는 공개 API는 [docs/connectors.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/connectors.md)에 정리되어 있습니다.
+ 
+ ## 인용
+ 
+@@ -90,13 +90,13 @@ BibTeX(소프트웨어 자체, 그리고 설계를 설명한 preprint):
+ }
+ ```
+ 
+-Zenodo concept DOI [10.5281/zenodo.20155321](https://doi.org/10.5281/zenodo.20155321)은 항상 최신 릴리스를 가리키고, [`CITATION.cff`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/CITATION.cff)에 기계가 읽을 수 있는 인용 정보가 있습니다.
++Zenodo concept DOI [10.5281/zenodo.20155321](https://doi.org/10.5281/zenodo.20155321)은 항상 최신 릴리스를 가리키고, [`CITATION.cff`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/CITATION.cff)에 기계가 읽을 수 있는 인용 정보가 있습니다.
+ 
+ ## 라이선스
+ 
+-MIT License입니다. [LICENSE](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/LICENSE)를 보세요.
+-함께 들어 있는 자료 중 일부는 이 프로젝트의 것이 아니고 MIT도 아닙니다. 공식 guideline 템플릿, CSL 인용 스타일, 몇몇 체크리스트 요약은 각자의 조건을 따르며, 여기에는 상업적 이용을 제한하는 CC BY-NC도 있습니다. 목록은 [THIRD-PARTY-NOTICES.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/THIRD-PARTY-NOTICES.md)에 있습니다.
+-reporting guideline 체크리스트는 원 출처의 조건을 유지합니다. 그중 몇 개는 공개 라이선스가 없어 원문 대신 직접 다시 쓴 요약으로만 넣었고, 항목별 기록은 [check-reporting의 LICENSES.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/skills/check-reporting/references/LICENSES.md)에 있습니다.
++MIT License입니다. [LICENSE](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/LICENSE)를 보세요.
++함께 들어 있는 자료 중 일부는 이 프로젝트의 것이 아니고 MIT도 아닙니다. 공식 guideline 템플릿, CSL 인용 스타일, 몇몇 체크리스트 요약은 각자의 조건을 따르며, 여기에는 상업적 이용을 제한하는 CC BY-NC도 있습니다. 목록은 [THIRD-PARTY-NOTICES.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/THIRD-PARTY-NOTICES.md)에 있습니다.
++reporting guideline 체크리스트는 원 출처의 조건을 유지합니다. 그중 몇 개는 공개 라이선스가 없어 원문 대신 직접 다시 쓴 요약으로만 넣었고, 항목별 기록은 [check-reporting의 LICENSES.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/skills/check-reporting/references/LICENSES.md)에 있습니다.
+ 선택 의존성: `pdf_to_md.py`는 [pymupdf4llm](https://pymupdf.readthedocs.io)(AGPL-3.0)을 씁니다. 함께 배포하지 않으며, 필요하면 `pip install pymupdf4llm`으로 직접 설치합니다.
+ 
+ Built by [Aperivue](https://aperivue.com).
+diff --git a/README.md b/README.md
+index 96444667..6982baf7 100644
+--- a/README.md
++++ b/README.md
+@@ -2,9 +2,9 @@
+ 
+ # MedSci Skills
+ 
+-English | [简体中文](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/README.zh-CN.md) | [한국어](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/README.ko.md)
++English | [简体中文](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/README.zh-CN.md) | [한국어](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/README.ko.md)
+ 
+-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/LICENSE)
++[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/LICENSE)
+ [![Release](https://img.shields.io/github/v/release/Aperivue/medsci-skills?style=flat-square&color=blue)](https://github.com/Aperivue/medsci-skills/releases/latest)
+ [![CI](https://img.shields.io/github/actions/workflow/status/Aperivue/medsci-skills/validate.yml?branch=main&style=flat-square&label=CI)](https://github.com/Aperivue/medsci-skills/actions/workflows/validate.yml)
+ ![Skills](https://img.shields.io/badge/Skills-54-brightgreen?style=flat-square)
+@@ -26,9 +26,9 @@ The skills draft and check, bundled scripts recompute what can be recomputed, an
+ ## Installation
+ 
+ <a id="quick-start"></a><a id="install-with-gh-skill"></a><a id="install-as-a-claude-code-plugin"></a><a id="option-1-classroom-installer-recommended-for-non-programmers"></a><a id="option-2-install-all-skills-manually"></a><a id="option-3-install-individual-skills-manually"></a><a id="option-4-npm--npx-terminal-friendly-shortcut"></a><a id="option-5-github-cli-gh-skill"></a><a id="platform-notes"></a><a id="optional-let-plain-language-requests-find-the-skills"></a><a id="updating"></a><a id="setup"></a><a id="requirements"></a>
+-**Without a terminal** (Windows or macOS): download the [classroom installer](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/install.md#classroom-installer-no-terminal), unzip it and double-click the installer inside. It also turns on update reminders and puts an **Update MedSci Skills** icon on your Desktop. If you have not installed Claude Code, Python or Node yet, the [setup guides](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/setup/README.md) for Mac and Windows go step by step.
++**Without a terminal** (Windows or macOS): download the [classroom installer](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/install.md#classroom-installer-no-terminal), unzip it and double-click the installer inside. It also turns on update reminders and puts an **Update MedSci Skills** icon on your Desktop. If you have not installed Claude Code, Python or Node yet, the [setup guides](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/setup/README.md) for Mac and Windows go step by step.
+ 
+-**In a terminal**, with [Node 18+ and Python 3.9+](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/setup/README.md) installed:
++**In a terminal**, with [Node 18+ and Python 3.9+](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/setup/README.md) installed:
+ 
+ ```bash
+ npx medsci-skills install
+@@ -38,14 +38,14 @@ This copies every skill into `~/.claude/skills/` (read by Claude Code, Cursor an
+ Restart your agent, type `/orchestrate`, and describe what you want to do; it routes the request to the right skill.
+ To be told when a new version ships, add `--enable-update-notify`: a one-line notice at Claude Code session start, off by default, no telemetry.
+ 
+-Other ways to install, each described in [docs/install.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/install.md):
++Other ways to install, each described in [docs/install.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/install.md):
+ 
+-- **Claude Code plugin:** [`/plugin marketplace add Aperivue/medsci-skills`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/install.md#claude-code-plugin-marketplace), then enable the plugins you want; skills are then namespaced, e.g. `/medsci-analysis:analyze-stats`.
+-- **GitHub CLI 2.90+:** [`gh skill install Aperivue/medsci-skills --all --agent claude-code --scope user`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/install.md#github-cli-gh-skill), or name a single skill. The two flags put the skills where Claude Code looks; the linked section gives the values for other hosts.
+-- **git:** [clone the repository](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/install.md#git-clone) and copy `skills/*` into `~/.claude/skills/`.
+-- **A fixed version**, for a paper that cites the version it used: `npx medsci-skills@6.2.0 install`; the plugin and `gh` equivalents are in [docs/install.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/install.md#staying-on-one-version).
++- **Claude Code plugin:** [`/plugin marketplace add Aperivue/medsci-skills`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/install.md#claude-code-plugin-marketplace), then enable the plugins you want; skills are then namespaced, e.g. `/medsci-analysis:analyze-stats`.
++- **GitHub CLI 2.90+:** [`gh skill install Aperivue/medsci-skills --all --agent claude-code --scope user`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/install.md#github-cli-gh-skill), or name a single skill. The two flags put the skills where Claude Code looks; the linked section gives the values for other hosts.
++- **git:** [clone the repository](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/install.md#git-clone) and copy `skills/*` into `~/.claude/skills/`.
++- **A fixed version**, for a paper that cites the version it used: `npx medsci-skills@6.3.0 install`; the plugin and `gh` equivalents are in [docs/install.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/install.md#staying-on-one-version).
+ 
+-[Updating](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/install.md#updating), [what individual skills need](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/install.md#requirements) (pandoc, R, PyTorch), [where the files go](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/install.md#where-the-skills-go) and the [optional routing block](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/install.md#optional-let-plain-language-requests-find-the-skills) for plain-language requests are on the same page.
++[Updating](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/install.md#updating), [what individual skills need](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/install.md#requirements) (pandoc, R, PyTorch), [where the files go](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/install.md#where-the-skills-go) and the [optional routing block](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/install.md#optional-let-plain-language-requests-find-the-skills) for plain-language requests are on the same page.
+ 
+ ## Three workflows to start with
+ 
+@@ -64,7 +64,7 @@ Call a skill by name, or describe the task to `/orchestrate`.
+ - You give: a manuscript or bibliography (`.md`, `.docx`, `.bib`, `.txt` or `.tsv`).
+ - You get: `qc/reference_audit.json`, marking each reference OK, MISMATCH, UNVERIFIED or FABRICATED after lookup in PubMed, CrossRef and OpenAlex; it reports and never edits your references.
+ 
+-Longer chains (pre-submission audit, data to manuscript, systematic review) and step-by-step command lists for common tasks are in [docs/workflows.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/workflows.md).
++Longer chains (pre-submission audit, data to manuscript, systematic review) and step-by-step command lists for common tasks are in [docs/workflows.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/workflows.md).
+ 
+ ### Demos
+ 
+@@ -73,13 +73,13 @@ Five worked examples on public datasets, with their code, outputs and QC reports
+ 
+ | Demo | Data | What it shows |
+ |------|------|---------------|
+-| [Diagnostic accuracy](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/demo/01_wisconsin_bc) | Wisconsin breast cancer (`sklearn`) | Analysis to manuscript draft, STARD 2015 audit |
+-| [Meta-analysis](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/demo/02_metafor_bcg) | BCG vaccine trials (`metafor::dat.bcg`) | Pooled analysis to manuscript draft, PRISMA 2020 audit |
+-| [Survey epidemiology](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/demo/03_nhanes_obesity) | NHANES 2017–18 | Weighted survey analysis to manuscript draft, STROBE audit |
+-| [Model engineering](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/demo/04_pneumoniamnist_cnn/README.md) | PneumoniaMNIST | CNN scaffold, leakage gates, training, evaluation, Grad-CAM |
+-| [External validation](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/demo/05_msd_amos_spleen/README.md) | MSD spleen, then AMOS CT and MRI | 3-D segmentation tested on an external cohort, including where it failed |
++| [Diagnostic accuracy](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/demo/01_wisconsin_bc) | Wisconsin breast cancer (`sklearn`) | Analysis to manuscript draft, STARD 2015 audit |
++| [Meta-analysis](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/demo/02_metafor_bcg) | BCG vaccine trials (`metafor::dat.bcg`) | Pooled analysis to manuscript draft, PRISMA 2020 audit |
++| [Survey epidemiology](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/demo/03_nhanes_obesity) | NHANES 2017–18 | Weighted survey analysis to manuscript draft, STROBE audit |
++| [Model engineering](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/demo/04_pneumoniamnist_cnn/README.md) | PneumoniaMNIST | CNN scaffold, leakage gates, training, evaluation, Grad-CAM |
++| [External validation](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/demo/05_msd_amos_spleen/README.md) | MSD spleen, then AMOS CT and MRI | 3-D segmentation tested on an external cohort, including where it failed |
+ 
+-What each demo produced, and how to rerun it: [docs/demos.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/demos.md).
++What each demo produced, and how to rerun it: [docs/demos.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/demos.md).
+ 
+ ## Skills
+ 
+@@ -88,15 +88,15 @@ All 54 skills, by research stage. Each name links to its reference page (what it
+ 
+ | Stage | Plugin | Skills |
+ |-------|--------|--------|
+-| Project & Workflow | `medsci-project` | [`author-strategy`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/author-strategy.md) · [`find-cohort-gap`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/find-cohort-gap.md) · [`intake-project`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/intake-project.md) · [`ma-scout`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/ma-scout.md) · [`manage-project`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/manage-project.md) · [`orchestrate`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/orchestrate.md) |
+-| Literature & References | `medsci-literature` | [`fulltext-retrieval`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/fulltext-retrieval.md) · [`lit-sync`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/lit-sync.md) · [`manage-refs`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/manage-refs.md) · [`obsidian-paper-vault`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/obsidian-paper-vault.md) · [`search-lit`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/search-lit.md) · [`verify-refs`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/verify-refs.md) |
+-| Data & Study Design | `medsci-data` | [`calc-sample-size`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/calc-sample-size.md) · [`clean-data`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/clean-data.md) · [`define-variables`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/define-variables.md) · [`deidentify`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/deidentify.md) · [`design-ai-benchmarking`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/design-ai-benchmarking.md) · [`design-study`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/design-study.md) · [`generate-codebook`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/generate-codebook.md) · [`version-dataset`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/version-dataset.md) |
+-| Analysis & Figures | `medsci-analysis` | [`analyze-stats`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/analyze-stats.md) · [`batch-cohort`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/batch-cohort.md) · [`cross-national`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/cross-national.md) · [`make-figures`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/make-figures.md) · [`meta-analysis`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/meta-analysis.md) · [`replicate-study`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/replicate-study.md) |
+-| Model Engineering & Validation | `medsci-modeling` | [`imaging-data`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/imaging-data.md) · [`mllm-eval`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/mllm-eval.md) · [`model-assessment`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/model-assessment.md) · [`model-card`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/model-card.md) · [`model-scaffold`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/model-scaffold.md) · [`model-selection`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/model-selection.md) · [`radiomics-ml`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/radiomics-ml.md) |
+-| Writing & Manuscript | `medsci-writing` | [`academic-aio`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/academic-aio.md) · [`humanize`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/humanize.md) · [`polish-language`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/polish-language.md) · [`review-paper`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/review-paper.md) · [`revise`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/revise.md) · [`write-paper`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/write-paper.md) · [`write-protocol`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/write-protocol.md) |
+-| Review & Compliance | `medsci-review` | [`check-reporting`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/check-reporting.md) · [`peer-review`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/peer-review.md) · [`self-review`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/self-review.md) |
+-| Submission & Journals | `medsci-submission` | [`add-journal`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/add-journal.md) · [`fill-icmje-coi`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/fill-icmje-coi.md) · [`fill-protocol`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/fill-protocol.md) · [`find-journal`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/find-journal.md) · [`grant-builder`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/grant-builder.md) · [`sync-submission`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/sync-submission.md) |
+-| Presentation & Tooling | `medsci-presentation` | [`contribute`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/contribute.md) · [`present-paper`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/present-paper.md) · [`publish-skill`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/publish-skill.md) · [`render-pdf-doc`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/render-pdf-doc.md) · [`setup-medsci`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/setup-medsci.md) |
++| Project & Workflow | `medsci-project` | [`author-strategy`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/author-strategy.md) · [`find-cohort-gap`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/find-cohort-gap.md) · [`intake-project`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/intake-project.md) · [`ma-scout`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/ma-scout.md) · [`manage-project`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/manage-project.md) · [`orchestrate`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/orchestrate.md) |
++| Literature & References | `medsci-literature` | [`fulltext-retrieval`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/fulltext-retrieval.md) · [`lit-sync`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/lit-sync.md) · [`manage-refs`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/manage-refs.md) · [`obsidian-paper-vault`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/obsidian-paper-vault.md) · [`search-lit`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/search-lit.md) · [`verify-refs`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/verify-refs.md) |
++| Data & Study Design | `medsci-data` | [`calc-sample-size`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/calc-sample-size.md) · [`clean-data`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/clean-data.md) · [`define-variables`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/define-variables.md) · [`deidentify`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/deidentify.md) · [`design-ai-benchmarking`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/design-ai-benchmarking.md) · [`design-study`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/design-study.md) · [`generate-codebook`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/generate-codebook.md) · [`version-dataset`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/version-dataset.md) |
++| Analysis & Figures | `medsci-analysis` | [`analyze-stats`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/analyze-stats.md) · [`batch-cohort`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/batch-cohort.md) · [`cross-national`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/cross-national.md) · [`make-figures`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/make-figures.md) · [`meta-analysis`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/meta-analysis.md) · [`replicate-study`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/replicate-study.md) |
++| Model Engineering & Validation | `medsci-modeling` | [`imaging-data`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/imaging-data.md) · [`mllm-eval`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/mllm-eval.md) · [`model-assessment`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/model-assessment.md) · [`model-card`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/model-card.md) · [`model-scaffold`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/model-scaffold.md) · [`model-selection`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/model-selection.md) · [`radiomics-ml`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/radiomics-ml.md) |
++| Writing & Manuscript | `medsci-writing` | [`academic-aio`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/academic-aio.md) · [`humanize`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/humanize.md) · [`polish-language`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/polish-language.md) · [`review-paper`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/review-paper.md) · [`revise`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/revise.md) · [`write-paper`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/write-paper.md) · [`write-protocol`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/write-protocol.md) |
++| Review & Compliance | `medsci-review` | [`check-reporting`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/check-reporting.md) · [`peer-review`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/peer-review.md) · [`self-review`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/self-review.md) |
++| Submission & Journals | `medsci-submission` | [`add-journal`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/add-journal.md) · [`fill-icmje-coi`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/fill-icmje-coi.md) · [`fill-protocol`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/fill-protocol.md) · [`find-journal`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/find-journal.md) · [`grant-builder`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/grant-builder.md) · [`sync-submission`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/sync-submission.md) |
++| Presentation & Tooling | `medsci-presentation` | [`contribute`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/contribute.md) · [`present-paper`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/present-paper.md) · [`publish-skill`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/publish-skill.md) · [`render-pdf-doc`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/render-pdf-doc.md) · [`setup-medsci`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/setup-medsci.md) |
+ 
+ Not sure which one fits? Start with `/orchestrate`.
+ 
+@@ -105,7 +105,7 @@ Renamed in v6 (the old names still work until v7): `imaging-data` ← `preproces
+ ## Patient data and safety
+ 
+ <a id="disclaimer"></a><a id="validation-status--available-vs-ci-gated-vs-evaluated"></a>
+-Do not give an agent identifiable patient data. `/deidentify` runs locally with no network or AI calls: it detects protected health information with regex and heuristics (locale packs for twelve countries) and pseudonymises it after an interactive review, and `/analyze-stats` asks whether a raw data file contains patient identifiers before using it. These are research productivity tools, not clinical decision support: they are not clinically validated and do not replace expert review, so a qualified researcher must check every output before it is used in a publication or clinical context. The 93 deterministic detectors recompute or cross-check specific things (reference metadata, arithmetic, checklist items, data leakage); a clean run means those checks found nothing, not that the manuscript is correct. [MEDSCI_AUDIT.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/MEDSCI_AUDIT.md) lists each detector and which have been formally evaluated; reference lookups use the public, keyless APIs in [docs/connectors.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/connectors.md).
++Do not give an agent identifiable patient data. `/deidentify` runs locally with no network or AI calls: it detects protected health information with regex and heuristics (locale packs for twelve countries) and pseudonymises it after an interactive review, and `/analyze-stats` asks whether a raw data file contains patient identifiers before using it. These are research productivity tools, not clinical decision support: they are not clinically validated and do not replace expert review, so a qualified researcher must check every output before it is used in a publication or clinical context. The 93 deterministic detectors recompute or cross-check specific things (reference metadata, arithmetic, checklist items, data leakage); a clean run means those checks found nothing, not that the manuscript is correct. [MEDSCI_AUDIT.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/MEDSCI_AUDIT.md) lists each detector and which have been formally evaluated; reference lookups use the public, keyless APIs in [docs/connectors.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/connectors.md).
+ 
+ ## Citation
+ 
+@@ -141,20 +141,20 @@ software citation is how a tool like this earns academic recognition, and it tak
+ ```
+ 
+ The Zenodo **concept DOI** [10.5281/zenodo.20155321](https://doi.org/10.5281/zenodo.20155321)
+-always resolves to the latest release; [`CITATION.cff`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/CITATION.cff) carries the machine-readable
++always resolves to the latest release; [`CITATION.cff`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/CITATION.cff) carries the machine-readable
+ metadata (GitHub's "Cite this repository" button reads it).
+ 
+ **Used it in published or in-review work?** Tell us via the
+ ["Used in research" issue template](https://github.com/Aperivue/medsci-skills/issues/new?template=used-in-research.yml)
+-— with your permission it is added to [`docs/citations.md`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/citations.md).
++— with your permission it is added to [`docs/citations.md`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/citations.md).
+ 
+ ## License
+ 
+-MIT License. See [LICENSE](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/LICENSE) for details.
++MIT License. See [LICENSE](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/LICENSE) for details.
+ 
+-Some bundled material is **not** ours and is not MIT: the official guideline templates, the CSL citation styles, and a few checklist summaries carry their own terms — including CC BY-NC, which restricts commercial use. Those are indexed in [THIRD-PARTY-NOTICES.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/THIRD-PARTY-NOTICES.md), which ships with every copy and is checked against the tree on every build.
++Some bundled material is **not** ours and is not MIT: the official guideline templates, the CSL citation styles, and a few checklist summaries carry their own terms — including CC BY-NC, which restricts commercial use. Those are indexed in [THIRD-PARTY-NOTICES.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/THIRD-PARTY-NOTICES.md), which ships with every copy and is checked against the tree on every build.
+ 
+-Reporting-guideline checklists keep their sources' terms, and several have no open licence, so those are included only as summaries in our own words; [check-reporting's LICENSES.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/skills/check-reporting/references/LICENSES.md) records each one.
++Reporting-guideline checklists keep their sources' terms, and several have no open licence, so those are included only as summaries in our own words; [check-reporting's LICENSES.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/skills/check-reporting/references/LICENSES.md) records each one.
+ 
+ Optional dependency: `pdf_to_md.py` uses [pymupdf4llm](https://pymupdf.readthedocs.io) (AGPL-3.0). Not bundled -- installed separately by the user via `pip install pymupdf4llm`.
+ 
+@@ -168,14 +168,14 @@ Optional dependency: `pdf_to_md.py` uses [pymupdf4llm](https://pymupdf.readthedo
+ 
+ <a id="whats-new"></a><a id="key-features"></a><a id="autonomous-e2e-pipeline"></a><a id="anti-hallucination-citations"></a><a id="anti-hallucination-numerical-claims"></a><a id="reference-safety-phase-1"></a><a id="meta-analysis-failure-modes"></a><a id="49-reporting-guidelines--rob-tools-built-in"></a><a id="publication-ready-output"></a><a id="resultsdiscussion-boundary-enforcement"></a><a id="irb-protocol-to-submission-in-one-pipeline"></a><a id="skills-work-together"></a><a id="skill-boundaries--which-to-use-and-in-what-order"></a><a id="contributing"></a><a id="in-the-wild"></a><a id="cited-in-the-literature"></a><a id="adoption"></a><a id="star-history"></a><a id="why-this-repo"></a><a id="what-this-is-not"></a><a id="about"></a>
+ 
+-- [Release notes](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/CHANGELOG.md) — what changed in each version.
+-- [Upgrading from v5](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/MIGRATION-v6.md) — renamed skills, and how to update for each install channel.
+-- [Workflows and skill boundaries](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/workflows.md) — skill chains, which skill to use when two look alike, and checks that span skills.
+-- [Skill reference](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/skills/README.md) and [FAQ](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/faq.md).
+-- [Host compatibility](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/host_compatibility.md) — verified install paths for Claude Code, Codex, Cursor and GitHub Copilot.
+-- [How it differs from other skill collections](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/competitive_positioning.md) and the [scope boundary](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/ROADMAP.md#not-planned--explicitly-out-of-scope).
+-- [Contributing](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/CONTRIBUTING.md) — most contributions are one file; `/contribute` sends a change from your installed copy after scanning it for patient data. [Good first issues](https://github.com/Aperivue/medsci-skills/contribute).
+-- [Adoption](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/IMPACT.md) (stars, forks, downloads) and [citations](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/citations.md).
+-- Governance: [ROADMAP](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/ROADMAP.md), [MAINTAINERS](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/MAINTAINERS.md), [SECURITY](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/SECURITY.md), [CONTRIBUTORS](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/CONTRIBUTORS.md).
++- [Release notes](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/CHANGELOG.md) — what changed in each version.
++- [Upgrading from v5](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/MIGRATION-v6.md) — renamed skills, and how to update for each install channel.
++- [Workflows and skill boundaries](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/workflows.md) — skill chains, which skill to use when two look alike, and checks that span skills.
++- [Skill reference](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/skills/README.md) and [FAQ](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/faq.md).
++- [Host compatibility](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/host_compatibility.md) — verified install paths for Claude Code, Codex, Cursor and GitHub Copilot.
++- [How it differs from other skill collections](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/competitive_positioning.md) and the [scope boundary](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/ROADMAP.md#not-planned--explicitly-out-of-scope).
++- [Contributing](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/CONTRIBUTING.md) — most contributions are one file; `/contribute` sends a change from your installed copy after scanning it for patient data. [Good first issues](https://github.com/Aperivue/medsci-skills/contribute).
++- [Adoption](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/IMPACT.md) (stars, forks, downloads) and [citations](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/citations.md).
++- Governance: [ROADMAP](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/ROADMAP.md), [MAINTAINERS](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/MAINTAINERS.md), [SECURITY](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/SECURITY.md), [CONTRIBUTORS](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/CONTRIBUTORS.md).
+ 
+ Built by [Aperivue](https://aperivue.com).
+diff --git a/README.zh-CN.md b/README.zh-CN.md
+index 637a9a2a..d72f667f 100644
+--- a/README.zh-CN.md
++++ b/README.zh-CN.md
+@@ -2,9 +2,9 @@
+ 
+ # MedSci Skills
+ 
+-[English](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/README.md) | 简体中文 | [한국어](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/README.ko.md)
++[English](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/README.md) | 简体中文 | [한국어](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/README.ko.md)
+ 
+-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/LICENSE)
++[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/LICENSE)
+ [![Release](https://img.shields.io/github/v/release/Aperivue/medsci-skills?style=flat-square&color=blue)](https://github.com/Aperivue/medsci-skills/releases/latest)
+ ![Skills](https://img.shields.io/badge/Skills-54-brightgreen?style=flat-square)
+ [![npm](https://img.shields.io/npm/v/medsci-skills?style=flat-square&label=npm&color=cb3837)](https://www.npmjs.com/package/medsci-skills)
+@@ -16,7 +16,7 @@
+ 
+ </div>
+ 
+-> 本页是英文 [README](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/README.md) 的简短中文摘要。两者不一致时，以英文 README 为准。
++> 本页是英文 [README](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/README.md) 的简短中文摘要。两者不一致时，以英文 README 为准。
+ 
+ ## 这是什么，适合谁
+ 
+@@ -26,7 +26,7 @@ MedSci Skills 是一套面向临床研究的 [Agent Skills](https://agentskills.
+ 
+ ## 安装
+ 
+-**无需终端**（Windows 或 macOS）：下载 [classroom 安装包](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/install.md#classroom-installer-no-terminal)，解压后双击其中的安装程序。它还会开启更新提醒，并在桌面放置 **Update MedSci Skills** 图标。如果还没有安装 Claude Code、Python 或 Node，可按 Mac 和 Windows 的[安装指南](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/setup/README.md)（英文）逐步操作。
++**无需终端**（Windows 或 macOS）：下载 [classroom 安装包](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/install.md#classroom-installer-no-terminal)，解压后双击其中的安装程序。它还会开启更新提醒，并在桌面放置 **Update MedSci Skills** 图标。如果还没有安装 Claude Code、Python 或 Node，可按 Mac 和 Windows 的[安装指南](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/setup/README.md)（英文）逐步操作。
+ 
+ **在终端中**运行（需要 Node 18+ 和 Python 3.9+）：
+ 
+@@ -38,7 +38,7 @@ npx medsci-skills install
+ 重启 agent，输入 `/orchestrate` 并描述你要做的事，它会把请求转给合适的技能。
+ 如需在新版本发布时收到提醒，可加上 `--enable-update-notify`：Claude Code 会话开始时显示一行通知，默认关闭，没有遥测。
+ 
+-其他安装方式（无需终端的 classroom 安装包、Claude Code 插件、GitHub CLI `gh skill`、git clone）、更新方法，以及个别技能需要的额外工具（pandoc、R、PyTorch），见 [docs/install.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/install.md)（英文）。
++其他安装方式（无需终端的 classroom 安装包、Claude Code 插件、GitHub CLI `gh skill`、git clone）、更新方法，以及个别技能需要的额外工具（pandoc、R、PyTorch），见 [docs/install.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/install.md)（英文）。
+ 
+ ## 从三个工作流开始
+ 
+@@ -48,17 +48,17 @@ npx medsci-skills install
+ - **`/analyze-stats`**：读取去标识化的数据文件（CSV、Excel 或 TSV）和研究问题，先给出分析计划供你确认，再运行 Python（或 R）代码，输出表格、图和 manifest。
+ - **`/verify-refs`**：在 PubMed、CrossRef 和 OpenAlex 中查找每条参考文献，标记为 OK、MISMATCH、UNVERIFIED 或 FABRICATED，写入 `qc/reference_audit.json`；只报告，从不修改你的参考文献。
+ 
+-更长的流程（投稿前审核、从数据到稿件、系统综述）见 [docs/workflows.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/workflows.md)；基于公开数据集的五个完整示例见 [docs/demos.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/demos.md)。
++更长的流程（投稿前审核、从数据到稿件、系统综述）见 [docs/workflows.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/workflows.md)；基于公开数据集的五个完整示例见 [docs/demos.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/demos.md)。
+ 
+ ## 技能列表
+ 
+-全部 54 个技能按研究阶段分组的表格（每个技能名都链接到其说明页）见英文 README 的 [Skills 一节](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/README.md#skills)。在终端中，`npx medsci-skills list` 会列出相同的分组。不确定该用哪个时，从 `/orchestrate` 开始。
++全部 54 个技能按研究阶段分组的表格（每个技能名都链接到其说明页）见英文 README 的 [Skills 一节](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/README.md#skills)。在终端中，`npx medsci-skills list` 会列出相同的分组。不确定该用哪个时，从 `/orchestrate` 开始。
+ 
+-v6 中改名的技能（旧名称在 v7 之前仍可使用）：`imaging-data` ← `preprocess-imaging`、`profile-imaging`；`model-assessment` ← `explainability`、`model-evaluation`、`model-validation`、`uncertainty-imaging`；`model-selection` ← `architecture-zoo`、`model-sourcing`。从 v5 升级请看 [MIGRATION-v6.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/MIGRATION-v6.md)（英文）。
++v6 中改名的技能（旧名称在 v7 之前仍可使用）：`imaging-data` ← `preprocess-imaging`、`profile-imaging`；`model-assessment` ← `explainability`、`model-evaluation`、`model-validation`、`uncertainty-imaging`；`model-selection` ← `architecture-zoo`、`model-sourcing`。从 v5 升级请看 [MIGRATION-v6.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/MIGRATION-v6.md)（英文）。
+ 
+ ## 患者数据与安全
+ 
+-不要把可识别身份的患者数据交给 agent。`/deidentify` 在本地运行，不联网，也不调用 AI：它用正则表达式和启发式规则（含十二个国家的 locale 包）检测受保护的健康信息（PHI），经你交互审核后进行假名化；`/analyze-stats` 在使用原始数据文件前会询问其中是否含有患者标识符。这些是科研效率工具，不是临床决策支持：它们未经临床验证，不能替代专家审查，任何输出在用于发表或临床场景之前都必须由合格的研究人员核对。93 个确定性检测器会重新计算或交叉核对特定内容（参考文献元数据、算术、清单条目、数据泄漏）；运行后没有发现问题，只说明这些检查没有找到问题，不代表稿件正确。[MEDSCI_AUDIT.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/MEDSCI_AUDIT.md) 列出了每个检测器以及其中哪些经过正式评估；参考文献查询使用 [docs/connectors.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/docs/connectors.md) 中列出的公开、无需密钥的 API。
++不要把可识别身份的患者数据交给 agent。`/deidentify` 在本地运行，不联网，也不调用 AI：它用正则表达式和启发式规则（含十二个国家的 locale 包）检测受保护的健康信息（PHI），经你交互审核后进行假名化；`/analyze-stats` 在使用原始数据文件前会询问其中是否含有患者标识符。这些是科研效率工具，不是临床决策支持：它们未经临床验证，不能替代专家审查，任何输出在用于发表或临床场景之前都必须由合格的研究人员核对。93 个确定性检测器会重新计算或交叉核对特定内容（参考文献元数据、算术、清单条目、数据泄漏）；运行后没有发现问题，只说明这些检查没有找到问题，不代表稿件正确。[MEDSCI_AUDIT.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/MEDSCI_AUDIT.md) 列出了每个检测器以及其中哪些经过正式评估；参考文献查询使用 [docs/connectors.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/docs/connectors.md) 中列出的公开、无需密钥的 API。
+ 
+ ## 引用
+ 
+@@ -90,13 +90,13 @@ BibTeX（软件本身，以及介绍其设计的预印本）：
+ }
+ ```
+ 
+-Zenodo concept DOI [10.5281/zenodo.20155321](https://doi.org/10.5281/zenodo.20155321) 始终指向最新版本；[`CITATION.cff`](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/CITATION.cff) 提供机器可读的引用元数据。
++Zenodo concept DOI [10.5281/zenodo.20155321](https://doi.org/10.5281/zenodo.20155321) 始终指向最新版本；[`CITATION.cff`](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/CITATION.cff) 提供机器可读的引用元数据。
+ 
+ ## 许可证
+ 
+-MIT 许可证，见 [LICENSE](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/LICENSE)。
+-部分随附材料不属于本项目，也不适用 MIT：官方规范模板、CSL 引文样式和少数清单摘要有各自的条款，其中包括限制商业使用的 CC BY-NC。它们都列在 [THIRD-PARTY-NOTICES.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/THIRD-PARTY-NOTICES.md) 中。
+-报告规范清单保留其来源的条款；其中几项没有开放许可，因此只以我们自己的话写成摘要收录，逐项记录见 [check-reporting 的 LICENSES.md](https://github.com/Aperivue/medsci-skills/blob/v6.2.0/skills/check-reporting/references/LICENSES.md)。
++MIT 许可证，见 [LICENSE](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/LICENSE)。
++部分随附材料不属于本项目，也不适用 MIT：官方规范模板、CSL 引文样式和少数清单摘要有各自的条款，其中包括限制商业使用的 CC BY-NC。它们都列在 [THIRD-PARTY-NOTICES.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/THIRD-PARTY-NOTICES.md) 中。
++报告规范清单保留其来源的条款；其中几项没有开放许可，因此只以我们自己的话写成摘要收录，逐项记录见 [check-reporting 的 LICENSES.md](https://github.com/Aperivue/medsci-skills/blob/v6.3.0/skills/check-reporting/references/LICENSES.md)。
+ 可选依赖：`pdf_to_md.py` 使用 [pymupdf4llm](https://pymupdf.readthedocs.io)（AGPL-3.0），不随附，需要时由用户自行 `pip install pymupdf4llm`。
+ 
+ Built by [Aperivue](https://aperivue.com).
+diff --git a/docs/install.md b/docs/install.md
+index f46fb771..a0908953 100644
+--- a/docs/install.md
++++ b/docs/install.md
+@@ -154,7 +154,7 @@ when you update. To stay on a release instead, add the marketplace with its tag
+ plugins as above:
+ 
+ ```text
+-/plugin marketplace add Aperivue/medsci-skills@v6.2.0
++/plugin marketplace add Aperivue/medsci-skills@v6.3.0
+ ```
+ 
+ To move to a later release, remove the marketplace (`/plugin marketplace remove medsci-skills`, which
+@@ -249,10 +249,10 @@ latest:
+ 
+ | Channel | Command |
+ |---|---|
+-| npx | `npx medsci-skills@6.2.0 install` |
+-| Claude Code plugin | `/plugin marketplace add Aperivue/medsci-skills@v6.2.0` (see [Staying on one release](#claude-code-plugin-marketplace)) |
+-| GitHub CLI | `gh skill install Aperivue/medsci-skills --all --pin v6.2.0 --agent claude-code --scope user` |
+-| git | `git clone --branch v6.2.0 https://github.com/Aperivue/medsci-skills.git`, then `python3 medsci-skills/installers/install.py` |
++| npx | `npx medsci-skills@6.3.0 install` |
++| Claude Code plugin | `/plugin marketplace add Aperivue/medsci-skills@v6.3.0` (see [Staying on one release](#claude-code-plugin-marketplace)) |
++| GitHub CLI | `gh skill install Aperivue/medsci-skills --all --pin v6.3.0 --agent claude-code --scope user` |
++| git | `git clone --branch v6.3.0 https://github.com/Aperivue/medsci-skills.git`, then `python3 medsci-skills/installers/install.py` |
+ | Classroom ZIP | download the ZIP attached to that [release](https://github.com/Aperivue/medsci-skills/releases) instead of the latest one |
+ 
+ The one-click updater and `npx medsci-skills@latest install` move you to the newest version, so skip
+diff --git a/metadata/distribution_manifest.json b/metadata/distribution_manifest.json
+index dfc2b247..7e54f135 100644
+--- a/metadata/distribution_manifest.json
++++ b/metadata/distribution_manifest.json
+@@ -1,6 +1,6 @@
+ {
+   "schema_version": 1,
+-  "version": "6.2.0",
++  "version": "6.3.0",
+   "owned_skills": [
+     "academic-aio",
+     "add-journal",
+diff --git a/package.json b/package.json
+index dae4a8f6..3be34e31 100644
+--- a/package.json
++++ b/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "medsci-skills",
+-  "version": "6.2.0",
++  "version": "6.3.0",
+   "description": "MedSci Skills — a medical/scientific research skill suite for AI coding agents (Claude Code, Codex, Cursor, Copilot). The npm package is a terminal-friendly installer shortcut; the canonical distribution remains the GitHub repository and the Claude Code plugin marketplace.",
+   "license": "SEE LICENSE IN LICENSE",
+   "homepage": "https://github.com/Aperivue/medsci-skills#readme",

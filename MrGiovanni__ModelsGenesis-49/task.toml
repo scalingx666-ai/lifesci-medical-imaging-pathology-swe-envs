@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/MrGiovanni__ModelsGenesis-49"
+description = "Major refactoring and bugfixes to allow data preprocessed by nnUNet"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "ModelsGenesis",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "MrGiovanni/ModelsGenesis"
+ref = "13932523d1754a3180301448f4bfd5274a1c9f41"
+reference = "https://github.com/MrGiovanni/ModelsGenesis/pull/49"
+source_access = "auto"
+built_at = "2026-11-14T07:08:30.443971+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:ec5d239585ea59f6aa2dcaa8699e06eccdcdadbb95fa0fac8730a4767f0cfa49"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2022-02-18T12:50:12Z"
+diff_format = "unified"
+context_files = [
+    "competition/utils.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 212
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

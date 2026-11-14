@@ -1,0 +1,64 @@
+version = "1.0"
+
+[task]
+name = "default/juliandewit__kaggle_ndsb2017-36"
+description = "Add WORKER_POOL_SIZE setting."
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "kaggle_ndsb2017",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "juliandewit/kaggle_ndsb2017"
+ref = "5847325c58db6300f6a721193bde1a674eb5c8b5"
+reference = "https://github.com/juliandewit/kaggle_ndsb2017/pull/36"
+source_access = "auto"
+built_at = "2026-11-14T07:09:28.186324+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:feaa3fff868d44724bcb2d68a31708d22ecfa927d69bcc4ead6071f7646fcd55"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2017-10-22T06:32:37Z"
+diff_format = "unified"
+context_files = [
+    "settings.py",
+    "step1_preprocess_luna16.py",
+    "step1_preprocess_ndsb.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 6
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

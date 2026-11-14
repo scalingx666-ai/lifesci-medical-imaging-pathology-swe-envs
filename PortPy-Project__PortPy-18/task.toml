@@ -1,0 +1,63 @@
+version = "1.0"
+
+[task]
+name = "default/PortPy-Project__PortPy-18"
+description = "Add prediction-based dose mimicking APIs to VMAT column generation"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "PortPy",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "PortPy-Project/PortPy"
+ref = "da638032adb1502b032deaf9ba1a4d372b23f890"
+reference = "https://github.com/PortPy-Project/PortPy/pull/18"
+source_access = "auto"
+built_at = "2026-11-14T07:13:15.692243+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:11554764df44f596b41e74e12f25c41669dc09cb4625232c144763e1b2f24db0"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-01-15T16:14:10Z"
+diff_format = "unified"
+context_files = [
+    "portpy/photon/vmat_scp/vmat_optimization_col_gen.py",
+    "portpy/photon/vmat_scp/vmat_scp_optimization.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 61
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,63 @@
+version = "1.0"
+
+[task]
+name = "default/mahmoodlab__CLAM-244"
+description = "added missing args & correct import of eval_transforms "
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "CLAM",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "mahmoodlab/CLAM"
+ref = "206bf2dfddd5a297513087358302c8d9b2233192"
+reference = "https://github.com/mahmoodlab/CLAM/pull/244"
+source_access = "auto"
+built_at = "2026-11-14T07:05:52.594276+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:b60e6cfa1e0cc7d5ed4347b0f51aba6cc89bf83a2f85f77d2bf83dc7d3bdb81a"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2024-04-29T20:35:04Z"
+diff_format = "unified"
+context_files = [
+    "eval.py",
+    "vis_utils/heatmap_utils.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 4
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

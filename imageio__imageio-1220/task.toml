@@ -1,0 +1,70 @@
+version = "1.0"
+
+[task]
+name = "default/imageio__imageio-1220"
+description = "BUG: Drop Python 3.10, fix PyAV gc stall, temporarily pin pillow on pypy"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "imageio",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "imageio/imageio"
+ref = "8e800546200487abf3ca7aa1977ca67d488a5a00"
+reference = "https://github.com/imageio/imageio/pull/1220"
+source_access = "auto"
+built_at = "2026-11-14T07:06:02.429220+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:efdb3893b68138d1ec05cc56b5610a9eeadbefe7c6326bf02c0264f32b64fab7"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-10-08T12:36:15Z"
+diff_format = "unified"
+context_files = [
+    ".github/workflows/cpython_tests.yml",
+    ".github/workflows/pypy_tests.yml",
+    ".readthedocs.yaml",
+    "README.md",
+    "docs/user_guide/installation.rst",
+    "imageio/__init__.py",
+    "imageio/plugins/pyav.py",
+    "pyproject.toml",
+    "uv.lock",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 478
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

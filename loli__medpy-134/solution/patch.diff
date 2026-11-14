@@ -1,0 +1,271 @@
+diff --git a/CHANGES.txt b/CHANGES.txt
+index 80143b3..898636d 100644
+--- a/CHANGES.txt
++++ b/CHANGES.txt
+@@ -1,3 +1,4 @@
++v0.5.2, 2024-07-23 -- Hotfixes
+ v0.5.1, 2024-04-03 -- Hotfixes
+ v0.5.0, 2024-04-03 -- Addressed all depreciation warnings and incompatabilities
+                       Updated documentation
+diff --git a/doc/source/conf.py b/doc/source/conf.py
+index bc8a6ae..7f0c045 100644
+--- a/doc/source/conf.py
++++ b/doc/source/conf.py
+@@ -50,7 +50,7 @@
+ # The short X.Y version.
+ version = "0.5"
+ # The full version, including alpha/beta/rc tags.
+-release = "0.5.1"
++release = "0.5.2"
+ 
+ # Automatically created autosummary entries (thus no need to call sphinx-autogen)
+ autosummary_generate = True
+diff --git a/medpy/__init__.py b/medpy/__init__.py
+index 0e79643..d8a6242 100644
+--- a/medpy/__init__.py
++++ b/medpy/__init__.py
+@@ -24,4 +24,4 @@
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ """
+ 
+-__version__ = "0.5.1"
++__version__ = "0.5.2"
+diff --git a/medpy/features/intensity.py b/medpy/features/intensity.py
+index ec55f10..e9742de 100644
+--- a/medpy/features/intensity.py
++++ b/medpy/features/intensity.py
+@@ -218,7 +218,7 @@ def indices(image, voxelspacing=None, mask=slice(None)):
+         image = image[0]
+ 
+     if not type(mask) is slice:
+-        mask = numpy.array(mask, copy=False, dtype=numpy.bool_)
++        numpy.asarray(mask).astype(bool)
+ 
+     if voxelspacing is None:
+         voxelspacing = [1.0] * image.ndim
+@@ -865,7 +865,7 @@ def _extract_centerdistance(image, mask=slice(None), voxelspacing=None):
+     """
+     Internal, single-image version of `centerdistance`.
+     """
+-    image = numpy.array(image, copy=False)
++    image = numpy.asarray(image)
+ 
+     if None == voxelspacing:
+         voxelspacing = [1.0] * image.ndim
+@@ -889,7 +889,7 @@ def _extract_intensities(image, mask=slice(None)):
+     """
+     if type(mask) is list and type(mask[0]) is slice:
+         mask = tuple(mask)
+-    return numpy.array(image, copy=True)[mask].ravel()
++    return numpy.asarray(image)[mask].ravel()
+ 
+ 
+ def _substract_hemispheres(
+@@ -941,7 +941,7 @@ def _extract_feature(fun, image, mask=slice(None), **kwargs):
+         Additional keyword arguments to be passed to the feature extraction function
+     """
+     if not type(mask) is slice:
+-        mask = numpy.array(mask, copy=False, dtype=numpy.bool_)
++        numpy.asarray(mask).astype(bool)
+ 
+     if type(image) is tuple or type(image) is list:
+         return join(*[fun(i, mask, **kwargs) for i in image])
+diff --git a/medpy/features/texture.py b/medpy/features/texture.py
+index 1524745..3804f6b 100644
+--- a/medpy/features/texture.py
++++ b/medpy/features/texture.py
+@@ -78,7 +78,7 @@ def coarseness(image, voxelspacing=None, mask=slice(None)):
+     # set default mask or apply given mask
+     if not type(mask) is slice:
+         if not type(mask[0] is slice):
+-            mask = numpy.array(mask, copy=False, dtype=numpy.bool_)
++            mask = numpy.asarray(mask).astype(bool)
+     image = image[mask]
+ 
+     # set default voxel spacing if not suppliec
+@@ -170,7 +170,7 @@ def contrast(image, mask=slice(None)):
+     # set default mask or apply given mask
+     if not type(mask) is slice:
+         if not type(mask[0] is slice):
+-            mask = numpy.array(mask, copy=False, dtype=numpy.bool_)
++            mask = numpy.asarray(mask).astype(bool)
+         else:
+             mask = tuple(mask)
+     image = image[mask]
+@@ -238,7 +238,7 @@ def directionality(
+     # set default mask or apply given mask
+     if not type(mask) is slice:
+         if not type(mask[0] is slice):
+-            mask = numpy.array(mask, copy=False, dtype=numpy.bool_)
++            mask = numpy.asarray(mask).astype(bool)
+     image = image[mask]
+ 
+     # set default voxel spacing if not suppliec
+diff --git a/medpy/features/utilities.py b/medpy/features/utilities.py
+index d766b47..11e6782 100644
+--- a/medpy/features/utilities.py
++++ b/medpy/features/utilities.py
+@@ -77,7 +77,7 @@ def normalize(vector, cutoffp=(0, 100), model=False):
+         The learned normalization model.
+ 
+     """
+-    vector = numpy.array(vector, dtype=float)
++    vector = numpy.asarray(vector).astype(float)
+ 
+     # add a singleton dimension if required
+     if 1 == vector.ndim:
+@@ -121,7 +121,7 @@ def normalize_with_model(vector, model):
+     normalize : ndarray
+         The normalized versions of the input vectors.
+     """
+-    vector = numpy.array(vector, dtype=float)
++    vector = numpy.asarray(vector).astype(float)
+ 
+     # unpack model
+     minp, maxp, minv, maxv = model
+@@ -213,9 +213,9 @@ def join(*vectors):
+     # process supplied arguments
+     vectors = list(vectors)
+     for i in range(len(vectors)):
+-        vectors[i] = numpy.array(vectors[i], copy=False)
++        vectors[i] = numpy.asarray(vectors[i])
+         if vectors[i].ndim == 1:
+-            vectors[i] = numpy.array([vectors[i]], copy=False).T
++            vectors[i] = numpy.asarray([vectors[i]]).T
+ 
+     # treat single-value cases special (no squeezing)
+     if 1 == len(vectors[0]):
+diff --git a/medpy/metric/binary.py b/medpy/metric/binary.py
+index fbab502..38c6ef0 100644
+--- a/medpy/metric/binary.py
++++ b/medpy/metric/binary.py
+@@ -467,12 +467,12 @@ def assd(result, reference, voxelspacing=None, connectivity=1):
+ 
+     and then averaging the two lists. The binary images can therefore be supplied in any order.
+     """
+-    assd = numpy.mean(
+-        (
++    assd = numpy.concatenate(
++        [
+             __surface_distances(result, reference, voxelspacing, connectivity),
+             __surface_distances(reference, result, voxelspacing, connectivity),
+-        )
+-    )
++        ]
++    ).mean()
+     return assd
+ 
+ 
+@@ -802,12 +802,12 @@ def obj_assd(result, reference, voxelspacing=None, connectivity=1):
+ 
+     and then averaging the two lists. The binary images can therefore be supplied in any order.
+     """
+-    assd = numpy.mean(
+-        (
++    assd = numpy.concatenate(
++        [
+             __obj_surface_distances(result, reference, voxelspacing, connectivity),
+             __obj_surface_distances(reference, result, voxelspacing, connectivity),
+-        )
+-    )
++        ]
++    ).mean()
+     return assd
+ 
+ 
+diff --git a/setup.py b/setup.py
+index c30017d..89be0a1 100755
+--- a/setup.py
++++ b/setup.py
+@@ -138,7 +138,7 @@ def run_setup(with_compilation):
+ 
+     setup(
+         name="MedPy",
+-        version="0.5.1",  # major.minor.micro
++        version="0.5.2",  # major.minor.micro
+         description="Medical image processing in Python",
+         author="Oskar Maier",
+         author_email="oskar.maier@gmail.com",
+diff --git a/tests/metric_/binary.py b/tests/metric_/binary.py
+new file mode 100644
+index 0000000..fcaa5ff
+--- /dev/null
++++ b/tests/metric_/binary.py
+@@ -0,0 +1,77 @@
++"""
++Unittest for medpy.features.histogram.
++
++@author Oskar Maier
++@version r0.1.0
++@since 2024-07-23
++@status Release
++"""
++
++import numpy as np
++
++from medpy.metric import asd, assd, obj_asd, obj_assd
++
++result_min = np.asarray([1, 0]).astype(bool)
++reference_min = np.asarray([0, 1]).astype(bool)
++result_sym = np.asarray(
++    [[1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0], [1, 1, 0, 0]]
++).astype(bool)
++reference_sym = np.asarray(
++    [[1, 1, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0], [0, 0, 0, 0]]
++).astype(bool)
++
++
++def test_asd_identity():
++    assert asd(result_min, result_min) == 0
++
++
++def test_assd_identity():
++    assert assd(result_min, result_min) == 0
++
++
++def test_obj_asd_identity():
++    assert obj_asd(result_min, result_min) == 0
++
++
++def test_obj_assd_identity():
++    assert obj_assd(result_min, result_min) == 0
++
++
++def test_asd_distance():
++    assert asd(result_min, reference_min) == 1.0
++
++
++def test_assd_distance():
++    assert assd(result_min, reference_min) == 1.0
++
++
++def test_asd_voxelspacing():
++    assert asd(result_min, reference_min, voxelspacing=[2]) == 2.0
++
++
++def test_assd_voxelspacing():
++    assert assd(result_min, reference_min, voxelspacing=[2]) == 2.0
++
++
++def test_asd_is_not_symetric():
++    asd_1 = asd(result_sym, reference_sym)
++    asd_2 = asd(reference_sym, result_sym)
++    assert asd_1 != asd_2
++
++
++def test_assd_is_symetric():
++    assd_1 = assd(result_sym, reference_sym)
++    assd_2 = assd(reference_sym, result_sym)
++    assert assd_1 == assd_2
++
++
++def test_obj_asd_is_not_symetric():
++    asd_1 = obj_asd(result_sym, reference_sym)
++    asd_2 = obj_asd(reference_sym, result_sym)
++    assert asd_1 != asd_2
++
++
++def test_obj_assd_is_symetric():
++    assd_1 = obj_assd(result_sym, reference_sym)
++    assd_2 = obj_assd(reference_sym, result_sym)
++    assert assd_1 == assd_2

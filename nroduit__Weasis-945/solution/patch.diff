@@ -1,0 +1,537 @@
+diff --git a/weasis-dicom/weasis-dicom-codec/src/main/java/org/weasis/dicom/codec/seg/BasicContourLoader.java b/weasis-dicom/weasis-dicom-codec/src/main/java/org/weasis/dicom/codec/seg/BasicContourLoader.java
+index 63917416d..d87298774 100644
+--- a/weasis-dicom/weasis-dicom-codec/src/main/java/org/weasis/dicom/codec/seg/BasicContourLoader.java
++++ b/weasis-dicom/weasis-dicom-codec/src/main/java/org/weasis/dicom/codec/seg/BasicContourLoader.java
+@@ -22,7 +22,6 @@
+ import org.weasis.dicom.codec.DicomImageElement;
+ import org.weasis.opencv.data.PlanarImage;
+ import org.weasis.opencv.op.ImageConversion;
+-import org.weasis.opencv.seg.Region;
+ import org.weasis.opencv.seg.Segment;
+ 
+ /** Lazy contour loader for legacy BINARY DICOM SEG frames (one segment per frame). */
+@@ -72,7 +71,7 @@ private Attributes segDicomObject() {
+ 
+   private Set<SegContour> buildContours(PlanarImage binary) {
+     Mat mat = binary.toMat();
+-    List<Segment> segmentList = Region.buildSegmentList(binary);
++    List<Segment> segmentList = MaskContours.build(mat);
+     int pixelCount = Core.countNonZero(mat);
+     SegContour contour = new SegContour(String.valueOf(id), segmentList, pixelCount);
+     region.addPixels(contour);
+diff --git a/weasis-dicom/weasis-dicom-codec/src/main/java/org/weasis/dicom/codec/seg/LabelMapContourLoader.java b/weasis-dicom/weasis-dicom-codec/src/main/java/org/weasis/dicom/codec/seg/LabelMapContourLoader.java
+index 6a6ed5d81..ea8e6111e 100644
+--- a/weasis-dicom/weasis-dicom-codec/src/main/java/org/weasis/dicom/codec/seg/LabelMapContourLoader.java
++++ b/weasis-dicom/weasis-dicom-codec/src/main/java/org/weasis/dicom/codec/seg/LabelMapContourLoader.java
+@@ -23,7 +23,6 @@
+ import org.weasis.core.util.SoftHashMap;
+ import org.weasis.dicom.codec.DicomImageElement;
+ import org.weasis.opencv.data.ImageCV;
+-import org.weasis.opencv.seg.Region;
+ import org.weasis.opencv.seg.Segment;
+ 
+ /**
+@@ -94,7 +93,7 @@ private SegContour buildLabelContour(Mat src, int label) {
+       if (pixelCount == 0) {
+         return null;
+       }
+-      List<Segment> segmentList = Region.buildSegmentList(binary);
++      List<Segment> segmentList = MaskContours.build(binary);
+       SegContour contour = new SegContour(label + "_" + id, segmentList, pixelCount);
+       region.addPixels(contour);
+       contour.setAttributes(region);
+diff --git a/weasis-dicom/weasis-dicom-codec/src/main/java/org/weasis/dicom/codec/seg/MaskContours.java b/weasis-dicom/weasis-dicom-codec/src/main/java/org/weasis/dicom/codec/seg/MaskContours.java
+new file mode 100644
+index 000000000..1d1c73575
+--- /dev/null
++++ b/weasis-dicom/weasis-dicom-codec/src/main/java/org/weasis/dicom/codec/seg/MaskContours.java
+@@ -0,0 +1,93 @@
++/*
++ * Copyright (c) 2026 Weasis Team and other contributors.
++ *
++ * This program and the accompanying materials are made available under the terms of the Eclipse
++ * Public License 2.0 which is available at https://www.eclipse.org/legal/epl-2.0, or the Apache
++ * License, Version 2.0 which is available at https://www.apache.org/licenses/LICENSE-2.0.
++ *
++ * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
++ */
++package org.weasis.dicom.codec.seg;
++
++import java.awt.geom.Point2D;
++import java.util.ArrayList;
++import java.util.LinkedHashMap;
++import java.util.List;
++import java.util.Map;
++import org.opencv.core.Core;
++import org.opencv.core.Mat;
++import org.opencv.core.Scalar;
++import org.weasis.opencv.seg.Segment;
++
++/** Traces the exposed pixel edges of a binary mask, preserving holes and single pixels. */
++final class MaskContours {
++  private MaskContours() {}
++
++  static List<Segment> build(Mat mask) {
++    Mat binary = new Mat();
++    try {
++      Core.compare(mask, Scalar.all(0), binary, Core.CMP_NE);
++      byte[] pixels = new byte[Math.multiplyExact(mask.cols(), mask.rows())];
++      binary.get(0, 0, pixels);
++      return build(pixels, mask.cols(), mask.rows());
++    } finally {
++      binary.release();
++    }
++  }
++
++  static List<Segment> build(byte[] pixels, int width, int height) {
++    // Directions are clockwise: east, south, west, north. Foreground stays on the right,
++    // giving holes the opposite winding for SegContour's WIND_NON_ZERO path.
++    Map<Long, Integer> edges = new LinkedHashMap<>();
++    long stride = (long) width + 1;
++    for (int y = 0; y < height; y++) {
++      for (int x = 0; x < width; x++) {
++        int i = y * width + x;
++        if (pixels[i] == 0) continue;
++        long vertex = y * stride + x;
++        if (y == 0 || pixels[i - width] == 0) add(edges, vertex, 0);
++        if (x == width - 1 || pixels[i + 1] == 0) add(edges, vertex + 1, 1);
++        if (y == height - 1 || pixels[i + width] == 0) add(edges, vertex + stride + 1, 2);
++        if (x == 0 || pixels[i - 1] == 0) add(edges, vertex + stride, 3);
++      }
++    }
++
++    List<Segment> contours = new ArrayList<>();
++    long[] steps = {1, stride, -1, -stride};
++    while (!edges.isEmpty()) {
++      long start = edges.keySet().iterator().next();
++      long vertex = start;
++      int direction = Integer.numberOfTrailingZeros(edges.get(start));
++      Segment contour = new Segment();
++      contour.add(point(start, stride));
++      do {
++        int remaining = edges.get(vertex) & ~(1 << direction);
++        if (remaining == 0) edges.remove(vertex);
++        else edges.put(vertex, remaining);
++        vertex += steps[direction];
++        if (vertex == start) break;
++        int outgoing = edges.get(vertex);
++        // At a diagonal contact, turn right to keep the two foreground pixels separate.
++        int next = (direction + 1) % 4;
++        if ((outgoing & (1 << next)) == 0) {
++          next = direction;
++          if ((outgoing & (1 << next)) == 0) next = (direction + 3) % 4;
++        }
++        if (next != direction) contour.add(point(vertex, stride));
++        direction = next;
++      } while (true);
++      contours.add(contour);
++    }
++    return contours;
++  }
++
++  private static void add(Map<Long, Integer> edges, long vertex, int direction) {
++    edges.merge(vertex, 1 << direction, (a, b) -> a | b);
++  }
++
++  private static Point2D point(long vertex, long stride) {
++    // DICOM and OpenCV pixel centres have integer coordinates. The viewer uses the same
++    // affine transform for the source image and graphics, so boundaries lie half a pixel away.
++    return new Point2D.Double(vertex % stride - 0.5, vertex / stride - 0.5);
++  }
++}
+diff --git a/weasis-dicom/weasis-dicom-codec/src/main/java/org/weasis/dicom/codec/seg/SegmentationVolume.java b/weasis-dicom/weasis-dicom-codec/src/main/java/org/weasis/dicom/codec/seg/SegmentationVolume.java
+index 644bcf949..16ec16bef 100644
+--- a/weasis-dicom/weasis-dicom-codec/src/main/java/org/weasis/dicom/codec/seg/SegmentationVolume.java
++++ b/weasis-dicom/weasis-dicom-codec/src/main/java/org/weasis/dicom/codec/seg/SegmentationVolume.java
+@@ -41,9 +41,7 @@
+ import org.weasis.core.ui.model.graphic.imp.seg.SegContour;
+ import org.weasis.core.ui.model.graphic.imp.seg.SegRegion;
+ import org.weasis.core.util.MathUtil;
+-import org.weasis.opencv.data.ImageCV;
+ import org.weasis.opencv.data.PlanarImage;
+-import org.weasis.opencv.seg.Region;
+ import org.weasis.opencv.seg.RegionAttributes;
+ import org.weasis.opencv.seg.Segment;
+ 
+@@ -1236,7 +1234,7 @@ public void stampMaskWithTransform(
+   /**
+    * Reslices the segmentation volume onto an arbitrary 2D image plane defined by its LPS origin,
+    * row/column unit directions, pixel spacing and dimensions, and returns one {@link SegContour}
+-   * map per visible segment. Uses <b>nearest-neighbor</b> sampling with adaptive oversampling.
++   * map per visible segment. Samples once at each output pixel centre using nearest-neighbor.
+    *
+    * <p>Used by 2D overlays when a segmentation has to be displayed on an image whose orientation
+    * does not match the segmentation's native plane (reformat, oblique series, MPR view).
+@@ -1260,15 +1258,6 @@ public Map<Integer, List<SegContour>> getContoursForImagePlane(
+     if (imgOrigin == null || rowDir == null || colDir == null || width <= 0 || height <= 0) {
+       return Collections.emptyMap();
+     }
+-    // Compute an oversampling factor so every output pixel covers at most one SEG voxel along
+-    // each in-plane axis. Without this, an MR pixel that spans several SEG voxels samples only
+-    // one of them with nearest-neighbor, turning a continuous structure into a dotted column /
+-    // row pattern that findContours then traces as thin parallel stripes. Capped at 4×.
+-    double minSegSpacing = Math.min(pixelSpacing.x, Math.min(pixelSpacing.y, pixelSpacing.z));
+-    int factorU = Math.max(1, (int) Math.ceil(colSpacing / minSegSpacing));
+-    int factorV = Math.max(1, (int) Math.ceil(rowSpacing / minSegSpacing));
+-    int factor = Math.clamp(Math.max(factorU, factorV), 1, 4);
+-
+     // A segmentation usually covers a small part of the displayed field of view, and a study may
+     // hold dozens of them: sampling the whole image for each one — including the ones the plane
+     // misses entirely — dominates every slice change. Restrict the sweep to the pixels that can
+@@ -1278,8 +1267,7 @@ public Map<Integer, List<SegContour>> getContoursForImagePlane(
+       return Collections.emptyMap();
+     }
+     int[] raster =
+-        sampleImagePlane(
+-            imgOrigin, rowDir, colDir, colSpacing, rowSpacing, width, height, factor, box);
++        sampleImagePlane(imgOrigin, rowDir, colDir, colSpacing, rowSpacing, width, height, box);
+     return buildContours(raster, width, height);
+   }
+ 
+@@ -1423,7 +1411,6 @@ private int[] sampleImagePlane(
+       double rowSpacing,
+       int width,
+       int height,
+-      int oversample,
+       PlaneBox box) {
+     int[] raster = new int[width * height];
+ 
+@@ -1439,51 +1426,27 @@ private int[] sampleImagePlane(
+     double rowStepY = colDir.y * rowSpacing;
+     double rowStepZ = colDir.z * rowSpacing;
+ 
+-    int n = Math.max(1, oversample);
+-    double[] subOffsets = new double[n];
+-    for (int i = 0; i < n; i++) {
+-      subOffsets[i] = (i + 0.5) / n - 0.5;
+-    }
+-
+     for (int v = box.v0(); v <= box.v1(); v++) {
+       int rowBase = v * width;
++      double oxV = imgOrigin.x + v * rowStepX;
++      double oyV = imgOrigin.y + v * rowStepY;
++      double ozV = imgOrigin.z + v * rowStepZ;
+       for (int u = box.u0(); u <= box.u1(); u++) {
+-        int combined = 0;
+-        for (int sv = 0; sv < n; sv++) {
+-          double vv = v + subOffsets[sv];
+-          double oxV = imgOrigin.x + vv * rowStepX;
+-          double oyV = imgOrigin.y + vv * rowStepY;
+-          double ozV = imgOrigin.z + vv * rowStepZ;
+-          for (int su = 0; su < n; su++) {
+-            double uu = u + subOffsets[su];
+-            double dx = oxV + uu * colStepX - volumeOrigin.x;
+-            double dy = oyV + uu * colStepY - volumeOrigin.y;
+-            double dz = ozV + uu * colStepZ - volumeOrigin.z;
+-
+-            int vx =
+-                (int)
+-                    Math.round(
+-                        (dx * volumeAxisX.x + dy * volumeAxisX.y + dz * volumeAxisX.z) * invSx);
+-            int vy =
+-                (int)
+-                    Math.round(
+-                        (dx * volumeAxisY.x + dy * volumeAxisY.y + dz * volumeAxisY.z) * invSy);
+-            int vz =
+-                (int)
+-                    Math.round(
+-                        (dx * volumeAxisZ.x + dy * volumeAxisZ.y + dz * volumeAxisZ.z) * invSz);
+-
+-            int id = getStorageId(vx, vy, vz);
+-            if (id != 0) {
+-              // Compose sub-samples by union of their segment lists; allocates a fresh
+-              // combination ID on demand so every observed (sub-)voxel state is preserved.
+-              combined = idForUnion(combined, id);
+-            }
+-          }
+-        }
+-        if (combined != 0) {
+-          raster[rowBase + u] = combined;
+-        }
++        double dx = oxV + u * colStepX - volumeOrigin.x;
++        double dy = oyV + u * colStepY - volumeOrigin.y;
++        double dz = ozV + u * colStepZ - volumeOrigin.z;
++
++        int vx =
++            (int)
++                Math.round((dx * volumeAxisX.x + dy * volumeAxisX.y + dz * volumeAxisX.z) * invSx);
++        int vy =
++            (int)
++                Math.round((dx * volumeAxisY.x + dy * volumeAxisY.y + dz * volumeAxisY.z) * invSy);
++        int vz =
++            (int)
++                Math.round((dx * volumeAxisZ.x + dy * volumeAxisZ.y + dz * volumeAxisZ.z) * invSz);
++
++        raster[rowBase + u] = getStorageId(vx, vy, vz);
+       }
+     }
+     return raster;
+@@ -1582,24 +1545,18 @@ private Map<Integer, List<SegContour>> buildContours(int[] raster, int width, in
+       byte[] maskData = entry.getValue();
+       int pixelCount = segPixelCount.get(segNum)[0];
+       RegionAttributes attrs = attrsBySeg[segNum];
+-      ImageCV binaryMask = new ImageCV(height, width, CvType.CV_8UC1);
+-      try {
+-        binaryMask.toMat().put(0, 0, maskData);
+-        List<Segment> segmentList = Region.buildSegmentList(binaryMask);
+-        if (!segmentList.isEmpty()) {
+-          SegContour contour = new SegContour(String.valueOf(segNum), segmentList, pixelCount);
+-          contour.setAttributes(attrs);
+-          result.computeIfAbsent(segNum, _ -> new ArrayList<>()).add(contour);
+-        } else if (LOGGER.isDebugEnabled()) {
+-          LOGGER.debug(
+-              "buildContours: segment #{} '{}' had {} pixels in the resliced raster but"
+-                  + " Region.buildSegmentList returned no contour",
+-              segNum,
+-              labelOf(segNum),
+-              pixelCount);
+-        }
+-      } finally {
+-        binaryMask.release();
++      List<Segment> segmentList = MaskContours.build(maskData, width, height);
++      if (!segmentList.isEmpty()) {
++        SegContour contour = new SegContour(String.valueOf(segNum), segmentList, pixelCount);
++        contour.setAttributes(attrs);
++        result.computeIfAbsent(segNum, _ -> new ArrayList<>()).add(contour);
++      } else if (LOGGER.isDebugEnabled()) {
++        LOGGER.debug(
++            "buildContours: segment #{} '{}' had {} pixels in the resliced raster but"
++                + " MaskContours returned no contour",
++            segNum,
++            labelOf(segNum),
++            pixelCount);
+       }
+     }
+ 
+diff --git a/weasis-dicom/weasis-dicom-codec/src/test/java/org/weasis/dicom/codec/seg/MaskContoursNativeTest.java b/weasis-dicom/weasis-dicom-codec/src/test/java/org/weasis/dicom/codec/seg/MaskContoursNativeTest.java
+new file mode 100644
+index 000000000..1ca02e0a6
+--- /dev/null
++++ b/weasis-dicom/weasis-dicom-codec/src/test/java/org/weasis/dicom/codec/seg/MaskContoursNativeTest.java
+@@ -0,0 +1,85 @@
++/*
++ * Copyright (c) 2026 Weasis Team and other contributors.
++ *
++ * This program and the accompanying materials are made available under the terms of the Eclipse
++ * Public License 2.0 which is available at https://www.eclipse.org/legal/epl-2.0, or the Apache
++ * License, Version 2.0 which is available at https://www.apache.org/licenses/LICENSE-2.0.
++ *
++ * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
++ */
++package org.weasis.dicom.codec.seg;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assumptions.assumeTrue;
++
++import java.awt.Color;
++import java.awt.Shape;
++import java.io.IOException;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import org.junit.jupiter.api.BeforeAll;
++import org.junit.jupiter.api.Test;
++import org.opencv.core.CvType;
++import org.opencv.core.Mat;
++import org.opencv.core.Size;
++import org.opencv.imgproc.Imgproc;
++import org.weasis.core.ui.model.graphic.imp.seg.SegContour;
++import org.weasis.core.ui.model.graphic.imp.seg.SegRegion;
++
++class MaskContoursNativeTest {
++  @BeforeAll
++  static void loadOpenCV() throws IOException {
++    Path modules = Path.of("..", "..", "weasis-opencv").toAbsolutePath().normalize();
++    boolean loaded = false;
++    if (Files.isDirectory(modules)) {
++      try (var files = Files.walk(modules, 4)) {
++        for (Path library :
++            files
++                .filter(
++                    p -> p.getFileName().toString().equals(System.mapLibraryName("opencv_java")))
++                .toList()) {
++          try {
++            System.load(library.toString());
++            loaded = true;
++            break;
++          } catch (UnsatisfiedLinkError ignored) {
++            // Try the next platform's build output.
++          }
++        }
++      }
++    }
++    assumeTrue(loaded, "OpenCV native library unavailable");
++  }
++
++  @Test
++  void pixelEdgesFollowNearestNeighbourImageZoom() {
++    Mat mask = new Mat(3, 3, CvType.CV_16UC1);
++    Mat transform = new Mat(2, 3, CvType.CV_64FC1);
++    Mat zoomed = new Mat();
++    try {
++      // A hole, diagonal contacts and different non-zero values, including unsigned 16-bit.
++      mask.put(0, 0, new short[] {1, 1, 0, 1, 0, 1, 0, 1, (short) 65535});
++      SegContour contour = new SegContour("test", MaskContours.build(mask));
++      contour.setAttributes(new SegRegion<>(1, "test", Color.RED));
++      Shape shape = contour.getSegGraphic().getShape();
++      transform.put(0, 0, new double[] {8, 0, 0, 0, 8, 0});
++      Imgproc.warpAffine(mask, zoomed, transform, new Size(24, 24), Imgproc.INTER_NEAREST);
++      short[] pixels = new short[24 * 24];
++      zoomed.get(0, 0, pixels);
++      for (int y = 0; y < 24; y++) {
++        for (int x = 0; x < 24; x++) {
++          // Exclude exact boundaries, where nearest-neighbour tie-breaking is arbitrary.
++          if (x % 8 == 4 || y % 8 == 4) continue;
++          assertEquals(
++              pixels[y * 24 + x] != 0,
++              shape.contains(x / 8.0, y / 8.0),
++              "zoomed pixel " + x + "," + y);
++        }
++      }
++    } finally {
++      zoomed.release();
++      transform.release();
++      mask.release();
++    }
++  }
++}
+diff --git a/weasis-dicom/weasis-dicom-codec/src/test/java/org/weasis/dicom/codec/seg/MaskContoursTest.java b/weasis-dicom/weasis-dicom-codec/src/test/java/org/weasis/dicom/codec/seg/MaskContoursTest.java
+new file mode 100644
+index 000000000..e85551132
+--- /dev/null
++++ b/weasis-dicom/weasis-dicom-codec/src/test/java/org/weasis/dicom/codec/seg/MaskContoursTest.java
+@@ -0,0 +1,78 @@
++/*
++ * Copyright (c) 2026 Weasis Team and other contributors.
++ *
++ * This program and the accompanying materials are made available under the terms of the Eclipse
++ * Public License 2.0 which is available at https://www.eclipse.org/legal/epl-2.0, or the Apache
++ * License, Version 2.0 which is available at https://www.apache.org/licenses/LICENSE-2.0.
++ *
++ * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
++ */
++package org.weasis.dicom.codec.seg;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++import java.awt.Color;
++import java.awt.Shape;
++import java.awt.geom.Point2D;
++import java.awt.geom.Rectangle2D;
++import java.util.List;
++import org.junit.jupiter.api.Test;
++import org.weasis.core.ui.model.graphic.imp.seg.SegContour;
++import org.weasis.core.ui.model.graphic.imp.seg.SegRegion;
++import org.weasis.opencv.seg.Segment;
++
++class MaskContoursTest {
++  @Test
++  void preservesEveryThreeByThreeMaskIncludingHolesAndDiagonalContacts() {
++    for (int bits = 1; bits < 512; bits++) {
++      byte[] mask = new byte[9];
++      for (int i = 0; i < mask.length; i++) mask[i] = (byte) ((bits >> i) & 1);
++      List<Segment> segments = MaskContours.build(mask, 3, 3);
++      SegContour contour = new SegContour("test", segments);
++      contour.setAttributes(new SegRegion<>(1, "test", Color.RED));
++      Shape shape = contour.getSegGraphic().getShape();
++      double twiceArea = 0;
++      for (Segment segment : segments) {
++        assertTrue(segment.size() >= 4);
++        for (int i = 0; i < segment.size(); i++) {
++          Point2D a = segment.get(i);
++          Point2D b = segment.get((i + 1) % segment.size());
++          assertTrue(a.getX() == b.getX() || a.getY() == b.getY(), "diagonal edge");
++          twiceArea += a.getX() * b.getY() - b.getX() * a.getY();
++        }
++      }
++      assertEquals(Integer.bitCount(bits), twiceArea / 2, "mask " + bits);
++      for (int y = 0; y < 3; y++) {
++        for (int x = 0; x < 3; x++) {
++          boolean occupied = mask[y * 3 + x] != 0;
++          for (double dy : new double[] {-0.4, 0, 0.4}) {
++            for (double dx : new double[] {-0.4, 0, 0.4}) {
++              assertEquals(occupied, shape.contains(x + dx, y + dy), "mask " + bits);
++            }
++          }
++        }
++      }
++    }
++  }
++
++  @Test
++  void isolatedPixelOccupiesItsWholeImagePixel() {
++    List<Segment> segments = MaskContours.build(new byte[] {0, 0, 0, 1, 0, 0}, 3, 2);
++    assertEquals(1, segments.size());
++    SegContour contour = new SegContour("test", segments);
++    contour.setAttributes(new SegRegion<>(1, "test", Color.RED));
++    assertEquals(
++        new Rectangle2D.Double(-0.5, 0.5, 1, 1), contour.getSegGraphic().getShape().getBounds2D());
++  }
++
++  @Test
++  void diagonalPixelsHaveSeparateContours() {
++    assertEquals(2, MaskContours.build(new byte[] {1, 0, 0, 1}, 2, 2).size());
++  }
++
++  @Test
++  void emptyMaskHasNoContours() {
++    assertTrue(MaskContours.build(new byte[6], 3, 2).isEmpty());
++  }
++}
+diff --git a/weasis-dicom/weasis-dicom-codec/src/test/java/org/weasis/dicom/codec/seg/SegmentationVolumeTest.java b/weasis-dicom/weasis-dicom-codec/src/test/java/org/weasis/dicom/codec/seg/SegmentationVolumeTest.java
+index 69cfc3f82..fed4ade34 100644
+--- a/weasis-dicom/weasis-dicom-codec/src/test/java/org/weasis/dicom/codec/seg/SegmentationVolumeTest.java
++++ b/weasis-dicom/weasis-dicom-codec/src/test/java/org/weasis/dicom/codec/seg/SegmentationVolumeTest.java
+@@ -17,6 +17,7 @@
+ import static org.junit.jupiter.api.Assertions.assertTrue;
+ 
+ import java.awt.Color;
++import java.awt.Shape;
+ import java.nio.ByteBuffer;
+ import java.nio.ByteOrder;
+ import java.util.LinkedHashMap;
+@@ -52,6 +53,44 @@ private SegmentationVolume newVolume() {
+         attributes);
+   }
+ 
++  @Test
++  void imagePlaneSamplesOnlyTheCentreAndKeepsTrueOverlaps() {
++    SegmentationVolume volume = newVolume();
++    volume.addLabel(4, 4, 2, 1);
++    volume.addLabel(4, 4, 2, 2);
++    // Inside an output pixel's footprint, but away from its centre: must not dilate it.
++    volume.addLabel(1, 0, 2, 1);
++    var contours =
++        volume.getContoursForImagePlane(
++            new Vector3d(0, 0, 2), new Vector3d(1, 0, 0), new Vector3d(0, 1, 0), 4, 4, 2, 2);
++    for (int segment : new int[] {1, 2}) {
++      assertEquals(1, contours.get(segment).getFirst().getNumberOfPixels());
++      Shape shape = contours.get(segment).getFirst().getSegGraphic().getShape();
++      assertTrue(shape.contains(0.6, 0.6));
++      assertTrue(shape.contains(1.4, 1.4));
++      assertFalse(shape.contains(0, 0));
++    }
++  }
++
++  @Test
++  void obliqueImagePlaneDoesNotUnionNeighbouringSlices() {
++    SegmentationVolume volume = newVolume();
++    volume.addLabel(2, 2, 2, 1);
++    volume.addLabel(3, 2, 3, 2);
++    var contours =
++        volume.getContoursForImagePlane(
++            new Vector3d(2, 2, 2),
++            new Vector3d(1, 0, 1).normalize(),
++            new Vector3d(0, 1, 0),
++            4,
++            4,
++            1,
++            1);
++    assertEquals(1, contours.size());
++    assertTrue(contours.containsKey(1));
++    assertEquals(1, contours.get(1).getFirst().getNumberOfPixels());
++  }
++
+   @Test
+   void getSegmentNumberResolvesTheRegion() {
+     SegmentationVolume volume = newVolume();

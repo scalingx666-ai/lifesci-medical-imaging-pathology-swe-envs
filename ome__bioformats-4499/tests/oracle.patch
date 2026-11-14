@@ -1,0 +1,425 @@
+diff --git a/components/bio-formats-tools/src/loci/formats/tools/ImageConverter.java b/components/bio-formats-tools/src/loci/formats/tools/ImageConverter.java
+index 1abd0a97b49..39b1ea67488 100644
+--- a/components/bio-formats-tools/src/loci/formats/tools/ImageConverter.java
++++ b/components/bio-formats-tools/src/loci/formats/tools/ImageConverter.java
+@@ -32,8 +32,6 @@
+ 
+ package loci.formats.tools;
+ 
+-import com.google.common.base.Joiner;
+-
+ import java.awt.image.IndexColorModel;
+ import java.io.BufferedReader;
+ import java.io.File;
+@@ -316,7 +314,7 @@ private static SortedMap<String,String> getExtensions() {
+     SortedMap<String, String> extensions = new TreeMap<String, String>();
+     for (int i=0; i<writers.length; i++) {
+       extensions.put(writers[i].getFormat(),
+-        '.' + Joiner.on(", .").join(writers[i].getSuffixes()));
++        '.' + String.join(", .", writers[i].getSuffixes()));
+     }
+     return extensions;
+   }
+@@ -329,7 +327,7 @@ private static SortedMap<String,String> getCompressions() {
+       String[] compressionTypes = writers[i].getCompressionTypes();
+       if (compressionTypes != null) {
+         compressions.put(writers[i].getFormat(),
+-          Joiner.on(", ").join(compressionTypes));
++          String.join(", ", compressionTypes));
+       }
+     }
+     return compressions;
+diff --git a/components/bio-formats-tools/src/loci/formats/tools/ImageInfo.java b/components/bio-formats-tools/src/loci/formats/tools/ImageInfo.java
+index 015f9d35821..deaaffe376f 100644
+--- a/components/bio-formats-tools/src/loci/formats/tools/ImageInfo.java
++++ b/components/bio-formats-tools/src/loci/formats/tools/ImageInfo.java
+@@ -81,8 +81,6 @@
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ 
+-import com.google.common.collect.ImmutableSet;
+-
+ /**
+  * ImageInfo is a utility class for reading a file
+  * and reporting information about it.
+@@ -94,8 +92,8 @@ public class ImageInfo {
+   private static final Logger LOGGER = LoggerFactory.getLogger(ImageInfo.class);
+   private static final String NEWLINE = System.getProperty("line.separator");
+ 
+-  private static final ImmutableSet<String> HELP_ARGUMENTS =
+-      ImmutableSet.of("-h", "-help", "--help");
++  private static final List<String> HELP_ARGUMENTS =
++      Arrays.asList("-h", "-help", "--help");
+ 
+   // -- Fields --
+ 
+diff --git a/components/bio-formats-tools/src/loci/formats/tools/PrintDomains.java b/components/bio-formats-tools/src/loci/formats/tools/PrintDomains.java
+index 670f312ab0f..88f639cd80c 100644
+--- a/components/bio-formats-tools/src/loci/formats/tools/PrintDomains.java
++++ b/components/bio-formats-tools/src/loci/formats/tools/PrintDomains.java
+@@ -33,10 +33,11 @@
+ package loci.formats.tools;
+ 
+ import java.io.IOException;
++import java.util.ArrayList;
+ import java.util.Collection;
++import java.util.List;
+ import java.util.Map;
+-
+-import com.google.common.collect.TreeMultimap;
++import java.util.TreeMap;
+ 
+ import loci.formats.FormatException;
+ import loci.formats.IFormatReader;
+@@ -52,13 +53,15 @@ public static void main(String[] args) {
+     // get a list of all available readers
+     IFormatReader[] readers = new ImageReader().getReaders();
+ 
+-    final TreeMultimap<String, String> domains = TreeMultimap.create();
++    final Map<String, List<String>> domains = new TreeMap<String, List<String>>();
+ 
+     for (IFormatReader reader : readers) {
+       try {
+         String[] readerDomains = reader.getPossibleDomains("");
+         for (String domain : readerDomains) {
+-          domains.put(domain, reader.getFormat());
++          List<String> formats = domains.containsKey(domain) ? domains.get(domain) : new ArrayList<String>();
++          formats.add(reader.getFormat());
++          domains.put(domain, formats);
+         }
+       }
+       catch (FormatException e) {
+@@ -69,10 +72,12 @@ public static void main(String[] args) {
+       }
+     }
+ 
+-    for (final Map.Entry<String, Collection<String>> domain :
+-             domains.asMap().entrySet()) {
++    for (final Map.Entry<String, List<String>> domain :
++             domains.entrySet()) {
+       System.out.println(domain.getKey() + ":");
+-      for (final String readerFormat : domain.getValue()) {
++      List<String> formats = domain.getValue();
++      formats.sort(null);
++      for (final String readerFormat : formats) {
+         System.out.println("  " + readerFormat);
+       }
+     }
+diff --git a/components/formats-bsd/src/loci/formats/in/OMEXMLReader.java b/components/formats-bsd/src/loci/formats/in/OMEXMLReader.java
+index 6b4a1f80cea..18611ccd783 100644
+--- a/components/formats-bsd/src/loci/formats/in/OMEXMLReader.java
++++ b/components/formats-bsd/src/loci/formats/in/OMEXMLReader.java
+@@ -51,6 +51,7 @@
+ import loci.formats.FormatTools;
+ import loci.formats.MetadataTools;
+ import loci.formats.MissingLibraryException;
++import loci.formats.codec.Base64Codec;
+ import loci.formats.codec.CodecOptions;
+ import loci.formats.codec.JPEG2000Codec;
+ import loci.formats.codec.JPEGCodec;
+@@ -63,8 +64,6 @@
+ import org.xml.sax.Attributes;
+ import org.xml.sax.Locator;
+ import org.xml.sax.helpers.DefaultHandler;
+-import com.google.common.io.BaseEncoding;
+-
+ 
+ /**
+  * OMEXMLReader is the file format reader for OME-XML files.
+@@ -163,7 +162,10 @@ public byte[] openBytes(int no, byte[] buf, int x, int y, int w, int h)
+       return buf;
+     }
+     encoded = encoded.substring(0, encoded.length() - 1);
+-    byte[] pixels =  BaseEncoding.base64().decode(encoded);
++
++    // charset encoding omitted as this is only base64 data
++    byte[] pixels = new Base64Codec().decompress(encoded.getBytes());
++
+     // return a blank plane if no pixel data was stored
+     if (pixels.length == 0) {
+       LOGGER.debug("No pixel data for plane #{}", no);
+diff --git a/components/formats-bsd/test/loci/formats/utests/CompressDecompressTest.java b/components/formats-bsd/test/loci/formats/utests/CompressDecompressTest.java
+index 5c979725f70..66c2c819467 100644
+--- a/components/formats-bsd/test/loci/formats/utests/CompressDecompressTest.java
++++ b/components/formats-bsd/test/loci/formats/utests/CompressDecompressTest.java
+@@ -32,11 +32,11 @@
+ 
+ package loci.formats.utests;
+ 
+-import com.google.common.hash.Hashing;
+-
+ import static org.testng.AssertJUnit.fail;
+ import org.testng.annotations.Test;
+ 
++import spec.AbstractTest;
++
+ import loci.formats.codec.CodecOptions;
+ import loci.formats.tiff.IFD;
+ import loci.formats.tiff.TiffCompression;
+@@ -49,7 +49,7 @@
+  *
+  * @author Jean-Marie Burel <j dot burel at dundee dot ac dot uk>
+  */
+-public class CompressDecompressTest {
++public class CompressDecompressTest extends AbstractTest {
+ 
+   /**
+    * Tests the writing of the tiles.
+@@ -78,17 +78,16 @@ private void assertCompression(TiffCompression compression, boolean lossy)
+     String beforeCompression, afterCompression, afterDecompression;
+     CodecOptions options = compression.getCompressionCodecOptions(ifd);
+     byte[] compressed;
+-    beforeCompression = Hashing.md5().hashBytes(plane).toString();
++    beforeCompression = md5(plane);
+     compressed = compression.compress(plane, options);
+-    afterCompression = Hashing.md5().hashBytes(compressed).toString();
++    afterCompression = md5(compressed);
+     if (compression.equals(TiffCompression.UNCOMPRESSED)) {
+       if (!beforeCompression.equals(afterCompression)) {
+         fail("Compression: "+compression.getCodecName()+" "+
+             String.format("Compression MD5 %s != %s",
+             beforeCompression, afterCompression));
+       }
+-      afterDecompression = Hashing.md5().hashBytes(
+-        compression.decompress(compressed, options)).toString();
++      afterDecompression = md5(compression.decompress(compressed, options));
+       if (!beforeCompression.equals(afterDecompression)) {
+         fail("Compression: "+compression.getCodecName()+" "+
+             String.format("Decompression MD5 %s != %s",
+@@ -100,8 +99,7 @@ private void assertCompression(TiffCompression compression, boolean lossy)
+             String.format("Compression MD5 %s != %s",
+             beforeCompression, afterCompression));
+       }
+-      afterDecompression = Hashing.md5().hashBytes(
+-        compression.decompress(compressed, options)).toString();
++      afterDecompression = md5(compression.decompress(compressed, options));
+       if (!lossy && !beforeCompression.equals(afterDecompression)) {
+         fail("Compression: "+compression.getCodecName()+" "+
+             String.format("Decompression MD5 %s != %s",
+diff --git a/components/formats-bsd/test/spec/AbstractTest.java b/components/formats-bsd/test/spec/AbstractTest.java
+index b5444a77692..b0cd6f11529 100644
+--- a/components/formats-bsd/test/spec/AbstractTest.java
++++ b/components/formats-bsd/test/spec/AbstractTest.java
+@@ -119,6 +119,26 @@ protected String sha1(byte[] data)
+         return byteArrayToHexString(md.digest());
+     }
+ 
++    /**
++     * Calculates a MD5 digest.
++     * @param data Data to calcluate a MD5 digest for.
++     * @return Hex string of the MD5 digest.
++     */
++    protected String md5(byte[] data)
++    {
++        MessageDigest md;
++        try {
++            md = MessageDigest.getInstance("MD5");
++        } catch (NoSuchAlgorithmException e) {
++            throw new RuntimeException(
++                    "Required MD5 message digest algorithm unavailable.");
++        }
++        md.update(data);
++        return byteArrayToHexString(md.digest());
++    }
++
++
++
+     /**
+      * Converts a byte array to a hex string.
+      * @param in Byte array to convert.
+diff --git a/components/formats-gpl/src/loci/formats/in/LIFReader.java b/components/formats-gpl/src/loci/formats/in/LIFReader.java
+index 27ff0080a69..b59e3a40e1b 100644
+--- a/components/formats-gpl/src/loci/formats/in/LIFReader.java
++++ b/components/formats-gpl/src/loci/formats/in/LIFReader.java
+@@ -32,9 +32,10 @@
+ import java.util.ArrayList;
+ import java.util.Deque;
+ import java.util.HashMap;
++import java.util.HashSet;
+ import java.util.Iterator;
+ import java.util.List;
+-import java.util.HashSet;
++import java.util.Map;
+ import java.util.Set;
+ import java.util.StringTokenizer;
+ 
+@@ -75,9 +76,6 @@
+ import org.w3c.dom.Node;
+ import org.w3c.dom.NodeList;
+ 
+-import com.google.common.collect.ImmutableMap;
+-import com.google.common.collect.ImmutableMap.Builder;
+-
+ /**
+  * LIFReader is the file format reader for Leica LIF files.
+  *
+@@ -100,11 +98,11 @@ public class LIFReader extends FormatReader {
+   private static final String LOGO_FILE = "LeicaLogo.jpg";
+   private static final String STYLESHEET_FILE = "LASAF_CIP.xsl";
+ 
+-  private static final ImmutableMap<String, Integer> CHANNEL_PRIORITIES =
++  private static final Map<String, Integer> CHANNEL_PRIORITIES =
+     createChannelPriorities();
+ 
+-  private static ImmutableMap<String, Integer> createChannelPriorities() {
+-    final Builder<String, Integer> h = ImmutableMap.builder();
++  private static Map<String, Integer> createChannelPriorities() {
++    final HashMap<String, Integer> h = new HashMap<String, Integer>();
+ 
+     h.put("red", 0);
+     h.put("green", 1);
+@@ -116,7 +114,7 @@ private static ImmutableMap<String, Integer> createChannelPriorities() {
+     h.put("gray", 7);
+     h.put("", 8);
+ 
+-    return h.build();
++    return h;
+   }
+ 
+   private static final long METER_MULTIPLY = 1000000;
+diff --git a/components/formats-gpl/src/loci/formats/in/LeicaReader.java b/components/formats-gpl/src/loci/formats/in/LeicaReader.java
+index 72814cad0e2..d1e9c3d85fe 100644
+--- a/components/formats-gpl/src/loci/formats/in/LeicaReader.java
++++ b/components/formats-gpl/src/loci/formats/in/LeicaReader.java
+@@ -30,6 +30,7 @@
+ import java.util.Arrays;
+ import java.util.ArrayList;
+ import java.util.Collections;
++import java.util.HashMap;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.StringTokenizer;
+@@ -64,8 +65,6 @@
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ 
+-import com.google.common.collect.ImmutableMap;
+-
+ /**
+  * LeicaReader is the file format reader for Leica files.
+  *
+@@ -103,7 +102,7 @@ public class LeicaReader extends FormatReader {
+   private static final int SEQ_SCANNERSET_END = 300;
+   private static final int SEQ_FILTERSET_END = 800;
+ 
+-  private static final ImmutableMap<Integer, String> DIMENSION_NAMES =
++  private static final Map<Integer, String> DIMENSION_NAMES =
+     makeDimensionTable();
+ 
+   // -- Fields --
+@@ -1660,8 +1659,8 @@ private String getString(boolean doubleLength) throws IOException {
+     return getString(len);
+   }
+ 
+-  private static ImmutableMap<Integer, String> makeDimensionTable() {
+-    ImmutableMap.Builder<Integer, String> table = ImmutableMap.builder();
++  private static Map<Integer, String> makeDimensionTable() {
++    final HashMap<Integer, String> table = new HashMap<Integer, String>();
+     table.put(0, "undefined");
+     table.put(120, "x");
+     table.put(121, "y");
+@@ -1689,7 +1688,7 @@ private static ImmutableMap<Integer, String> makeDimensionTable() {
+     table.put(5767246, "logical x-wide");
+     table.put(5832782, "logical y-wide");
+     table.put(5898318, "logical z-wide");
+-    return table.build();
++    return table;
+   }
+ 
+   // -- Helper class --
+diff --git a/components/formats-gpl/src/loci/formats/in/SlidebookReader.java b/components/formats-gpl/src/loci/formats/in/SlidebookReader.java
+index 3601ae3d40a..7403d5fbbe8 100644
+--- a/components/formats-gpl/src/loci/formats/in/SlidebookReader.java
++++ b/components/formats-gpl/src/loci/formats/in/SlidebookReader.java
+@@ -33,9 +33,6 @@
+ import java.util.List;
+ import java.util.Map;
+ 
+-import com.google.common.collect.ArrayListMultimap;
+-import com.google.common.collect.ListMultimap;
+-
+ import loci.common.Constants;
+ import loci.common.DataTools;
+ import loci.common.RandomAccessInputStream;
+@@ -396,8 +393,7 @@ else if (((buf[i] == 'j' || buf[i] == 'k' || buf[i] == 'n') &&
+     }
+ 
+     final List<Long> orderedSeries = new ArrayList<Long>();
+-    final ListMultimap<Long, Integer> uniqueSeries =
+-        ArrayListMultimap.create();
++    final Map<Long, List<Integer>> uniqueSeries = new HashMap<Long, List<Integer>>();
+ 
+     for (int i=0; i<pixelOffsets.size(); i++) {
+       long length = pixelLengths.get(i).longValue();
+@@ -411,11 +407,15 @@ else if (((buf[i] == 'j' || buf[i] == 'k' || buf[i] == 'n') &&
+         i--;
+       }
+       else {
+-        final List<Integer> v = uniqueSeries.get(length);
++        List<Integer> v = uniqueSeries.get(length);
++        if (v == null) {
++          v = new ArrayList<Integer>();
++        }
+         if (v.isEmpty()) {
+           orderedSeries.add(length);
+         }
+-        uniqueSeries.put(length, i);
++        v.add(i);
++        uniqueSeries.put(length, v);
+       }
+     }
+ 
+@@ -795,7 +795,9 @@ else if (isSpool) {
+       for (int i=0; i<core.size(); i++) {
+         long thisSeries = (long) i;
+         orderedSeries.add(thisSeries);
+-        uniqueSeries.put(thisSeries, nextIndex);
++        List<Integer> singleSeries = new ArrayList<Integer>();
++        singleSeries.add(nextIndex);
++        uniqueSeries.put(thisSeries, singleSeries);
+ 
+         long length = pixelLengths.get(nextIndex);
+         length *= core.get(i).sizeT;
+diff --git a/components/formats-gpl/src/loci/formats/in/ZeissLSMReader.java b/components/formats-gpl/src/loci/formats/in/ZeissLSMReader.java
+index 9cecac8eed6..7bdebfc2ab1 100644
+--- a/components/formats-gpl/src/loci/formats/in/ZeissLSMReader.java
++++ b/components/formats-gpl/src/loci/formats/in/ZeissLSMReader.java
+@@ -34,9 +34,6 @@
+ import java.util.Map;
+ import java.util.Vector;
+ 
+-import com.google.common.collect.ImmutableMap;
+-import com.google.common.collect.ImmutableMap.Builder;
+-
+ import loci.common.DataTools;
+ import loci.common.DateTools;
+ import loci.common.Location;
+@@ -157,7 +154,7 @@ public class ZeissLSMReader extends FormatReader {
+ 
+   // -- Static fields --
+ 
+-  private static final ImmutableMap<Integer, String> METADATA_KEYS =
++  private static final Map<Integer, String> METADATA_KEYS =
+     createKeys();
+ 
+   // -- Fields --
+@@ -2049,8 +2046,8 @@ else if (checkSuffix(fileList[i], "mdb")) {
+     return referencedLSMs.toArray(new String[0]);
+   }
+ 
+-  private static ImmutableMap<Integer, String> createKeys() {
+-    final Builder<Integer, String> h = ImmutableMap.builder();
++  private static Map<Integer, String> createKeys() {
++    final HashMap<Integer, String> h = new HashMap<Integer, String>();
+     h.put(0x10000001, "Name");
+     h.put(0x4000000c, "Name");
+     h.put(0x50000001, "Name");
+@@ -2212,7 +2209,7 @@ private static ImmutableMap<Integer, String> createKeys() {
+     h.put(0xd0000013, "Ratio First Images 2");
+     h.put(0xd0000016, "Spectrum");
+     h.put(0x12000003, "Interval");
+-    return h.build();
++    return h;
+   }
+ 
+   private Integer readEntry() throws IOException {

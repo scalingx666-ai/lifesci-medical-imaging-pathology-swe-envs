@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/ellisdg__3DUnetCNN-339"
+description = "The input size of the image can be any size."
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "3DUnetCNN",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "ellisdg/3DUnetCNN"
+ref = "6bd566e0c77ac0fadd8e1f58089978d875fcff7e"
+reference = "https://github.com/ellisdg/3DUnetCNN/pull/339"
+source_access = "auto"
+built_at = "2026-11-14T07:05:34.765186+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:1ee7ffadb1ddebfc5923a6b6fb2b79c64fdb712441fef03e11ef4301f61a8d30"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2024-05-10T21:51:51Z"
+diff_format = "unified"
+context_files = [
+    "unet3d/models/pytorch/segmentation/unet.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 9
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,96 @@
+diff --git a/nnunet_mednext/run/default_configuration.py b/nnunet_mednext/run/default_configuration.py
+index 72334a7..92bb960 100644
+--- a/nnunet_mednext/run/default_configuration.py
++++ b/nnunet_mednext/run/default_configuration.py
+@@ -33,7 +33,7 @@ def get_configuration_from_output_folder(folder):
+ 
+ def get_default_configuration(network, task, network_trainer, plans_identifier=default_plans_identifier,
+                               search_in=(nnunet_mednext.__path__[0], "training", "network_training"),
+-                              base_module='nnunet.training.network_training'):
++                              base_module='nnunet_mednext.training.network_training'):
+     assert network in ['2d', '3d_lowres', '3d_fullres', '3d_cascade_fullres'], \
+         "network can only be one of the following: \'2d\', \'3d_lowres\', \'3d_fullres\', \'3d_cascade_fullres\'"
+ 
+diff --git a/nnunet_mednext/training/network_training/MedNeXt/nnUNetTrainerV2_MedNeXt.py b/nnunet_mednext/training/network_training/MedNeXt/nnUNetTrainerV2_MedNeXt.py
+index 6dfa5d7..9851832 100644
+--- a/nnunet_mednext/training/network_training/MedNeXt/nnUNetTrainerV2_MedNeXt.py
++++ b/nnunet_mednext/training/network_training/MedNeXt/nnUNetTrainerV2_MedNeXt.py
+@@ -1,8 +1,7 @@
+ import torch
+ import os
+ import torch.nn as nn
+-from nnunet_mednext.network_architecture.custom_modules.custom_networks.MedNeXt.MedNext \
+-    import MedNeXt as MedNeXt_Orig, MedNeXt_RegularUpDown as MedNeXt_RegularUpDown_Orig
++from nnunet_mednext.network_architecture.mednextv1.MedNextV1 import MedNeXt as MedNeXt_Orig
+ from nnunet_mednext.training.network_training.nnUNetTrainerV2 import nnUNetTrainerV2
+ from nnunet_mednext.network_architecture.neural_network import SegmentationNetwork
+ from nnunet_mednext.utilities.nd_softmax import softmax_helper
+@@ -136,14 +135,14 @@ def initialize_network(self):
+             self.network.cuda()
+ 
+ 
+-class nnUNetTrainerV2_MedNeXt_S_kernel5_lr_1e_4(nnUNetTrainerV2_MedNeXt_A1_kernel5):   
++class nnUNetTrainerV2_MedNeXt_S_kernel5_lr_1e_4(nnUNetTrainerV2_MedNeXt_S_kernel5):
+     
+     def __init__(self, *args, **kwargs):
+         super().__init__(*args, **kwargs)
+         self.initial_lr = 1e-4
+ 
+ 
+-class nnUNetTrainerV2_MedNeXt_S_kernel5_lr_25e_5(nnUNetTrainerV2_MedNeXt_A1_kernel5):   
++class nnUNetTrainerV2_MedNeXt_S_kernel5_lr_25e_5(nnUNetTrainerV2_MedNeXt_S_kernel5):
+     
+     def __init__(self, *args, **kwargs):
+         super().__init__(*args, **kwargs)
+diff --git a/nnunet_mednext/utilities/distributed.py b/nnunet_mednext/utilities/distributed.py
+index d82d2d1..e2dcab5 100644
+--- a/nnunet_mednext/utilities/distributed.py
++++ b/nnunet_mednext/utilities/distributed.py
+@@ -24,32 +24,6 @@ def print_if_rank0(*args):
+         print(*args)
+ 
+ 
+-class AllGatherGrad(torch.autograd.Function):
+-    # stolen from pytorch lightning
+-    @staticmethod
+-    def forward(
+-        ctx: Any,
+-        tensor: torch.Tensor,
+-        group: Optional["torch.distributed.ProcessGroup"] = None,
+-    ) -> torch.Tensor:
+-        ctx.group = group
+-
+-        gathered_tensor = [torch.zeros_like(tensor) for _ in range(torch.distributed.get_world_size())]
+-
+-        torch.distributed.all_gather(gathered_tensor, tensor, group=group)
+-        gathered_tensor = torch.stack(gathered_tensor, dim=0)
+-
+-        return gathered_tensor
+-
+-    @staticmethod
+-    def backward(ctx: Any, *grad_output: torch.Tensor) -> Tuple[torch.Tensor, None]:
+-        grad_output = torch.cat(grad_output)
+-
+-        torch.distributed.all_reduce(grad_output, op=torch.distributed.ReduceOp.SUM, async_op=False, group=ctx.group)
+-
+-        return grad_output[torch.distributed.get_rank()], None
+-
+-
+ class awesome_allgather_function(autograd.Function):
+     @staticmethod
+     def forward(ctx, input):
+diff --git a/setup.py b/setup.py
+index 59fd613..faf548e 100755
+--- a/setup.py
++++ b/setup.py
+@@ -27,8 +27,8 @@
+       ],
+       entry_points={
+           'console_scripts': [
+-              'mednextv1_convert_decathlon_task = nnunet_mednext.experiment_planning.nnunet_convert_decathlon_task:main',
+-              'mednextv1_plan_and_preprocess = nnunet_mednext.experiment_planning.nnunet_plan_and_preprocess:main',
++              'mednextv1_convert_decathlon_task = nnunet_mednext.experiment_planning.nnUNet_convert_decathlon_task:main',
++              'mednextv1_plan_and_preprocess = nnunet_mednext.experiment_planning.nnUNet_plan_and_preprocess:main',
+               'mednextv1_train = nnunet_mednext.run.run_training:main',
+               'mednextv1_train_DP = nnunet_mednext.run.run_training_DP:main',
+               'mednextv1_train_DDP = nnunet_mednext.run.run_training_DDP:main',

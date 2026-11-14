@@ -1,0 +1,212 @@
+diff --git a/.github/workflows/build.yaml b/.github/workflows/build.yaml
+index 26f9a9a..f50327f 100644
+--- a/.github/workflows/build.yaml
++++ b/.github/workflows/build.yaml
+@@ -6,7 +6,7 @@ on:
+ jobs:
+   build_wheels:
+     name: Build release
+-    runs-on: ubuntu-20.04
++    runs-on: ubuntu-24.04
+ 
+     steps:
+       - uses: actions/checkout@v4
+@@ -26,7 +26,7 @@ jobs:
+     
+   upload_pypi:
+     needs: build_wheels
+-    runs-on: ubuntu-20.04
++    runs-on: ubuntu-24.04
+     
+     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+ 
+diff --git a/.github/workflows/tests_full.yml b/.github/workflows/tests_full.yml
+index 057d00f..fd4dcfe 100644
+--- a/.github/workflows/tests_full.yml
++++ b/.github/workflows/tests_full.yml
+@@ -1,26 +1,26 @@
+ name: Full Tests
+ 
+ on:
+-  push:
+-    branches:
+-      - main
+-  pull_request:
+-    branches:
+-      - main
++  # push:
++  #   branches:
++  #     - main
++  # pull_request:
++  #   branches-ignore:
++  #     - main
+   workflow_dispatch:
+ 
+ jobs:
+   build:
+-    runs-on: ubuntu-20.04
++    runs-on: ubuntu-24.04
+     
+     if: startsWith(github.ref, 'refs/tags/v') != true
+ 
+     steps:
+       - uses: actions/checkout@v4
+-      - name: Set up Python 3.6
++      - name: Set up Python 3.8
+         uses: actions/setup-python@v4
+         with:
+-          python-version: 3.6
++          python-version: 3.8
+ 
+       - name: Install dependencies
+         run: pip install wheel setuptools
+@@ -40,8 +40,8 @@ jobs:
+     runs-on: ${{ matrix.os }}
+     strategy:
+       matrix:
+-        os: [ windows-2019, ubuntu-20.04, macos-13 ]
+-        python-version: [ 3.7, 3.8, 3.9 ]
++        os: [ windows-latest, ubuntu-latest, macos-latest ]
++        python-version: [ 3.8, 3.9]
+         tf-version: [2.7.0, 2.8.0, 2.9.0]
+ 
+     steps:
+@@ -71,8 +71,8 @@ jobs:
+     runs-on: ${{ matrix.os }}
+     strategy:
+       matrix:
+-        os: [ windows-2019, ubuntu-20.04, macos-13 ]
+-        python-version: [ 3.7, 3.8, 3.9 ]
++        os: [ windows-latest, ubuntu-latest, macos-latest ]
++        python-version: [ 3.8, 3.9 ]
+         pytorch-version: [1.8.0, 1.9.0, 1.10.0, 1.11.0, 1.12.0, 1.13.0]
+ 
+     steps:
+diff --git a/.github/workflows/tests_quick.yml b/.github/workflows/tests_quick.yml
+index b5e62c7..d935ecc 100644
+--- a/.github/workflows/tests_quick.yml
++++ b/.github/workflows/tests_quick.yml
+@@ -1,23 +1,23 @@
+ name: Quick Tests
+ 
+-on:
+-  push:
+-    branches-ignore:
+-      - main
+-  pull_request:
+-    branches-ignore:
+-      - main
+-  workflow_dispatch:
++on: [push, pull_request, workflow_dispatch]
++  # push:
++    #branches-ignore:
++    #  - main
++  # pull_request:
++    #branches-ignore:
++    #  - main
++  # workflow_dispatch:
+ 
+ jobs:
+   build:
+-    runs-on: ubuntu-20.04
++    runs-on: ubuntu-24.04
+     steps:
+       - uses: actions/checkout@v4
+-      - name: Set up Python 3.6
++      - name: Set up Python 3.8
+         uses: actions/setup-python@v4
+         with:
+-          python-version: 3.6
++          python-version: 3.8
+ 
+       - name: Install dependencies
+         run: pip install wheel setuptools
+@@ -34,7 +34,7 @@ jobs:
+ 
+   test-tf:
+     needs: build
+-    runs-on: ubuntu-20.04
++    runs-on: ubuntu-24.04
+ 
+     steps:
+       - uses: actions/checkout@v4
+@@ -60,7 +60,7 @@ jobs:
+ 
+   test-torch:
+     needs: build
+-    runs-on: ubuntu-20.04
++    runs-on: ubuntu-24.04
+ 
+     steps:
+       - uses: actions/checkout@v4
+diff --git a/setup.py b/setup.py
+index 040a55e..3b94eba 100644
+--- a/setup.py
++++ b/setup.py
+@@ -6,7 +6,7 @@
+ 
+ setup(
+     name='torchstain',
+-    version='1.4.0',
++    version='1.4.1',
+     description='Stain normalization tools for histological analysis and computational pathology',
+     long_description=README,
+     long_description_content_type='text/markdown',
+diff --git a/torchstain/torch/utils/lab2rgb.py b/torchstain/torch/utils/lab2rgb.py
+index 250c1c9..309632d 100644
+--- a/torchstain/torch/utils/lab2rgb.py
++++ b/torchstain/torch/utils/lab2rgb.py
+@@ -6,6 +6,11 @@
+ def lab2rgb(lab):
+     lab = lab.type(torch.float32)
+     
++    # Move constant tensors to the same device as input
++    device = lab.device
++    _white_device = _white.to(device)
++    _xyz2rgb_device = _xyz2rgb.to(device)
++    
+     # rescale back from OpenCV format and extract LAB channel
+     L, a, b = lab[0] / 2.55, lab[1] - 128, lab[2] - 128
+ 
+@@ -24,10 +29,10 @@ def lab2rgb(lab):
+     out.masked_scatter_(not_mask, (torch.masked_select(out, not_mask) - 16 / 116) / 7.787)
+ 
+     # rescale to the reference white (illuminant)
+-    out = torch.mul(out, _white.type(out.dtype).unsqueeze(dim=-1).unsqueeze(dim=-1))
++    out = torch.mul(out, _white_device.type(out.dtype).unsqueeze(dim=-1).unsqueeze(dim=-1))
+ 
+     # convert XYZ -> RGB color domain
+-    arr = torch.tensordot(out, torch.t(_xyz2rgb).type(out.dtype), dims=([0], [0]))
++    arr = torch.tensordot(out, torch.t(_xyz2rgb_device).type(out.dtype), dims=([0], [0]))
+     mask = arr > 0.0031308
+     not_mask = torch.logical_not(mask)
+     arr.masked_scatter_(mask, 1.055 * torch.pow(torch.masked_select(arr, mask), 1 / 2.4) - 0.055)
+diff --git a/torchstain/torch/utils/rgb2lab.py b/torchstain/torch/utils/rgb2lab.py
+index bbb0d56..a765fc5 100644
+--- a/torchstain/torch/utils/rgb2lab.py
++++ b/torchstain/torch/utils/rgb2lab.py
+@@ -9,17 +9,21 @@
+ 
+ def rgb2lab(rgb):
+     arr = rgb.type(torch.float32)
+-
++    # Move constant tensors to the same device as input
++    device = arr.device
++    _rgb2xyz_device = _rgb2xyz.to(device)
++    _white_device = _white.to(device)
++  
+     # convert rgb -> xyz color domain
+     mask = arr > 0.04045
+     not_mask = torch.logical_not(mask)
+     arr.masked_scatter_(mask, torch.pow((torch.masked_select(arr, mask) + 0.055) / 1.055, 2.4))
+     arr.masked_scatter_(not_mask, torch.masked_select(arr, not_mask) / 12.92)
+ 
+-    xyz = torch.tensordot(torch.t(_rgb2xyz), arr, dims=([0], [0]))
++    xyz = torch.tensordot(torch.t(_rgb2xyz_device), arr, dims=([0], [0]))
+ 
+     # scale by CIE XYZ tristimulus values of the reference white point
+-    arr = torch.mul(xyz, 1 / _white.type(xyz.dtype).unsqueeze(dim=-1).unsqueeze(dim=-1))
++    arr = torch.mul(xyz, 1 / _white_device.type(xyz.dtype).unsqueeze(dim=-1).unsqueeze(dim=-1))
+ 
+     # nonlinear distortion and linear transformation
+     mask = arr > 0.008856

@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/microsoft__dicom-server-3507"
+description = "Add JavaScript to CodeQL workflow"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "dicom-server",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "microsoft/dicom-server"
+ref = "9b3b9587a25d7d14c7c25fa44e55633050120af3"
+reference = "https://github.com/microsoft/dicom-server/pull/3507"
+source_access = "auto"
+built_at = "2026-11-14T06:29:35.970437+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:fd9784b3a56cc78e66b0c14b70abac611538d8015de9bba33adf7573668d7acf"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2024-12-18T17:31:02Z"
+diff_format = "unified"
+context_files = [
+    ".github/workflows/codeql-analysis.yml",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 2
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

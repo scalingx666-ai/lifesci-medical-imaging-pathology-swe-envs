@@ -1,0 +1,71 @@
+version = "1.0"
+
+[task]
+name = "default/pymedphys__pymedphys-2601"
+description = "Explain a date that begins a kept datetime (MIDI-B Full Dates same-day holds)"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "pymedphys",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "pymedphys/pymedphys"
+ref = "ac823650b69048a836e269720125c146367cb4cb"
+reference = "https://github.com/pymedphys/pymedphys/pull/2601"
+source_access = "auto"
+built_at = "2026-11-14T07:11:51.927911+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:9beaa99251e9ab9371ff1d062a70c0be2a21c18708466e27787392fb3f38ccec"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-10T01:54:55Z"
+diff_format = "unified"
+context_files = [
+    ".github/scripts/test_workflow_contracts.py",
+    ".github/workflows/unit-tests.yml",
+    "lib/pymedphys/_dicom/deidentify/conformance_values.py",
+    "lib/pymedphys/_dicom/deidentify/option_kept.py",
+    "lib/pymedphys/_dicom/deidentify/release_gate.py",
+    "lib/pymedphys/_dicom/deidentify/requirements.toml",
+    "lib/pymedphys/_dicom/deidentify/residual_exemptions.py",
+    "lib/pymedphys/docs/contrib/info/deidentification-design.md",
+    "lib/pymedphys/tests/dicom/test_deidentify_full_dates.py",
+    "lib/pymedphys/tests/dicom/test_deidentify_option_kept.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 348
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

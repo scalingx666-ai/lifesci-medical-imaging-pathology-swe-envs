@@ -1,0 +1,723 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index bd3e2499d7..dbaceaf5da 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -16,26 +16,36 @@ permissions:
+ 
+ jobs:
+   build:
++    name: "Qt ${{ matrix.qt-major-version }}, ${{ matrix.runs-on }}, CMake ${{ matrix.cmake-version }}, DCMTK STL ${{ matrix.dcmtk-enable-stl }}"
+     runs-on: ${{ matrix.runs-on }}
+     strategy:
+       fail-fast: false
+       matrix:
+-        runs-on: ["ubuntu-latest"]
+-        qt-major-version: [5, 6]
+-        dcmtk-enable-stl: ["OFF"]
+         include:
++          # Qt 5 is built on Ubuntu 24.04, because newer Ubuntu versions provide VTK only with Qt 6.
++          # It uses the minimum CMake version required by CTK.
++          - runs-on: "ubuntu-24.04"
++            qt-major-version: 5
++            dcmtk-enable-stl: "OFF"
++            cmake-version: "3.20.6"
++          # Qt 6 is built on the latest Ubuntu. Its Qt 6 requires CMake 3.22 or later.
++          - runs-on: "ubuntu-latest"
++            qt-major-version: 6
++            dcmtk-enable-stl: "OFF"
++            cmake-version: "3.22.6"
+           # Projects embedding CTK may bring their own DCMTK built with STL
+           # containers, which makes OFList and friends aliases of the STL types.
+           - runs-on: "ubuntu-latest"
+             qt-major-version: 6
+             dcmtk-enable-stl: "ON"
++            cmake-version: "3.22.6"
+     steps:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+ 
+       - name: Setup CMake
+         uses: jwlawson/actions-setup-cmake@0d6a7d60b009d01c9e7523be22153ff8f19460d3 # v2.2.0
+         with:
+-          cmake-version: "3.20.6"
++          cmake-version: ${{ matrix.cmake-version }}
+ 
+       - name: Display CMake version
+         run: |
+@@ -60,7 +70,7 @@ jobs:
+             libxt-dev
+ 
+       - name: Install VTK (Qt 5)
+-        if: ${{ matrix.runs-on == 'ubuntu-latest' && matrix.qt-major-version == 5 }}
++        if: ${{ matrix.qt-major-version == 5 }}
+         run: |
+           sudo apt-get install -y \
+             libvtk9-dev \
+@@ -107,7 +117,7 @@ jobs:
+             -B CTK-build \
+             -S .
+         env:
+-          CTK_USE_VTK: "${{ matrix.runs-on == 'ubuntu-latest' && matrix.qt-major-version == 5 && 'ON' || 'OFF' }}"
++          CTK_USE_VTK: "${{ matrix.qt-major-version == 5 && 'ON' || 'OFF' }}"
+ 
+       - name: Display Qt_DIR
+         run: |
+diff --git a/.github/workflows/lint.yml b/.github/workflows/lint.yml
+index d2b0a2584a..a915af403b 100644
+--- a/.github/workflows/lint.yml
++++ b/.github/workflows/lint.yml
+@@ -20,6 +20,6 @@ jobs:
+ 
+     - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+       with:
+-        python-version: '3.9'
++        python-version: '3.12'
+ 
+     - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+diff --git a/Libs/DICOM/Core/Testing/Cpp/ctkDICOMDatabaseTest4.cpp b/Libs/DICOM/Core/Testing/Cpp/ctkDICOMDatabaseTest4.cpp
+index eae8e1a811..9124951081 100644
+--- a/Libs/DICOM/Core/Testing/Cpp/ctkDICOMDatabaseTest4.cpp
++++ b/Libs/DICOM/Core/Testing/Cpp/ctkDICOMDatabaseTest4.cpp
+@@ -98,12 +98,27 @@ int ctkDICOMDatabaseTest4( int argc, char * argv [] )
+   tagsToPrecache << tag;
+   database.setTagsToPrecache(tagsToPrecache);
+ 
+-  if (database.tagsToPrecache() != tagsToPrecache)
++  // Tags to precache are stored in upper case (hex digits are case-insensitive)
++  if (database.tagsToPrecache() != (QStringList() << tag.toUpper()))
+   {
+     std::cerr << "ctkDICOMDatabase: tags to precache not correct" << std::endl;
+     return EXIT_FAILURE;
+   }
+ 
++  // Number of threads: automatic by default (between 1 and 6), or the specified number
++  if (database.indexingThreadCount() != 0 || database.effectiveIndexingThreadCount() < 1 || database.effectiveIndexingThreadCount() > 6)
++  {
++    std::cerr << "ctkDICOMDatabase: default number of threads is not correct" << std::endl;
++    return EXIT_FAILURE;
++  }
++  database.setIndexingThreadCount(3);
++  if (database.indexingThreadCount() != 3 || database.effectiveIndexingThreadCount() != 3)
++  {
++    std::cerr << "ctkDICOMDatabase: number of threads is not set" << std::endl;
++    return EXIT_FAILURE;
++  }
++  database.setIndexingThreadCount(0);
++
+   // check the insert timestamp
+   QDateTime beforeInsert = QDateTime::currentDateTime();
+   std::cerr << "Current dateTime " << beforeInsert.toString().toStdString() << std::endl;
+diff --git a/Libs/DICOM/Core/Testing/Cpp/ctkDICOMIndexerTest1.cpp b/Libs/DICOM/Core/Testing/Cpp/ctkDICOMIndexerTest1.cpp
+index 3f56e63c5d..e50cf74d50 100644
+--- a/Libs/DICOM/Core/Testing/Cpp/ctkDICOMIndexerTest1.cpp
++++ b/Libs/DICOM/Core/Testing/Cpp/ctkDICOMIndexerTest1.cpp
+@@ -21,6 +21,7 @@
+ // Qt includes
+ #include <QCoreApplication>
+ #include <QDir>
++#include <QTemporaryDir>
+ 
+ // ctkDICOMCore includes
+ #include "ctkDICOMDatabase.h"
+@@ -42,10 +43,24 @@ int ctkDICOMIndexerTest1( int argc, char * argv [] )
+     std::cerr << "Make sure CTKData_DIR environment variable is set correctly" << std::endl;
+   }
+ 
++  // The indexer worker thread opens the database by file name, therefore an in-memory database cannot be used
++  QTemporaryDir tempDirectory;
++  if (!tempDirectory.isValid())
++  {
++    std::cerr << "Failed to create temporary directory" << std::endl;
++    return EXIT_FAILURE;
++  }
+   ctkDICOMDatabase database;
+-  database.openDatabase(":memory:");
++  database.openDatabase(QDir(tempDirectory.path()).filePath("database.test"));
+   ctkDICOMIndexer indexer;
+ 
++  // Lower-case tags must be found in the tag cache after indexing. Pixel data is excluded from storage
++  // (only its presence is cached) and the private tag is not in the test files.
++  const QString seriesDescriptionTag("0008,103e");
++  const QString pixelDataTag("7fe0,0010");
++  const QString missingPrivateTag("0019,100c");
++  database.setTagsToPrecache(QStringList() << seriesDescriptionTag << pixelDataTag << missingPrivateTag);
++
+   // Test ctkDICOMIndexer::addDirectory()
+   // just check if it doesn't crash
+   // Create block to test batch indexing using indexingBatch helper class.
+@@ -57,5 +72,46 @@ int ctkDICOMIndexerTest1( int argc, char * argv [] )
+   // ensure all concurrent inserts are complete
+   indexer.waitForImportFinished();
+ 
++  // Check that the precached tags are in the tag cache of the indexed instances
++  QStringList filePaths;
++  foreach (const QString& patient, database.patients())
++  {
++    foreach (const QString& study, database.studiesForPatient(patient))
++    {
++      foreach (const QString& series, database.seriesForStudy(study))
++      {
++        filePaths << database.filesForSeries(series);
++      }
++    }
++  }
++  if (filePaths.isEmpty())
++  {
++    std::cerr << "No files were indexed from " << qPrintable(dicomDir) << std::endl;
++    return EXIT_FAILURE;
++  }
++  foreach (const QString& filePath, filePaths)
++  {
++    QString sopInstanceUID = database.instanceForFile(filePath);
++    foreach (const QString& tag, QStringList() << seriesDescriptionTag << pixelDataTag << missingPrivateTag)
++    {
++      // cachedTag returns an empty string if the tag is not in the cache
++      if (database.cachedTag(sopInstanceUID, tag).isEmpty())
++      {
++        std::cerr << "Precached tag " << qPrintable(tag) << " is not in the tag cache of " << qPrintable(filePath) << std::endl;
++        return EXIT_FAILURE;
++      }
++    }
++    if (!database.fileValueExists(filePath, pixelDataTag))
++    {
++      std::cerr << "Pixel data presence is not detected in " << qPrintable(filePath) << std::endl;
++      return EXIT_FAILURE;
++    }
++    if (database.fileValueExists(filePath, missingPrivateTag))
++    {
++      std::cerr << "Missing private tag is detected as present in " << qPrintable(filePath) << std::endl;
++      return EXIT_FAILURE;
++    }
++  }
++
+   return EXIT_SUCCESS;
+ }
+diff --git a/Libs/DICOM/Core/ctkDICOMDatabase.cpp b/Libs/DICOM/Core/ctkDICOMDatabase.cpp
+index 8255f5c90d..e7e35606de 100644
+--- a/Libs/DICOM/Core/ctkDICOMDatabase.cpp
++++ b/Libs/DICOM/Core/ctkDICOMDatabase.cpp
+@@ -27,6 +27,12 @@
+ #include <QSet>
+ #include <QSqlError>
+ #include <QSqlQuery>
++#include <QThread>
++
++// STD includes
++#include <atomic>
++#include <thread>
++#include <vector>
+ #include <QSqlRecord>
+ #include <QStringList>
+ #include <QUuid>
+@@ -970,7 +976,7 @@ bool ctkDICOMDatabasePrivate::uidsForDataSet(QString& patientsName, QString& pat
+   {
+     // Use study instance uid as patient id if patient id is empty - can happen on anonymized datasets
+     // see: http://www.na-mic.org/Bug/view.php?id=2040
+-    logger.warn(QString("Patient ID is empty, using studyInstanceUID (%1) as patient ID").arg(studyInstanceUID));
++    // (a warning is logged once per study by updateDisplayedFields, which processes all files of an import)
+     patientID = studyInstanceUID;
+   }
+   if (patientsName.isEmpty() && !patientID.isEmpty())
+@@ -1482,6 +1488,37 @@ CTK_SET_CPP(ctkDICOMDatabase, bool, setUseShortStoragePath, UseShortStoragePath)
+ CTK_GET_CPP(ctkDICOMDatabase, bool, useSystemFileCopy, UseSystemFileCopy);
+ CTK_SET_CPP(ctkDICOMDatabase, bool, setUseSystemFileCopy, UseSystemFileCopy);
+ 
++//------------------------------------------------------------------------------
++CTK_GET_CPP(ctkDICOMDatabase, int, indexingThreadCount, IndexingThreadCount);
++
++//------------------------------------------------------------------------------
++void ctkDICOMDatabase::setIndexingThreadCount(int indexingThreadCount)
++{
++  Q_D(ctkDICOMDatabase);
++  d->IndexingThreadCount = qMax(0, indexingThreadCount);
++}
++
++//------------------------------------------------------------------------------
++int ctkDICOMDatabase::effectiveIndexingThreadCount()const
++{
++  Q_D(const ctkDICOMDatabase);
++  if (d->IndexingThreadCount > 0)
++  {
++    return d->IndexingThreadCount;
++  }
++  // Default: 6 threads, but at most the number of logical processors minus 2 (at least 1).
++  // - Two processors are left for the application's main thread (user interface) and other applications,
++  //   so that the computer remains responsive during a large import.
++  // - Indexing many small files is limited by the file access time, which parallel reads hide. Importing
++  //   27000 files (4.4 GB) with 6 threads instead of 1 was 3.1x faster from an SSD, 1.6x faster from a hard disk,
++  //   and 2.1x faster from a network share.
++  // - More threads slow down hard disks (by 3-33% with 7-18 threads), because the reads are less sequential.
++  //   SSDs and network shares are faster with more threads (with 18 threads: 1.6x and 1.7x faster than with 6),
++  //   so applications may set a higher indexingThreadCount for them.
++  const int defaultIndexingThreadCount = 6;
++  return qBound(1, QThread::idealThreadCount() - 2, defaultIndexingThreadCount);
++}
++
+ //------------------------------------------------------------------------------
+ // ctkDICOMDatabase methods
+ //------------------------------------------------------------------------------
+@@ -3072,8 +3109,98 @@ void ctkDICOMDatabase::insert(const QList<ctkDICOMDatabase::IndexingResult>& ind
+   d->TagCacheDatabase.transaction();
+   d->Database.transaction();
+ 
+-  foreach(const ctkDICOMDatabase::IndexingResult & indexingResult, indexingResults)
++  // Tags to precache with their keys, and the statements that insert the values of all tags of an instance
++  // into the tag cache (a single statement per instance, for fast inserts)
++  struct PrecachedTag
+   {
++    QString tag;
++    DcmTagKey key;
++    bool excludeFromStorage;
++  };
++  QList<PrecachedTag> precachedTags;
++  foreach(const QString& tag, d->TagsToPrecache)
++  {
++    PrecachedTag precachedTag;
++    precachedTag.tag = tag;
++    unsigned short group, element;
++    this->tagToGroupElement(tag, group, element);
++    precachedTag.key = DcmTagKey(group, element);
++    precachedTag.excludeFromStorage = d->TagsToExcludeFromStorage.contains(tag);
++    precachedTags << precachedTag;
++  }
++  const int maximumTagsPerStatement = 250; // 3 bound values per tag: 750 values per statement, below the minimum SQLite limit of 999 bound variables
++  QList<QSqlQuery> insertTagsStatements;
++  for (int firstTag = 0; firstTag < precachedTags.size(); firstTag += maximumTagsPerStatement)
++  {
++    int tagCount = qMin(maximumTagsPerStatement, precachedTags.size() - firstTag);
++    QStringList rows;
++    for (int i = 0; i < tagCount; ++i)
++    {
++      rows << "(?,?,?)";
++    }
++    QSqlQuery insertTags(d->TagCacheDatabase);
++    insertTags.prepare("INSERT OR REPLACE INTO TagCache VALUES " + rows.join(","));
++    insertTagsStatements << insertTags;
++  }
++
++  // Values of the tags to precache of all instances. They are extracted in parallel, before the database
++  // inserts: reading the values from the datasets (with character set conversion) takes most of the insert
++  // time, and it does not need the database.
++  const int numberOfResults = indexingResults.size();
++  std::vector<QStringList> precachedValues(numberOfResults);
++  {
++    // Value of a tag as it is stored in the tag cache
++    auto precachedValue = [](const ctkDICOMItem& dataset, const PrecachedTag& precachedTag) -> QString
++    {
++      if (precachedTag.excludeFromStorage)
++      {
++        // Only the presence of the tag is stored (for example, for pixel data)
++        return dataset.TagExists(precachedTag.key) ? ValueIsNotStored : TagNotInInstance;
++      }
++      QString value = dataset.GetAllElementValuesAsString(precachedTag.key);
++      return value.isEmpty() ? TagNotInInstance : value;
++    };
++
++    // Each thread takes the next instance that has not been processed yet, until all are done
++    std::atomic<int> nextResultIndex(0);
++    auto extractValues = [&]()
++    {
++      while (true)
++      {
++        const int resultIndex = nextResultIndex++;
++        if (resultIndex >= numberOfResults)
++        {
++          break;
++        }
++        const ctkDICOMItem& dataset = *indexingResults[resultIndex].dataset.data();
++        QStringList& values = precachedValues[resultIndex];
++        values.reserve(precachedTags.size());
++        foreach(const PrecachedTag& precachedTag, precachedTags)
++        {
++          values << precachedValue(dataset, precachedTag);
++        }
++      }
++    };
++
++    // Run on worker threads and on the current thread, then wait for all of them to finish.
++    // This does not access files, so the number of threads is not limited by indexingThreadCount:
++    // all logical processors are used, except two that are left for the user interface and other applications.
++    const int threadCount = qMax(1, qMin(QThread::idealThreadCount() - 2, numberOfResults));
++    std::vector<std::thread> workerThreads;
++    for (int threadIndex = 1; threadIndex < threadCount; ++threadIndex)
++    {
++      workerThreads.emplace_back(extractValues);
++    }
++    extractValues();
++    for (std::thread& workerThread : workerThreads)
++    {
++      workerThread.join();
++    }
++  }
++
++  for (int resultIndex = 0; resultIndex < numberOfResults; ++resultIndex)
++  {
++    const ctkDICOMDatabase::IndexingResult& indexingResult = indexingResults[resultIndex];
+     const ctkDICOMItem& dataset = *indexingResult.dataset.data();
+     QString filePath = indexingResult.filePath;
+     bool generateThumbnail = false; // thumbnail will be generated when needed, don't slow down import with that
+@@ -3140,38 +3267,18 @@ void ctkDICOMDatabase::insert(const QList<ctkDICOMDatabase::IndexingResult>& ind
+     if (!storedFilePath.isEmpty() && !seriesInstanceUID.isEmpty())
+     {
+       // Insert all pre-cached fields into tag cache
+-      QSqlQuery insertTags(d->TagCacheDatabase);
+-      insertTags.prepare("INSERT OR REPLACE INTO TagCache VALUES(?,?,?)");
+-      insertTags.bindValue(0, sopInstanceUID);
+-      foreach(const QString & tag, d->TagsToPrecache)
++      for (int statementIndex = 0; statementIndex < insertTagsStatements.size(); ++statementIndex)
+       {
+-        unsigned short group, element;
+-        this->tagToGroupElement(tag, group, element);
+-        DcmTagKey tagKey(group, element);
+-        QString value;
+-        if (d->TagsToExcludeFromStorage.contains(tag))
+-        {
+-          if (dataset.TagExists(tagKey))
+-          {
+-            value = ValueIsNotStored;
+-          }
+-          else
+-          {
+-            value = TagNotInInstance;
+-          }
+-        }
+-        else
+-        {
+-          value = dataset.GetAllElementValuesAsString(tagKey);
+-        }
+-        insertTags.bindValue(1, tag);
+-        if (value.isEmpty())
+-        {
+-          insertTags.bindValue(2, TagNotInInstance);
+-        }
+-        else
++        QSqlQuery& insertTags = insertTagsStatements[statementIndex];
++        int firstTag = statementIndex * maximumTagsPerStatement;
++        int tagCount = qMin(maximumTagsPerStatement, precachedTags.size() - firstTag);
++        int bindIndex = 0;
++        const QStringList& values = precachedValues[resultIndex];
++        for (int i = 0; i < tagCount; ++i)
+         {
+-          insertTags.bindValue(2, value);
++          insertTags.bindValue(bindIndex++, sopInstanceUID);
++          insertTags.bindValue(bindIndex++, precachedTags[firstTag + i].tag);
++          insertTags.bindValue(bindIndex++, values[firstTag + i]);
+         }
+         insertTags.exec();
+       }
+@@ -3491,9 +3598,19 @@ ctkDICOMDatabase::InsertResult ctkDICOMDatabase::insert(const QList<ctkDICOMJobR
+ }
+ 
+ //------------------------------------------------------------------------------
+-void ctkDICOMDatabase::setTagsToPrecache(const QStringList tags)
++void ctkDICOMDatabase::setTagsToPrecache(const QStringList inputTags)
+ {
+   Q_D(ctkDICOMDatabase);
++  // Tags are stored in upper case in the tag cache
++  QStringList tags;
++  foreach (const QString &inputTag, inputTags)
++  {
++    QString tag = inputTag.toUpper();
++    if (!tags.contains(tag))
++    {
++      tags << tag;
++    }
++  }
+   if (d->TagsToPrecache == tags)
+   {
+     return;
+@@ -4116,6 +4233,10 @@ void ctkDICOMDatabase::updateDisplayedFields()
+   // Initialize rules for starting the update
+   d->DisplayedFieldGenerator->startUpdate();
+ 
++  // Studies with empty patient ID: number of instances and an example instance, to log a single warning per study
++  // (all instances of an import are processed here at once)
++  QMap<QString /*StudyInstanceUID*/, QPair<int, QString /*SOPInstanceUID*/> > emptyPatientIDStudies;
++
+   // Get display names for newly added files and add them into the display tables
+   while (newFilesQuery.next())
+   {
+@@ -4128,11 +4249,23 @@ void ctkDICOMDatabase::updateDisplayedFields()
+     QString patientsName = cachedTags[ctkDICOMItem::TagKeyStripped(DCM_PatientName)];
+     QString patientID = cachedTags[ctkDICOMItem::TagKeyStripped(DCM_PatientID)];
+     QString studyInstanceUID = cachedTags[ctkDICOMItem::TagKeyStripped(DCM_StudyInstanceUID)];
++    if (patientID.isEmpty() && !studyInstanceUID.isEmpty())
++    {
++      QPair<int, QString>& study = emptyPatientIDStudies[studyInstanceUID];
++      if (study.first++ == 0)
++      {
++        study.second = sopInstanceUID;
++      }
++    }
+     if (!d->uidsForDataSet(patientsName, patientID, studyInstanceUID))
+     {
+       // UIDs not valid, message is already logged
+       continue;
+     }
++    // If the patient ID or name is empty then a substitute was used when the patient was inserted (see uidsForDataSet):
++    // use the same values in the displayed fields, otherwise the patient is not found when its fields are updated
++    cachedTags[ctkDICOMItem::TagKeyStripped(DCM_PatientID)] = patientID;
++    cachedTags[ctkDICOMItem::TagKeyStripped(DCM_PatientName)] = patientsName;
+ 
+     QString patientsBirthDate = cachedTags[ctkDICOMItem::TagKeyStripped(DCM_PatientBirthDate)];
+ 
+@@ -4174,6 +4307,12 @@ void ctkDICOMDatabase::updateDisplayedFields()
+     displayedFieldsMapPatient[ compositeId ] = displayedFieldsForCurrentPatient;
+   } // For each instance
+ 
++  for (auto studyIt = emptyPatientIDStudies.constBegin(); studyIt != emptyPatientIDStudies.constEnd(); ++studyIt)
++  {
++    logger.warn(QString("Patient ID is empty in %1 file(s) of study %2 (for example %3), using the study instance UID as patient ID")
++      .arg(studyIt.value().first).arg(studyIt.key()).arg(this->fileForInstance(studyIt.value().second)));
++  }
++
+   emit displayedFieldsUpdateProgress(++progressValue);
+ 
+   // Finalize update by giving the rules the chance to write the final results in the maps
+diff --git a/Libs/DICOM/Core/ctkDICOMDatabase.h b/Libs/DICOM/Core/ctkDICOMDatabase.h
+index e2df44df22..744c329c82 100644
+--- a/Libs/DICOM/Core/ctkDICOMDatabase.h
++++ b/Libs/DICOM/Core/ctkDICOMDatabase.h
+@@ -72,6 +72,8 @@ class CTK_DICOM_CORE_EXPORT ctkDICOMDatabase : public QObject
+   Q_PROPERTY(QStringList loadedSeriesInstanceUIDs READ loadedSeriesInstanceUIDs WRITE setLoadedSeriesInstanceUIDs NOTIFY loadedSeriesInstanceUIDsChanged)
+   Q_PROPERTY(bool useShortStoragePath READ useShortStoragePath WRITE setUseShortStoragePath)
+   Q_PROPERTY(bool useSystemFileCopy READ useSystemFileCopy WRITE setUseSystemFileCopy)
++  Q_PROPERTY(int indexingThreadCount READ indexingThreadCount WRITE setIndexingThreadCount)
++  Q_PROPERTY(int effectiveIndexingThreadCount READ effectiveIndexingThreadCount)
+ 
+ public:
+   struct IndexingResult
+@@ -249,7 +251,8 @@ class CTK_DICOM_CORE_EXPORT ctkDICOMDatabase : public QObject
+   /// tags so that subsequent calls to fileValue or instanceValue will
+   /// be able to use the cache rather than re-reading the file.
+   /// @param tags should be a list of ascii hex group/element tags
+-  ///  like "0008,0008" as in the instanceValue and fileValue calls
++  ///  like "0008,0008" as in the instanceValue and fileValue calls.
++  ///  Tags are stored in upper case, without duplicates.
+   void setTagsToPrecache(const QStringList tags);
+   const QStringList tagsToPrecache();
+ 
+@@ -305,6 +308,16 @@ class CTK_DICOM_CORE_EXPORT ctkDICOMDatabase : public QObject
+   void setUseShortStoragePath(bool useShort);
+   bool useShortStoragePath()const;
+ 
++  /// Number of threads that read and parse files in parallel during indexing (ctkDICOMIndexer uses the setting of
++  /// its database). The best value depends on the storage that the files are read from.
++  /// If it is 0 (default) then the number is determined automatically (see effectiveIndexingThreadCount).
++  void setIndexingThreadCount(int indexingThreadCount);
++  int indexingThreadCount()const;
++  /// Number of threads that read and parse files: indexingThreadCount if it is set, otherwise 6, but at most
++  /// the number of logical processors minus 2 (to leave processing capacity for other activities) and at least 1.
++  /// The default suits hard disks; SSDs and network shares are faster with more threads.
++  int effectiveIndexingThreadCount()const;
++
+   /// Set whether to use the operating system's file copy API (QFile::copy()) for file operations.
+   /// If useSystemFileCopy is false (default), direct read/write with buffering is used, which is
+   /// significantly faster in Qt6 (10-20x) but does not preserve file permissions, timestamps, or
+diff --git a/Libs/DICOM/Core/ctkDICOMDatabase_p.h b/Libs/DICOM/Core/ctkDICOMDatabase_p.h
+index f203238b53..b95084ef44 100644
+--- a/Libs/DICOM/Core/ctkDICOMDatabase_p.h
++++ b/Libs/DICOM/Core/ctkDICOMDatabase_p.h
+@@ -143,6 +143,7 @@ class CTK_DICOM_CORE_EXPORT ctkDICOMDatabasePrivate
+ 
+   bool UseShortStoragePath;
+   bool UseSystemFileCopy;
++  int IndexingThreadCount{0};
+ 
+   ctkDICOMAbstractThumbnailGenerator* ThumbnailGenerator;
+ 
+diff --git a/Libs/DICOM/Core/ctkDICOMIndexer.cpp b/Libs/DICOM/Core/ctkDICOMIndexer.cpp
+index 63a4dd71ba..688e81dfa8 100644
+--- a/Libs/DICOM/Core/ctkDICOMIndexer.cpp
++++ b/Libs/DICOM/Core/ctkDICOMIndexer.cpp
+@@ -32,6 +32,8 @@
+ #include <QDebug>
+ #if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
+ #include <QElapsedTimer>
++#include <QThread>
++#include <QVector>
+ #endif
+ 
+ // ctkDICOM includes
+@@ -40,6 +42,11 @@
+ #include "ctkDICOMIndexer_p.h"
+ #include "ctkDICOMDatabase.h"
+ 
++// STD includes
++#include <atomic>
++#include <thread>
++#include <vector>
++
+ // DCMTK includes
+ #include <dcmtk/dcmdata/dcfilefo.h>
+ #include <dcmtk/dcmdata/dcfilefo.h>
+@@ -91,6 +98,7 @@ void ctkDICOMIndexerPrivateWorker::start()
+   database.openDatabase(this->RequestQueue->databaseFilename());
+   database.setTagsToPrecache(this->RequestQueue->tagsToPrecache());
+   database.setTagsToExcludeFromStorage(this->RequestQueue->tagsToExcludeFromStorage());
++  database.setIndexingThreadCount(this->RequestQueue->indexingThreadCount());
+ 
+   int patientsCountBefore = database.patientsCount();
+   int studiesCountBefore = database.studiesCount();
+@@ -187,13 +195,12 @@ void ctkDICOMIndexerPrivateWorker::processIndexingRequest(DICOMIndexingQueue::In
+   int currentFileIndex = 0;
+   int alreadyAddedFileCount = 0;
+   QStringList alreadyAddedFiles;
++
++  // Files to parse: files that are already in the database and have not been modified since are skipped
++  QStringList filesToParse;
++  QVector<bool> datasetsAlreadyInDatabase;
+   foreach(const QString& filePath, indexingRequest.inputFilesPath)
+   {
+-    int percent = int(this->TimePercentageIndexing * (this->CompletedRequestCount + double(currentFileIndex++) / double(indexingRequest.inputFilesPath.size()))
+-      / double(this->CompletedRequestCount + this->RemainingRequestCount + 1));
+-    emit this->progress(percent);
+-    emit progressDetail(filePath);
+-
+     QDateTime fileModifiedTime = QFileInfo(filePath).lastModified();
+     bool datasetAlreadyInDatabase = this->ModifiedTimeForFilepath.contains(filePath);
+     if (datasetAlreadyInDatabase && this->ModifiedTimeForFilepath[filePath] >= fileModifiedTime)
+@@ -206,26 +213,79 @@ void ctkDICOMIndexerPrivateWorker::processIndexingRequest(DICOMIndexingQueue::In
+       continue;
+     }
+     this->ModifiedTimeForFilepath[filePath] = fileModifiedTime;
++    filesToParse << filePath;
++    datasetsAlreadyInDatabase << datasetAlreadyInDatabase;
++  }
++
++  // Parse the files in parallel: parsing a file takes a few milliseconds of CPU time, which is most of the
++  // indexing time, while writing the results into the database is fast. The files are parsed in batches,
++  // so that progress is reported and results are written into the database while parsing continues.
++  const int threadCount = database.effectiveIndexingThreadCount();
++  const int batchSize = threadCount * 16;
++  const int totalFileCount = indexingRequest.inputFilesPath.size();
++  for (int batchStart = 0; batchStart < filesToParse.size(); batchStart += batchSize)
++  {
++    const int batchCount = qMin(batchSize, filesToParse.size() - batchStart);
++    std::vector< QSharedPointer<ctkDICOMItem> > datasets(batchCount);
+ 
+-    ctkDICOMDatabase::IndexingResult indexingResult;
+-    indexingResult.dataset = QSharedPointer<ctkDICOMItem>(new ctkDICOMItem);
+-    indexingResult.dataset->InitializeFromFile(filePath);
+-    if (indexingResult.dataset->IsInitialized())
++    // Each thread takes the next file of the batch that has not been parsed yet, until all are done
++    std::atomic<int> nextFileIndex(0);
++    auto parseFiles = [&]()
+     {
+-      indexingResult.filePath = filePath;
+-      indexingResult.copyFile = indexingRequest.copyFile;
+-      indexingResult.overwriteExistingDataset = datasetAlreadyInDatabase;
+-      int resultsCount = this->RequestQueue->pushIndexingResult(indexingResult);
+-      if (resultsCount >= REQUEST_RESULTS_CACHE_MAXIMUM_SIZE)
++      while (true)
+       {
+-        emit progressStep(ctkDICOMIndexer::tr("Updating database fields"));
+-        this->writeIndexingResultsToDatabase(database);
+-        emit progressStep(ctkDICOMIndexer::tr("Parsing DICOM files"));
++        const int index = nextFileIndex++;
++        if (index >= batchCount)
++        {
++          break;
++        }
++        QSharedPointer<ctkDICOMItem> dataset(new ctkDICOMItem);
++        dataset->InitializeFromFile(filesToParse[batchStart + index]);
++        datasets[index] = dataset;
+       }
++    };
++
++    // Run on worker threads and on the current thread, then wait for all of them to finish
++    std::vector<std::thread> workerThreads;
++    for (int threadIndex = 1; threadIndex < threadCount && threadIndex < batchCount; ++threadIndex)
++    {
++      workerThreads.emplace_back(parseFiles);
+     }
+-    else
++    parseFiles();
++    for (std::thread& workerThread : workerThreads)
+     {
+-      logger.warn(QString("Could not read DICOM file:") + filePath);
++      workerThread.join();
++    }
++
++    // Push the results in file order (progress reporting and the periodic writes into the database)
++    for (int index = 0; index < batchCount; ++index)
++    {
++      const QString& filePath = filesToParse[batchStart + index];
++      int percent = int(this->TimePercentageIndexing * (this->CompletedRequestCount
++        + double(alreadyAddedFileCount + currentFileIndex++) / double(totalFileCount))
++        / double(this->CompletedRequestCount + this->RemainingRequestCount + 1));
++      emit this->progress(percent);
++      emit progressDetail(filePath);
++
++      if (datasets[index]->IsInitialized())
++      {
++        ctkDICOMDatabase::IndexingResult indexingResult;
++        indexingResult.dataset = datasets[index];
++        indexingResult.filePath = filePath;
++        indexingResult.copyFile = indexingRequest.copyFile;
++        indexingResult.overwriteExistingDataset = datasetsAlreadyInDatabase[batchStart + index];
++        int resultsCount = this->RequestQueue->pushIndexingResult(indexingResult);
++        if (resultsCount >= REQUEST_RESULTS_CACHE_MAXIMUM_SIZE)
++        {
++          emit progressStep(ctkDICOMIndexer::tr("Updating database fields"));
++          this->writeIndexingResultsToDatabase(database);
++          emit progressStep(ctkDICOMIndexer::tr("Parsing DICOM files"));
++        }
++      }
++      else
++      {
++        logger.warn(QString("Could not read DICOM file:") + filePath);
++      }
+     }
+ 
+     if (this->RequestQueue->isStopRequested())
+@@ -279,6 +339,10 @@ void ctkDICOMIndexerPrivateWorker::writeIndexingResultsToDatabase(ctkDICOMDataba
+   this->NumberOfInstancesToInsert = 0;
+   this->NumberOfInstancesInserted = 0;
+ 
++  // Free the parsed datasets in a background thread: they were allocated by the parsing threads, and freeing
++  // memory that was allocated by another thread is slow (it would take as long as the database insert).
++  std::thread([](QList<ctkDICOMDatabase::IndexingResult> results) { results.clear(); }, std::move(indexingResults)).detach();
++
+   float elapsedTimeInSeconds = timeProbe.elapsed() / 1000.0;
+   logger.info(QString("DICOM indexer has successfully inserted %1 files [%2s]")
+               .arg(indexingResults.count()).arg(QString::number(elapsedTimeInSeconds, 'f', 2)));
+@@ -339,6 +403,8 @@ void ctkDICOMIndexerPrivate::pushIndexingRequest(const DICOMIndexingQueue::Index
+     }
+     this->Database->allFilesModifiedTimes(modifiedTimeForFilepath);
+     this->RequestQueue.setModifiedTimeForFilepath(modifiedTimeForFilepath);
++    // The worker thread uses its own database object, with the same number of threads
++    this->RequestQueue.setIndexingThreadCount(this->Database->indexingThreadCount());
+     emit startWorker();
+   }
+ }
+diff --git a/Libs/DICOM/Core/ctkDICOMIndexer_p.h b/Libs/DICOM/Core/ctkDICOMIndexer_p.h
+index 5d187aca37..e9b31e9a83 100644
+--- a/Libs/DICOM/Core/ctkDICOMIndexer_p.h
++++ b/Libs/DICOM/Core/ctkDICOMIndexer_p.h
+@@ -86,6 +86,18 @@ class DICOMIndexingQueue
+     this->TagsToPrecache = tags;
+   }
+ 
++  int indexingThreadCount()
++  {
++    QMutexLocker locker(&this->Mutex);
++    return this->IndexingThreadCount;
++  }
++
++  void setIndexingThreadCount(int indexingThreadCount)
++  {
++    QMutexLocker locker(&this->Mutex);
++    this->IndexingThreadCount = indexingThreadCount;
++  }
++
+   QStringList tagsToExcludeFromStorage()
+   {
+     QMutexLocker locker(&this->Mutex);
+@@ -198,6 +210,7 @@ class DICOMIndexingQueue
+   QString DatabaseFilename;
+   QStringList TagsToPrecache;
+   QStringList TagsToExcludeFromStorage;
++  int IndexingThreadCount{0}; // number of threads of the database (0: automatic)
+ 
+   bool IsIndexing;
+   bool StopRequested;

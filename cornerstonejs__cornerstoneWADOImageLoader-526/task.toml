@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/cornerstonejs__cornerstoneWADOImageLoader-526"
+description = "fix(suv display): fix scaling of non-SUV PT images"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "cornerstoneWADOImageLoader",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "cornerstonejs/cornerstoneWADOImageLoader"
+ref = "b8092fc20f6cf92fe7f1b40a4256f0ec529f444f"
+reference = "https://github.com/cornerstonejs/cornerstoneWADOImageLoader/pull/526"
+source_access = "auto"
+built_at = "2026-11-14T07:12:43.034376+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:0a7ee4d9071ee983eb7d6459f3691dc5ad73edef23d8be19e6a8f33d4d41a895"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2023-04-14T02:19:48Z"
+diff_format = "unified"
+context_files = [
+    "src/shared/scaling/scaleArray.js",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 6
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

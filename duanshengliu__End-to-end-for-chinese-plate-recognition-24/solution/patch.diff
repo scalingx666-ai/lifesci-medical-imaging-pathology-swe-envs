@@ -1,0 +1,467 @@
+diff --git a/License-plate-recognition/CNN.py b/License-plate-recognition/CNN.py
+index f532680..6899ddd 100644
+--- a/License-plate-recognition/CNN.py
++++ b/License-plate-recognition/CNN.py
+@@ -1,9 +1,8 @@
+ # -*- coding:utf-8 -*-
+-# author: DuanshengLiu
+-from tensorflow.keras import layers, losses, models
+ import numpy as np
+ import cv2
+ import os
++from keras import layers, models
+ 
+ 
+ def cnn_train():
+@@ -27,7 +26,8 @@ def cnn_train():
+         X_train.append(img)
+         y_train.append(label)
+     X_train = np.array(X_train)
+-    y_train = [np.array(y_train)[:, i] for i in range(7)]  # y_train是长度为7的列表，其中每个都是shape为(n,)的ndarray，分别对应n张图片的第一个字符，第二个字符....第七个字符
++    y_train = [np.array(y_train)[:, i] for i in
++               range(7)]  # y_train是长度为7的列表，其中每个都是shape为(n,)的ndarray，分别对应n张图片的第一个字符，第二个字符....第七个字符
+ 
+     # cnn模型
+     Input = layers.Input((80, 240, 3))  # 车牌图片shape(80,240,3)
+@@ -41,7 +41,8 @@ def cnn_train():
+         x = layers.Dropout(0.5)(x)
+     x = layers.Flatten()(x)
+     x = layers.Dropout(0.3)(x)
+-    Output = [layers.Dense(65, activation='softmax', name='c%d' % (i + 1))(x) for i in range(7)]  # 7个输出分别对应车牌7个字符，每个输出都为65个类别类概率
++    Output = [layers.Dense(65, activation='softmax', name='c%d' % (i + 1))(x) for i in
++              range(7)]  # 7个输出分别对应车牌7个字符，每个输出都为65个类别类概率
+     model = models.Model(inputs=Input, outputs=Output)
+     model.summary()
+     model.compile(optimizer='adam',
+diff --git a/License-plate-recognition/UI.py b/License-plate-recognition/UI.py
+deleted file mode 100644
+index 95a0e97..0000000
+--- a/License-plate-recognition/UI.py
++++ /dev/null
+@@ -1,128 +0,0 @@
+-# -*- coding:utf-8 -*-
+-# author: DuanshengLiu
+-import cv2
+-import numpy as np
+-from tkinter import *
+-from tkinter.filedialog import askopenfilename
+-from PIL import Image, ImageTk
+-from tensorflow import keras
+-from core import locate_and_correct
+-from Unet import unet_predict
+-from CNN import cnn_predict
+-
+-
+-class Window:
+-    def __init__(self, win, ww, wh):
+-        self.win = win
+-        self.ww = ww
+-        self.wh = wh
+-        self.win.geometry("%dx%d+%d+%d" % (ww, wh, 200, 50))  # 界面启动时的初始位置
+-        self.win.title("车牌定位，矫正和识别软件---by DuanshengLiu")
+-        self.img_src_path = None
+-
+-        self.label_src = Label(self.win, text='原图:', font=('微软雅黑', 13)).place(x=0, y=0)
+-        self.label_lic1 = Label(self.win, text='车牌区域1:', font=('微软雅黑', 13)).place(x=615, y=0)
+-        self.label_pred1 = Label(self.win, text='识别结果1:', font=('微软雅黑', 13)).place(x=615, y=85)
+-        self.label_lic2 = Label(self.win, text='车牌区域2:', font=('微软雅黑', 13)).place(x=615, y=180)
+-        self.label_pred2 = Label(self.win, text='识别结果2:', font=('微软雅黑', 13)).place(x=615, y=265)
+-        self.label_lic3 = Label(self.win, text='车牌区域3:', font=('微软雅黑', 13)).place(x=615, y=360)
+-        self.label_pred3 = Label(self.win, text='识别结果3:', font=('微软雅黑', 13)).place(x=615, y=445)
+-
+-        self.can_src = Canvas(self.win, width=512, height=512, bg='white', relief='solid', borderwidth=1)  # 原图画布
+-        self.can_src.place(x=50, y=0)
+-        self.can_lic1 = Canvas(self.win, width=245, height=85, bg='white', relief='solid', borderwidth=1)  # 车牌区域1画布
+-        self.can_lic1.place(x=710, y=0)
+-        self.can_pred1 = Canvas(self.win, width=245, height=65, bg='white', relief='solid', borderwidth=1)  # 车牌识别1画布
+-        self.can_pred1.place(x=710, y=90)
+-        self.can_lic2 = Canvas(self.win, width=245, height=85, bg='white', relief='solid', borderwidth=1)  # 车牌区域2画布
+-        self.can_lic2.place(x=710, y=175)
+-        self.can_pred2 = Canvas(self.win, width=245, height=65, bg='white', relief='solid', borderwidth=1)  # 车牌识别2画布
+-        self.can_pred2.place(x=710, y=265)
+-        self.can_lic3 = Canvas(self.win, width=245, height=85, bg='white', relief='solid', borderwidth=1)  # 车牌区域3画布
+-        self.can_lic3.place(x=710, y=350)
+-        self.can_pred3 = Canvas(self.win, width=245, height=65, bg='white', relief='solid', borderwidth=1)  # 车牌识别3画布
+-        self.can_pred3.place(x=710, y=440)
+-
+-        self.button1 = Button(self.win, text='选择文件', width=10, height=1, command=self.load_show_img)  # 选择文件按钮
+-        self.button1.place(x=680, y=wh - 30)
+-        self.button2 = Button(self.win, text='识别车牌', width=10, height=1, command=self.display)  # 识别车牌按钮
+-        self.button2.place(x=780, y=wh - 30)
+-        self.button3 = Button(self.win, text='清空所有', width=10, height=1, command=self.clear)  # 清空所有按钮
+-        self.button3.place(x=880, y=wh - 30)
+-        self.unet = keras.models.load_model('unet.h5')
+-        self.cnn = keras.models.load_model('cnn.h5')
+-        print('正在启动中,请稍等...')
+-        cnn_predict(self.cnn, [np.zeros((80, 240, 3))])
+-        print("已启动,开始识别吧！")
+-
+-
+-    def load_show_img(self):
+-        self.clear()
+-        sv = StringVar()
+-        sv.set(askopenfilename())
+-        self.img_src_path = Entry(self.win, state='readonly', text=sv).get()  # 获取到所打开的图片
+-        img_open = Image.open(self.img_src_path)
+-        if img_open.size[0] * img_open.size[1] > 240 * 80:
+-            img_open = img_open.resize((512, 512), Image.ANTIALIAS)
+-        self.img_Tk = ImageTk.PhotoImage(img_open)
+-        self.can_src.create_image(258, 258, image=self.img_Tk, anchor='center')
+-
+-    def display(self):
+-        if self.img_src_path == None:  # 还没选择图片就进行预测
+-            self.can_pred1.create_text(32, 15, text='请选择图片', anchor='nw', font=('黑体', 28))
+-        else:
+-            img_src = cv2.imdecode(np.fromfile(self.img_src_path, dtype=np.uint8), -1)  # 从中文路径读取时用
+-            h, w = img_src.shape[0], img_src.shape[1]
+-            if h * w <= 240 * 80 and 2 <= w / h <= 5:  # 满足该条件说明可能整个图片就是一张车牌,无需定位,直接识别即可
+-                lic = cv2.resize(img_src, dsize=(240, 80), interpolation=cv2.INTER_AREA)[:, :, :3]  # 直接resize为(240,80)
+-                img_src_copy, Lic_img = img_src, [lic]
+-            else:  # 否则就需通过unet对img_src原图预测,得到img_mask,实现车牌定位,然后进行识别
+-                img_src, img_mask = unet_predict(self.unet, self.img_src_path)
+-                img_src_copy, Lic_img = locate_and_correct(img_src, img_mask)  # 利用core.py中的locate_and_correct函数进行车牌定位和矫正
+-
+-            Lic_pred = cnn_predict(self.cnn, Lic_img)  # 利用cnn进行车牌的识别预测,Lic_pred中存的是元祖(车牌图片,识别结果)
+-            if Lic_pred:
+-                img = Image.fromarray(img_src_copy[:, :, ::-1])  # img_src_copy[:, :, ::-1]将BGR转为RGB
+-                self.img_Tk = ImageTk.PhotoImage(img)
+-                self.can_src.delete('all')  # 显示前,先清空画板
+-                self.can_src.create_image(258, 258, image=self.img_Tk,
+-                                          anchor='center')  # img_src_copy上绘制出了定位的车牌轮廓,将其显示在画板上
+-                for i, lic_pred in enumerate(Lic_pred):
+-                    if i == 0:
+-                        self.lic_Tk1 = ImageTk.PhotoImage(Image.fromarray(lic_pred[0][:, :, ::-1]))
+-                        self.can_lic1.create_image(5, 5, image=self.lic_Tk1, anchor='nw')
+-                        self.can_pred1.create_text(35, 15, text=lic_pred[1], anchor='nw', font=('黑体', 28))
+-                    elif i == 1:
+-                        self.lic_Tk2 = ImageTk.PhotoImage(Image.fromarray(lic_pred[0][:, :, ::-1]))
+-                        self.can_lic2.create_image(5, 5, image=self.lic_Tk2, anchor='nw')
+-                        self.can_pred2.create_text(40, 15, text=lic_pred[1], anchor='nw', font=('黑体', 28))
+-                    elif i == 2:
+-                        self.lic_Tk3 = ImageTk.PhotoImage(Image.fromarray(lic_pred[0][:, :, ::-1]))
+-                        self.can_lic3.create_image(5, 5, image=self.lic_Tk3, anchor='nw')
+-                        self.can_pred3.create_text(40, 15, text=lic_pred[1], anchor='nw', font=('黑体', 28))
+-
+-            else:  # Lic_pred为空说明未能识别
+-                self.can_pred1.create_text(47, 15, text='未能识别', anchor='nw', font=('黑体', 27))
+-
+-    def clear(self):
+-        self.can_src.delete('all')
+-        self.can_lic1.delete('all')
+-        self.can_lic2.delete('all')
+-        self.can_lic3.delete('all')
+-        self.can_pred1.delete('all')
+-        self.can_pred2.delete('all')
+-        self.can_pred3.delete('all')
+-        self.img_src_path = None
+-
+-    def closeEvent():  # 关闭前清除session(),防止'NoneType' object is not callable
+-        keras.backend.clear_session()
+-        sys.exit()
+-
+-
+-if __name__ == '__main__':
+-    win = Tk()
+-    ww = 1000  # 窗口宽设定1000
+-    wh = 600  # 窗口高设定600
+-    Window(win, ww, wh)
+-    win.protocol("WM_DELETE_WINDOW", Window.closeEvent)
+-    win.mainloop()
+diff --git a/License-plate-recognition/Unet.py b/License-plate-recognition/Unet.py
+index a5c8d5c..df74ad7 100644
+--- a/License-plate-recognition/Unet.py
++++ b/License-plate-recognition/Unet.py
+@@ -1,9 +1,8 @@
+ # -*- coding:utf-8 -*-
+-# author: DuanshengLiu
+ import numpy as np
+ import os
+ import cv2
+-from tensorflow.keras import layers, losses, models
++from keras import layers,  models
+ 
+ 
+ def unet_train():
+diff --git a/License-plate-recognition/__pycache__/CNN.cpython-37.pyc b/License-plate-recognition/__pycache__/CNN.cpython-37.pyc
+new file mode 100644
+index 0000000..b8b7ca4
+Binary files /dev/null and b/License-plate-recognition/__pycache__/CNN.cpython-37.pyc differ
+diff --git a/License-plate-recognition/__pycache__/Unet.cpython-37.pyc b/License-plate-recognition/__pycache__/Unet.cpython-37.pyc
+new file mode 100644
+index 0000000..732a26c
+Binary files /dev/null and b/License-plate-recognition/__pycache__/Unet.cpython-37.pyc differ
+diff --git a/License-plate-recognition/__pycache__/core.cpython-37.pyc b/License-plate-recognition/__pycache__/core.cpython-37.pyc
+new file mode 100644
+index 0000000..14eb0ce
+Binary files /dev/null and b/License-plate-recognition/__pycache__/core.cpython-37.pyc differ
+diff --git a/License-plate-recognition/__pycache__/myui.cpython-37.pyc b/License-plate-recognition/__pycache__/myui.cpython-37.pyc
+new file mode 100644
+index 0000000..79232e2
+Binary files /dev/null and b/License-plate-recognition/__pycache__/myui.cpython-37.pyc differ
+diff --git a/License-plate-recognition/core.py b/License-plate-recognition/core.py
+index 8751f14..83a30b2 100644
+--- a/License-plate-recognition/core.py
++++ b/License-plate-recognition/core.py
+@@ -1,5 +1,5 @@
+ # -*- coding:utf-8 -*-
+-# author: DuanshengLiu
++
+ import cv2
+ import numpy as np
+ 
+diff --git a/License-plate-recognition/main.py b/License-plate-recognition/main.py
+new file mode 100644
+index 0000000..38f56d1
+--- /dev/null
++++ b/License-plate-recognition/main.py
+@@ -0,0 +1,66 @@
++import sys
++import cv2
++from myui import *
++from core import locate_and_correct
++from Unet import unet_predict
++
++
++class MyLpr(MyUI):
++    def __int__(self):
++        super().__init__()
++
++    def display(self):
++        # 还没选择图片就进行预测
++        if self.img_src_path is None:
++            self.can_pred1.create_text(32, 15, text='请选择图片', anchor='nw', font=('黑体', 28))
++            return
++
++        img_src = cv2.imdecode(np.fromfile(self.img_src_path, dtype=np.uint8), -1)  # 从中文路径读取时用
++        h, w = img_src.shape[0], img_src.shape[1]
++
++        # 情况一 : 满足该条件说明可能整个图片就是一张车牌,无需定位,直接识别即可
++        if h * w <= 240 * 80 and 2 <= w / h <= 5:  #
++            lic = cv2.resize(img_src, dsize=(240, 80), interpolation=cv2.INTER_AREA)[:, :, :3]  # 直接resize为(240,80)
++            img_src_copy, Lic_img = img_src, [lic]
++
++        # 情况二 : 需通过unet对img_src原图预测,得到img_mask,实现车牌定位,然后进行识别
++        else:
++            img_src, img_mask = unet_predict(self.unet, self.img_src_path)
++            # 利用core.py中的locate_and_correct函数进行车牌定位和矫正
++            img_src_copy, Lic_img = locate_and_correct(img_src, img_mask)
++
++        Lic_pred = cnn_predict(self.cnn, Lic_img)  # 利用cnn进行车牌的识别预测,Lic_pred中存的是元祖(车牌图片,识别结果)
++        # 情况一 : 识别失败
++        if Lic_pred is None:
++            self.can_pred1.create_text(47, 15, text='未能识别', anchor='nw', font=('黑体', 27))
++            return
++
++        # 情况二 : 识别成功
++        img = Image.fromarray(img_src_copy[:, :, ::-1])  # img_src_copy[:, :, ::-1]将BGR转为RGB
++        self.img_Tk = ImageTk.PhotoImage(img)
++        self.can_src.delete('all')  # 显示前,先清空画板
++        self.can_src.create_image(258, 258, image=self.img_Tk,
++                                  anchor='center')  # img_src_copy上绘制出了定位的车牌轮廓,将其显示在画板上
++        for i, lic_pred in enumerate(Lic_pred):
++            if i == 0:
++                self.lic_Tk1 = ImageTk.PhotoImage(Image.fromarray(lic_pred[0][:, :, ::-1]))
++                self.can_lic1.create_image(5, 5, image=self.lic_Tk1, anchor='nw')
++                self.can_pred1.create_text(35, 15, text=lic_pred[1], anchor='nw', font=('黑体', 28))
++            elif i == 1:
++                self.lic_Tk2 = ImageTk.PhotoImage(Image.fromarray(lic_pred[0][:, :, ::-1]))
++                self.can_lic2.create_image(5, 5, image=self.lic_Tk2, anchor='nw')
++                self.can_pred2.create_text(40, 15, text=lic_pred[1], anchor='nw', font=('黑体', 28))
++            elif i == 2:
++                self.lic_Tk3 = ImageTk.PhotoImage(Image.fromarray(lic_pred[0][:, :, ::-1]))
++                self.can_lic3.create_image(5, 5, image=self.lic_Tk3, anchor='nw')
++                self.can_pred3.create_text(40, 15, text=lic_pred[1], anchor='nw', font=('黑体', 28))
++
++
++def close():
++    keras.backend.clear_session()
++    sys.exit(0)
++
++
++a = MyLpr()
++a.protocol("WM_DELETE_WINDOW", close)
++a.mainloop()
+diff --git a/License-plate-recognition/myui.py b/License-plate-recognition/myui.py
+new file mode 100644
+index 0000000..6201194
+--- /dev/null
++++ b/License-plate-recognition/myui.py
+@@ -0,0 +1,107 @@
++import tkinter as tk
++from tkinter.filedialog import askopenfilename
++from tkinter import Label, Canvas, Button, StringVar, Entry
++from PIL import ImageTk, Image
++
++
++class MyUI(tk.Tk):
++
++    def __init__(self):
++        super().__init__()
++
++        [self.button_clear_all,
++         self.img_src_path,
++         self.button_recognize_plate,
++         self.button_select_file,
++         self.can_pred3,
++         self.can_lic3,
++         self.can_pred2,
++         self.can_lic2,
++         self.can_pred1,
++         self.can_lic1,
++         self.can_src] = [0] * 11
++
++        self.unet, self.cnn = CNN_init()  # 初始化CNN模型
++
++        self.setupUI(1000, 600)  # 窗口宽设定1000 窗口高设定600
++
++    def setupUI(self, window_width, window_height):
++        self.img_src_path = None
++        self.geometry("%dx%d+%d+%d" % (window_width, window_height, 200, 50))  # 界面启动时的初始位置
++        self.title("车牌定位，矫正和识别软件")
++        self.img_src_path = None
++
++        Label(self, text='原图:', font=('微软雅黑', 13)).place(x=0, y=0)
++        Label(self, text='车牌区域1:', font=('微软雅黑', 13)).place(x=615, y=0)
++        Label(self, text='识别结果1:', font=('微软雅黑', 13)).place(x=615, y=85)
++        Label(self, text='车牌区域2:', font=('微软雅黑', 13)).place(x=615, y=180)
++        Label(self, text='识别结果2:', font=('微软雅黑', 13)).place(x=615, y=265)
++        Label(self, text='车牌区域3:', font=('微软雅黑', 13)).place(x=615, y=360)
++        Label(self, text='识别结果3:', font=('微软雅黑', 13)).place(x=615, y=445)
++
++        self.can_src = Canvas(self, width=512, height=512, bg='white', relief='solid', borderwidth=1)  # 原图画布
++        self.can_src.place(x=50, y=0)
++        self.can_lic1 = Canvas(self, width=245, height=85, bg='white', relief='solid', borderwidth=1)  # 车牌区域1画布
++        self.can_lic1.place(x=710, y=0)
++        self.can_pred1 = Canvas(self, width=245, height=65, bg='white', relief='solid', borderwidth=1)  # 车牌识别1画布
++        self.can_pred1.place(x=710, y=90)
++        self.can_lic2 = Canvas(self, width=245, height=85, bg='white', relief='solid', borderwidth=1)  # 车牌区域2画布
++        self.can_lic2.place(x=710, y=175)
++        self.can_pred2 = Canvas(self, width=245, height=65, bg='white', relief='solid', borderwidth=1)  # 车牌识别2画布
++        self.can_pred2.place(x=710, y=265)
++        self.can_lic3 = Canvas(self, width=245, height=85, bg='white', relief='solid', borderwidth=1)  # 车牌区域3画布
++        self.can_lic3.place(x=710, y=350)
++        self.can_pred3 = Canvas(self, width=245, height=65, bg='white', relief='solid', borderwidth=1)  # 车牌识别3画布
++        self.can_pred3.place(x=710, y=440)
++
++        self.button_select_file = Button(self, text='选择文件', width=10, height=1,
++                                         command=self.load_show_img)  # 选择文件按钮
++        self.button_select_file.place(x=680, y=window_height - 30)
++        self.button_recognize_plate = Button(self, text='识别车牌', width=10, height=1, command=self.display)  # 识别车牌按钮
++        self.button_recognize_plate.place(x=780, y=window_height - 30)
++        self.button_clear_all = Button(self, text='清空所有', width=10, height=1, command=self.clear)  # 清空所有按钮
++        self.button_clear_all.place(x=880, y=window_height - 30)
++
++    # 加载文件
++    def load_show_img(self):
++        self.clear()
++        sv = StringVar()
++        sv.set(askopenfilename())
++        self.img_src_path = Entry(self, state='readonly', text=sv).get()  # 获取到所打开的图片
++
++        img_open = Image.open(self.img_src_path)
++
++        if img_open.size[0] * img_open.size[1] > 240 * 80:
++            img_open = img_open.resize((512, 512), Image.LANCZOS)
++
++        self.img_Tk = ImageTk.PhotoImage(img_open)
++        self.can_src.create_image(258, 258, image=self.img_Tk, anchor='center')
++
++    # 显示
++    def display(self):
++        raise NotImplementedError
++
++    # 清除
++    def clear(self):
++        self.can_src.delete('all')
++        self.can_lic1.delete('all')
++        self.can_lic2.delete('all')
++        self.can_lic3.delete('all')
++        self.can_pred1.delete('all')
++        self.can_pred2.delete('all')
++        self.can_pred3.delete('all')
++        self.img_src_path = None
++
++
++import numpy as np
++from tensorflow import keras
++from CNN import cnn_predict
++
++
++def CNN_init():
++    unet = keras.models.load_model('unet.h5')
++    cnn = keras.models.load_model('cnn.h5')
++    print('正在启动中,请稍等...')
++    cnn_predict(cnn, [np.zeros((80, 240, 3))])
++    print("已启动,开始识别吧！")
++    return unet, cnn
+diff --git a/requirements.txt b/requirements.txt
+new file mode 100644
+index 0000000..3f413e3
+Binary files /dev/null and b/requirements.txt differ
+diff --git a/test.py b/test.py
+new file mode 100644
+index 0000000..014d84d
+--- /dev/null
++++ b/test.py
+@@ -0,0 +1,61 @@
++'''
++python:3.7.6
++'''
++
++import cv2
++
++
++def main():
++    # 创建VideoCapture对象，参数为摄像头索引号，0表示第一个摄像头
++    cap = cv2.VideoCapture(0)
++
++    while True:
++        # 读取视频帧
++        ret, frame = cap.read()
++
++        # 如果视频帧读取成功
++        if ret:
++            # 显示视频帧
++            cv2.imshow('Camera', frame)
++
++        # 按下Esc键退出循环
++        if cv2.waitKey(1) == 27:
++            break
++
++    # 释放VideoCapture对象和销毁所有窗口
++    cap.release()
++    cv2.destroyAllWindows()
++
++
++if __name__ == '__main__':
++    main()
++
++import cv2
++from PIL import Image, ImageTk
++
++
++def display(img_src_path, img_src_copy, Lic_img, Lic_pred, canvas_src, canvas_lic1, canvas_lic2, canvas_lic3,
++            canvas_pred1, canvas_pred2, canvas_pred3):
++    if img_src_path is None:  # 还没选择图片就进行预测
++        canvas_pred1.create_text(32, 15, text='请选择图片', anchor='nw', font=('黑体', 28))
++    else:
++        if Lic_pred:
++            img = Image.fromarray(img_src_copy[:, :, ::-1])  # img_src_copy[:, :, ::-1]将BGR转为RGB
++            img_Tk = ImageTk.PhotoImage(img)
++            canvas_src.delete('all')  # 显示前,先清空画板
++            canvas_src.create_image(258, 258, image=img_Tk, anchor='center')  # img_src_copy上绘制出了定位的车牌轮廓,将其显示在画板上
++            for i, lic_pred in enumerate(Lic_pred):
++                if i == 0:
++                    lic_Tk1 = ImageTk.PhotoImage(Image.fromarray(lic_pred[0][:, :, ::-1]))
++                    canvas_lic1.create_image(5, 5, image=lic_Tk1, anchor='nw')
++                    canvas_pred1.create_text(35, 15, text=lic_pred[1], anchor='nw', font=('黑体', 28))
++                elif i == 1:
++                    lic_Tk2 = ImageTk.PhotoImage(Image.fromarray(lic_pred[0][:, :, ::-1]))
++                    canvas_lic2.create_image(5, 5, image=lic_Tk2, anchor='nw')
++                    canvas_pred2.create_text(40, 15, text=lic_pred[1], anchor='nw', font=('黑体', 28))
++                elif i == 2:
++                    lic_Tk3 = ImageTk.PhotoImage(Image.fromarray(lic_pred[0][:, :, ::-1]))
++                    canvas_lic3.create_image(5, 5, image=lic_Tk3, anchor='nw')
++                    canvas_pred3.create_text(40, 15, text=lic_pred[1], anchor='nw', font=('黑体', 28))
++        else:  # Lic_pred为空说明未能识别
++            canvas_pred1.create_text(47, 15, text='未能识别', anchor='nw', font=('黑体', 27))

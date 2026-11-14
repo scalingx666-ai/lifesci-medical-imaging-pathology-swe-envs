@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/HuCaoFighting__Swin-Unet-113"
+description = "Fixed train.sh"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "Swin-Unet",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "HuCaoFighting/Swin-Unet"
+ref = "0644419d567aca63a2835cf19b0ad81495bed811"
+reference = "https://github.com/HuCaoFighting/Swin-Unet/pull/113"
+source_access = "auto"
+built_at = "2026-11-14T07:05:19.014052+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:bf1e0b452d65be4fdf49ba67ec331a5c63651955048e5ef89a11f49eb223493b"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2024-05-30T07:33:32Z"
+diff_format = "unified"
+context_files = [
+    "train.sh",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 51
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

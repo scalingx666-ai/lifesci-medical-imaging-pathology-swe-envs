@@ -1,0 +1,40 @@
+diff --git a/object/src/lib.rs b/object/src/lib.rs
+index 4e8cc3dd..d86799e9 100644
+--- a/object/src/lib.rs
++++ b/object/src/lib.rs
+@@ -227,13 +227,13 @@ use std::path::Path;
+ ///
+ /// This UID may change in future versions,
+ /// even between patch versions.
+-pub const IMPLEMENTATION_CLASS_UID: &str = "2.25.175220362680028036156011002668768058626";
++pub const IMPLEMENTATION_CLASS_UID: &str = "2.25.268051044599311345688996422911472681751";
+ 
+ /// The current implementation version name generically referring to DICOM-rs.
+ ///
+ /// This name may change in future versions,
+ /// even between patch versions.
+-pub const IMPLEMENTATION_VERSION_NAME: &str = "DICOM-rs 0.10.0";
++pub const IMPLEMENTATION_VERSION_NAME: &str = "DICOM-rs 0.10.1";
+ 
+ /// An error which occurs when fetching a value
+ #[derive(Debug, Snafu)]
+diff --git a/ul/src/lib.rs b/ul/src/lib.rs
+index f8b5e179..b334768d 100644
+--- a/ul/src/lib.rs
++++ b/ul/src/lib.rs
+@@ -43,13 +43,13 @@ pub mod prelude;
+ ///
+ /// This UID may change in future versions,
+ /// even between patch versions.
+-pub const IMPLEMENTATION_CLASS_UID: &str = "2.25.175220362680028036156011002668768058626";
++pub const IMPLEMENTATION_CLASS_UID: &str = "2.25.268051044599311345688996422911472681751";
+ 
+ /// The current implementation version name generically referring to DICOM-rs.
+ ///
+ /// This name may change in future versions,
+ /// even between patch versions.
+-pub const IMPLEMENTATION_VERSION_NAME: &str = "DICOM-rs 0.10.0";
++pub const IMPLEMENTATION_VERSION_NAME: &str = "DICOM-rs 0.10.1";
+ 
+ // re-exports
+ 

@@ -1,0 +1,72 @@
+version = "1.0"
+
+[task]
+name = "default/imgly__background-removal-js-150"
+description = "Fix import statement of memoize to be from lodash-es not lodash"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "background-removal-js",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "imgly/background-removal-js"
+ref = "152b5b49825e0f2b26f712f9bb74bb964006688a"
+reference = "https://github.com/imgly/background-removal-js/pull/150"
+source_access = "auto"
+built_at = "2026-11-14T07:04:28.788999+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:1dee3bc42e315e3edc5a4771a0975e21456c1133f63f6d73f34782441028bf2f"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2025-03-13T15:56:57Z"
+diff_format = "unified"
+context_files = [
+    "package-lock.json",
+    "package.json",
+    "packages/node-e2e/package.json",
+    "packages/node-examples/package.json",
+    "packages/node/package.json",
+    "packages/web-data/package.json",
+    "packages/web-examples/next-example/package.json",
+    "packages/web-examples/vite-project/package.json",
+    "packages/web/README.md",
+    "packages/web/package.json",
+    "packages/web/src/api/v1.ts",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 65
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,1459 @@
+diff --git a/README.md b/README.md
+index 852ad226..c124bf30 100644
+--- a/README.md
++++ b/README.md
+@@ -15,7 +15,7 @@ Chest X-rays (CXRs) play an integral role in driving critical decisions in disea
+ ## MedRAX
+ MedRAX is built on a robust technical foundation:
+ - **Core Architecture**: Built on LangChain and LangGraph frameworks
+-- **Language Model**: Uses GPT-4o with vision capabilities as the backbone LLM
++- **Language Models**: Supports multiple LLM providers including OpenAI (GPT-4o) and Google (Gemini) models
+ - **Deployment**: Supports both local and cloud-based deployments
+ - **Interface**: Production-ready interface built with Gradio
+ - **Modular Design**: Tool-agnostic architecture allowing easy integration of new capabilities
+@@ -27,6 +27,8 @@ MedRAX is built on a robust technical foundation:
+ - **Report Generation**: Implements SwinV2 Transformer trained on CheXpert Plus for detailed medical reporting
+ - **Disease Classification**: Leverages DenseNet-121 from TorchXRayVision for detecting 18 pathology classes
+ - **X-ray Generation**: Utilizes RoentGen for synthetic CXR generation
++- **Web Browser**: Provides web search capabilities and URL content retrieval using Google Custom Search API
++- **Python Sandbox**: Executes Python code in a secure, stateful sandbox environment using `langchain-sandbox` and Pyodide. Supports custom data analysis, calculations, and dynamic package installations. Pre-configured with medical analysis packages including pandas, numpy, pydicom, SimpleITK, scikit-image, Pillow, scikit-learn, matplotlib, seaborn, and openpyxl. **Requires Deno runtime.**
+ - **Utilities**: Includes DICOM processing, visualization tools, and custom plotting capabilities
+ <br><br>
+ 
+@@ -69,6 +71,14 @@ python quickstart.py \
+ ## Installation
+ ### Prerequisites
+ - Python 3.8+
++- [Deno](https://docs.deno.com/runtime/getting_started/installation/): Required for the Python Sandbox tool. Install using:
++  ```bash
++  # macOS/Linux
++  curl -fsSL https://deno.land/install.sh | sh
++  
++  # Windows (PowerShell)
++  irm https://deno.land/install.ps1 | iex
++  ```
+ - CUDA/GPU for best performance
+ 
+ ### Installation Steps
+@@ -103,8 +113,11 @@ MedRAX supports selective tool initialization, allowing you to use only the tool
+ ```python
+ selected_tools = [
+     "ImageVisualizerTool",
+-    "ChestXRayClassifierTool",
++    "TorchXRayVisionClassifierTool",  # Renamed from ChestXRayClassifierTool
++    "ArcPlusClassifierTool",          # New ArcPlus classifier
+     "ChestXRaySegmentationTool",
++    "PythonSandboxTool",              # Python code execution
++    "WebBrowserTool",                 # Web search and URL access
+     # Add or remove tools as needed
+ ]
+ 
+@@ -120,9 +133,17 @@ agent, tools_dict = initialize_agent(
+ 
+ The following tools will automatically download their model weights when initialized:
+ 
+-### Classification Tool
++### Classification Tools
+ ```python
+-ChestXRayClassifierTool(device=device)
++# TorchXRayVision-based classifier (original)
++TorchXRayVisionClassifierTool(device=device)
++
++# ArcPlus SwinTransformer-based classifier (new)
++ArcPlusClassifierTool(
++    model_path="/path/to/Ark6_swinLarge768_ep50.pth.tar",  # Optional
++    num_classes=18,  # Default
++    device=device
++)
+ ```
+ 
+ ### Segmentation Tool
+@@ -175,11 +196,25 @@ XRayVQATool(
+ Support for MedSAM segmentation will be added in a future update.
+ ```
+ 
++### Python Sandbox Tool
++```python
++# Tool name for selection: "PythonSandboxTool" 
++# Implementation: create_python_sandbox() -> PyodideSandboxTool
++create_python_sandbox()  # Returns configured PyodideSandboxTool instance
++```
++- **Stateful execution**: Variables, functions, and imports persist between calls
++- **Pre-installed packages**: Common medical analysis packages (pandas, numpy, pydicom, SimpleITK, scikit-image, Pillow, scikit-learn, matplotlib, seaborn, openpyxl)
++- **Dynamic package installation**: Can install additional packages using `micropip`
++- **Network access**: Enabled for package installations from PyPI
++- **Secure sandbox**: Runs in isolated Pyodide environment
++- **Requires Deno**: Must have Deno runtime installed on host system
++
+ ### Utility Tools
+ No additional model weights required:
+ ```python
+ ImageVisualizerTool()
+ DicomProcessorTool(temp_dir=temp_dir)
++WebBrowserTool()  # Requires Google Search API credentials
+ ```
+ <br>
+ 
+@@ -212,12 +247,69 @@ ChestXRayGeneratorTool(
+ - Some tools (LLaVA-Med, Grounding) are more resource-intensive
+ <br>
+ 
+-### Local LLMs
++### Language Model Options
++MedRAX supports multiple language model providers:
++
++#### OpenAI Models
++Supported prefixes: `gpt-` and `chatgpt-`
++```
++export OPENAI_API_KEY="your-openai-api-key"
++export OPENAI_BASE_URL="https://api.openai.com/v1"  # Optional for custom endpoints
++```
++
++#### Google Gemini Models
++Supported prefix: `gemini-`
++```
++export GOOGLE_API_KEY="your-google-api-key"
++```
++
++#### OpenRouter Models (Open Source & Proprietary)
++Supported prefix: `openrouter-`
++
++Access many open source and proprietary models via [OpenRouter](https://openrouter.ai/):
++```
++export OPENROUTER_API_KEY="your-openrouter-api-key"
++```
++
++**Note:** Tool compatibility may vary with open-source models. For best results with tools, we recommend using OpenAI or Google Gemini models.
++
++#### Local LLMs
+ If you are running a local LLM using frameworks like [Ollama](https://ollama.com/) or [LM Studio](https://lmstudio.ai/), you need to configure your environment variables accordingly. For example:
+ ```
+ export OPENAI_BASE_URL="http://localhost:11434/v1"
+ export OPENAI_API_KEY="ollama"
+ ```
++
++#### Tool-Specific Configuration
++
++**WebBrowserTool**: Requires Google Custom Search API credentials:
++```bash
++export GOOGLE_SEARCH_API_KEY="your-google-search-api-key"
++export GOOGLE_SEARCH_ENGINE_ID="your-google-search-engine-id"
++```
++
++**PythonSandboxTool**: Requires Deno runtime installation:
++```bash
++# Verify Deno is installed
++deno --version
++
++# If not installed, install using:
++curl -fsSL https://deno.land/install.sh | sh  # macOS/Linux
++# or
++irm https://deno.land/install.ps1 | iex       # Windows PowerShell
++```
++
++**Custom Python Sandbox Configuration**:
++```python
++from medrax.tools import create_python_sandbox
++
++# Create custom sandbox with additional packages
++custom_sandbox = create_python_sandbox(
++    pip_packages=["your-package", "another-package"],
++    stateful=True,  # Maintain state between calls
++    allow_net=True,  # Allow network access for package installation
++)
++```
+ <br>
+ 
+ ## Star History
+diff --git a/main.py b/main.py
+index 8df8fdff..9fe774bc 100644
+--- a/main.py
++++ b/main.py
+@@ -5,9 +5,7 @@
+ from transformers import logging
+ 
+ from langgraph.checkpoint.memory import MemorySaver
+-from langchain_openai import ChatOpenAI
+-from langgraph.checkpoint.memory import MemorySaver
+-from langchain_openai import ChatOpenAI
++from medrax.models import ModelFactory
+ 
+ from interface import create_demo
+ from medrax.agent import *
+@@ -25,10 +23,10 @@ def initialize_agent(
+     model_dir="/model-weights",
+     temp_dir="temp",
+     device="cuda",
+-    model="chatgpt-4o-latest",
++    model="gpt-4.1-2025-04-14",
+     temperature=0.7,
+     top_p=0.95,
+-    openai_kwargs={}
++    model_kwargs={}
+ ):
+     """Initialize the MedRAX agent with specified tools and configuration.
+ 
+@@ -38,10 +36,10 @@ def initialize_agent(
+         model_dir (str, optional): Directory containing model weights. Defaults to "/model-weights".
+         temp_dir (str, optional): Directory for temporary files. Defaults to "temp".
+         device (str, optional): Device to run models on. Defaults to "cuda".
+-        model (str, optional): Model to use. Defaults to "chatgpt-4o-latest".
++        model (str, optional): Model to use. Defaults to "gpt-4o".
+         temperature (float, optional): Temperature for the model. Defaults to 0.7.
+         top_p (float, optional): Top P for the model. Defaults to 0.95.
+-        openai_kwargs (dict, optional): Additional keyword arguments for OpenAI API, such as API key and base URL.
++        model_kwargs (dict, optional): Additional keyword arguments for model.
+ 
+     Returns:
+         Tuple[Agent, Dict[str, BaseTool]]: Initialized agent and dictionary of tool instances
+@@ -50,7 +48,11 @@ def initialize_agent(
+     prompt = prompts["MEDICAL_ASSISTANT"]
+ 
+     all_tools = {
+-        "ChestXRayClassifierTool": lambda: ChestXRayClassifierTool(device=device),
++        "TorchXRayVisionClassifierTool": lambda: TorchXRayVisionClassifierTool(device=device),
++        "ArcPlusClassifierTool": lambda: ArcPlusClassifierTool(
++            cache_dir=model_dir,
++            device=device
++        ),
+         "ChestXRaySegmentationTool": lambda: ChestXRaySegmentationTool(device=device),
+         "LlavaMedTool": lambda: LlavaMedTool(cache_dir=model_dir, device=device, load_in_8bit=True),
+         "XRayVQATool": lambda: XRayVQATool(cache_dir=model_dir, device=device),
+@@ -65,6 +67,8 @@ def initialize_agent(
+         ),
+         "ImageVisualizerTool": lambda: ImageVisualizerTool(),
+         "DicomProcessorTool": lambda: DicomProcessorTool(temp_dir=temp_dir),
++        "WebBrowserTool": lambda: WebBrowserTool(),
++        "PythonSandboxTool": lambda: create_python_sandbox(),
+     }
+ 
+     # Initialize only selected tools or all if none specified
+@@ -75,9 +79,22 @@ def initialize_agent(
+             tools_dict[tool_name] = all_tools[tool_name]()
+ 
+     checkpointer = MemorySaver()
+-    model = ChatOpenAI(model=model, temperature=temperature, top_p=top_p, **openai_kwargs)
++    
++    # Create the language model using the factory
++    try:
++        llm = ModelFactory.create_model(
++            model_name=model,
++            temperature=temperature,
++            top_p=top_p,
++            **model_kwargs
++        )
++    except ValueError as e:
++        print(f"Error creating language model: {e}")
++        print(f"Available model providers: {list(ModelFactory._model_providers.keys())}")
++        raise
++    
+     agent = Agent(
+-        model,
++        llm,
+         tools=list(tools_dict.values()),
+         log_tools=True,
+         log_dir="logs",
+@@ -99,35 +116,38 @@ def initialize_agent(
+     # Example: initialize with only specific tools
+     # Here three tools are commented out, you can uncomment them to use them
+     selected_tools = [
+-        "ImageVisualizerTool",
+-        "DicomProcessorTool",
+-        "ChestXRayClassifierTool",
+-        "ChestXRaySegmentationTool",
+-        "ChestXRayReportGeneratorTool",
+-        "XRayVQATool",
++        # "ImageVisualizerTool",
++        # "DicomProcessorTool",
++        # "TorchXRayVisionClassifierTool",
++        # "ArcPlusClassifierTool",
++        # "ChestXRaySegmentationTool",
++        # "ChestXRayReportGeneratorTool",
++        # "XRayVQATool",
++        "WebBrowserTool",  # Add the web browser tool
++        "PythonSandboxTool",  # Add the Python sandbox tool
+         # "LlavaMedTool",
+         # "XRayPhraseGroundingTool",
+         # "ChestXRayGeneratorTool",
+     ]
+ 
+-    # Collect the ENV variables
+-    openai_kwargs = {}
+-    if api_key := os.getenv("OPENAI_API_KEY"):
+-        openai_kwargs["api_key"] = api_key
+-
+-    if base_url := os.getenv("OPENAI_BASE_URL"):
+-        openai_kwargs["base_url"] = base_url
+-
++    # Prepare any additional model-specific kwargs
++    model_kwargs = {}
++    
++    # Set up API keys for the web browser tool
++    # You'll need to set these environment variables:
++    # - GOOGLE_SEARCH_API_KEY: Your Google Custom Search API key
++    # - GOOGLE_SEARCH_ENGINE_ID: Your Google Custom Search Engine ID
++    
+     agent, tools_dict = initialize_agent(
+         "medrax/docs/system_prompts.txt",
+         tools_to_use=selected_tools,
+-        model_dir="/model-weights",  # Change this to the path of the model weights
++        model_dir="/model-weights",
+         temp_dir="temp",  # Change this to the path of the temporary directory
+-        device="cuda",  # Change this to the device you want to use
+-        model="gpt-4o",  # Change this to the model you want to use, e.g. gpt-4o-mini
++        device="cuda",
++        model="gpt-4.1-2025-04-14",  # Change this to the model you want to use, e.g. gpt-4.1-2025-04-14, gemini-2.5-pro
+         temperature=0.7,
+         top_p=0.95,
+-        openai_kwargs=openai_kwargs
++        model_kwargs=model_kwargs
+     )
+     demo = create_demo(agent, tools_dict)
+ 
+diff --git a/medrax/agent/__init__.py b/medrax/agent/__init__.py
+index 562c6acc..dffc681c 100644
+--- a/medrax/agent/__init__.py
++++ b/medrax/agent/__init__.py
+@@ -1 +1 @@
+-from .agent import AgentState, Agent
++from .agent import State, Agent
+diff --git a/medrax/agent/agent.py b/medrax/agent/agent.py
+index c4b658bd..2b99d558 100644
+--- a/medrax/agent/agent.py
++++ b/medrax/agent/agent.py
+@@ -5,8 +5,9 @@
+ from datetime import datetime
+ from typing import List, Dict, Any, TypedDict, Annotated, Optional
+ 
+-from langgraph.graph import StateGraph, END
+-from langchain_core.messages import AnyMessage, SystemMessage, ToolMessage
++from langgraph.prebuilt import create_react_agent
++from langchain_core.messages import AnyMessage
++from langgraph.prebuilt.chat_agent_executor import AgentState
+ from langchain_core.language_models import BaseLanguageModel
+ from langchain_core.tools import BaseTool
+ 
+@@ -32,17 +33,19 @@ class ToolCallLog(TypedDict):
+     content: str
+ 
+ 
+-class AgentState(TypedDict):
++class State(AgentState):
+     """
+-    A TypedDict representing the state of an agent.
++    A AgentState representing the state of an agent.
+ 
+     Attributes:
+-        messages (Annotated[List[AnyMessage], operator.add]): A list of messages
+-            representing the conversation history. The operator.add annotation
+-            indicates that new messages should be appended to this list.
++        session_bytes (bytes): The pickled state of the sandbox session. This is
++            required for stateful tools and should not be modified directly.
++        session_metadata (dict): Metadata associated with the sandbox session.
+     """
+ 
+-    messages: Annotated[List[AnyMessage], operator.add]
++    # Required for the stateful PyodideSandboxTool
++    session_bytes: bytes = b""
++    session_metadata: dict = {}
+ 
+ 
+ class Agent:
+@@ -52,7 +55,7 @@ class Agent:
+ 
+     Attributes:
+         model (BaseLanguageModel): The language model used for processing.
+-        tools (Dict[str, BaseTool]): A dictionary of available tools.
++        tools (List[BaseTool]): A list of available tools.
+         checkpointer (Any): Manages and persists the agent's state.
+         system_prompt (str): The system instructions for the agent.
+         workflow (StateGraph): The compiled workflow for the agent's processing.
+@@ -87,107 +90,11 @@ def __init__(
+             self.log_path = Path(log_dir or "logs")
+             self.log_path.mkdir(exist_ok=True)
+ 
+-        # Define the agent workflow
+-        workflow = StateGraph(AgentState)
+-        workflow.add_node("process", self.process_request)
+-        workflow.add_node("execute", self.execute_tools)
+-        workflow.add_conditional_edges(
+-            "process", self.has_tool_calls, {True: "execute", False: END}
++        self.workflow = create_react_agent(
++            model=model,
++            tools=tools,
++            checkpointer=checkpointer,
++            state_schema=State,
++            prompt=system_prompt if system_prompt else None,
+         )
+-        workflow.add_edge("execute", "process")
+-        workflow.set_entry_point("process")
+-
+-        self.workflow = workflow.compile(checkpointer=checkpointer)
+         self.tools = {t.name: t for t in tools}
+-        self.model = model.bind_tools(tools)
+-
+-    def process_request(self, state: AgentState) -> Dict[str, List[AnyMessage]]:
+-        """
+-        Process the request using the language model.
+-
+-        Args:
+-            state (AgentState): The current state of the agent.
+-
+-        Returns:
+-            Dict[str, List[AnyMessage]]: A dictionary containing the model's response.
+-        """
+-        messages = state["messages"]
+-        if self.system_prompt:
+-            messages = [SystemMessage(content=self.system_prompt)] + messages
+-        response = self.model.invoke(messages)
+-        return {"messages": [response]}
+-
+-    def has_tool_calls(self, state: AgentState) -> bool:
+-        """
+-        Check if the response contains any tool calls.
+-
+-        Args:
+-            state (AgentState): The current state of the agent.
+-
+-        Returns:
+-            bool: True if tool calls exist, False otherwise.
+-        """
+-        response = state["messages"][-1]
+-        return len(response.tool_calls) > 0
+-
+-    def execute_tools(self, state: AgentState) -> Dict[str, List[ToolMessage]]:
+-        """
+-        Execute tool calls from the model's response.
+-
+-        Args:
+-            state (AgentState): The current state of the agent.
+-
+-        Returns:
+-            Dict[str, List[ToolMessage]]: A dictionary containing tool execution results.
+-        """
+-        tool_calls = state["messages"][-1].tool_calls
+-        results = []
+-
+-        for call in tool_calls:
+-            print(f"Executing tool: {call}")
+-            if call["name"] not in self.tools:
+-                print("\n....invalid tool....")
+-                result = "invalid tool, please retry"
+-            else:
+-                result = self.tools[call["name"]].invoke(call["args"])
+-
+-            results.append(
+-                ToolMessage(
+-                    tool_call_id=call["id"],
+-                    name=call["name"],
+-                    args=call["args"],
+-                    content=str(result),
+-                )
+-            )
+-
+-        self._save_tool_calls(results)
+-        print("Returning to model processing!")
+-
+-        return {"messages": results}
+-
+-    def _save_tool_calls(self, tool_calls: List[ToolMessage]) -> None:
+-        """
+-        Save tool calls to a JSON file with timestamp-based naming.
+-
+-        Args:
+-            tool_calls (List[ToolMessage]): List of tool calls to save.
+-        """
+-        if not self.log_tools:
+-            return
+-
+-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+-        filename = self.log_path / f"tool_calls_{timestamp}.json"
+-
+-        logs: List[ToolCallLog] = []
+-        for call in tool_calls:
+-            log_entry = {
+-                "tool_call_id": call.tool_call_id,
+-                "name": call.name,
+-                "args": call.args,
+-                "content": call.content,
+-                "timestamp": datetime.now().isoformat(),
+-            }
+-            logs.append(log_entry)
+-
+-        with open(filename, "w") as f:
+-            json.dump(logs, f, indent=4)
+diff --git a/medrax/models/__init__.py b/medrax/models/__init__.py
+new file mode 100644
+index 00000000..c60949c7
+--- /dev/null
++++ b/medrax/models/__init__.py
+@@ -0,0 +1,5 @@
++"""Model module for MedRAX."""
++
++from .model_factory import ModelFactory
++
++__all__ = ["ModelFactory"]
+diff --git a/medrax/models/model_factory.py b/medrax/models/model_factory.py
+new file mode 100644
+index 00000000..4810127c
+--- /dev/null
++++ b/medrax/models/model_factory.py
+@@ -0,0 +1,140 @@
++"""Factory for creating language model instances based on model name."""
++
++import os
++from typing import Dict, Any, Type
++
++from langchain_core.language_models import BaseLanguageModel
++from langchain_openai import ChatOpenAI
++from langchain_google_genai import ChatGoogleGenerativeAI
++
++
++class ModelFactory:
++    """Factory for creating language model instances based on model name.
++    
++    This class implements a registry of language model providers and provides 
++    methods to create appropriate language model instances based on the model name.
++    """
++    
++    # Registry of model providers
++    _model_providers = {
++        "gpt": {
++            "class": ChatOpenAI,
++            "env_key": "OPENAI_API_KEY",
++            "base_url_key": "OPENAI_BASE_URL"
++        },
++        "chatgpt": {
++            "class": ChatOpenAI,
++            "env_key": "OPENAI_API_KEY",
++            "base_url_key": "OPENAI_BASE_URL"
++        },
++        "gemini": {
++            "class": ChatGoogleGenerativeAI,
++            "env_key": "GOOGLE_API_KEY"
++        },
++        "openrouter": {
++            "class": ChatOpenAI,  # OpenRouter uses OpenAI-compatible interface
++            "env_key": "OPENROUTER_API_KEY",
++            "base_url_key": "OPENROUTER_BASE_URL",
++            "default_base_url": "https://openrouter.ai/api/v1"
++        },
++        # Add more providers with default configurations here
++    }
++    
++    @classmethod
++    def register_provider(cls, prefix: str, model_class: Type[BaseLanguageModel], 
++                          env_key: str, **kwargs) -> None:
++        """Register a new model provider.
++        
++        Args:
++            prefix (str): The prefix used to identify this model provider (e.g., 'gpt', 'gemini')
++            model_class (Type[BaseLanguageModel]): The LangChain model class to use
++            env_key (str): The environment variable name for the API key
++            **kwargs: Additional provider-specific configuration
++        """
++        cls._model_providers[prefix] = {
++            "class": model_class,
++            "env_key": env_key,
++            **kwargs
++        }
++    
++    @classmethod
++    def create_model(cls, model_name: str, temperature: float = 0.7, 
++                     top_p: float = 0.95, **kwargs) -> BaseLanguageModel:
++        """Create and return an instance of the appropriate language model.
++        
++        Args:
++            model_name (str): Name of the model to create (e.g., 'gpt-4o', 'gemini-2.5-pro')
++            temperature (float, optional): Temperature parameter. Defaults to 0.7.
++            top_p (float, optional): Top-p sampling parameter. Defaults to 0.95.
++            **kwargs: Additional model-specific parameters
++            
++        Returns:
++            BaseLanguageModel: An initialized language model instance
++            
++        Raises:
++            ValueError: If no provider is found for the given model name
++            ValueError: If the required API key is missing
++        """
++        # Find the matching provider based on model name prefix
++        provider_prefix = next(
++            (prefix for prefix in cls._model_providers if model_name.startswith(prefix)),
++            None
++        )
++        
++        if not provider_prefix:
++            raise ValueError(
++                f"No provider found for model: {model_name}. "
++                f"Registered providers are for: {list(cls._model_providers.keys())}"
++            )
++        
++        provider = cls._model_providers[provider_prefix]
++        model_class = provider["class"]
++        env_key = provider["env_key"]
++        
++        # Set up provider-specific kwargs
++        provider_kwargs = {}
++        
++        # Handle API key
++        if env_key in os.environ:
++            provider_kwargs["api_key"] = os.environ[env_key]
++        else:
++            # Log warning but don't fail - the model class might handle missing API keys differently
++            print(f"Warning: Environment variable {env_key} not found. Authentication may fail.")
++        
++        # Check for base_url if applicable
++        if "base_url_key" in provider:
++            if provider["base_url_key"] in os.environ:
++                provider_kwargs["base_url"] = os.environ[provider["base_url_key"]]
++            elif "default_base_url" in provider:
++                provider_kwargs["base_url"] = provider["default_base_url"]
++        
++        # Merge with any additional provider-specific settings from the registry
++        for k, v in provider.items():
++            if k not in ["class", "env_key", "base_url_key", "default_base_url"]:
++                provider_kwargs[k] = v
++        
++        # Strip the provider prefix from the model name
++        # For example, 'openrouter-anthropic/claude-sonnet-4' becomes 'anthropic/claude-sonnet-4'
++        actual_model_name = model_name
++        if model_name.startswith(f"{provider_prefix}-"):
++            actual_model_name = model_name[len(provider_prefix)+1:]
++            
++        # Create and return the model instance
++        return model_class(
++            model=actual_model_name,
++            temperature=temperature,
++            top_p=top_p,
++            **provider_kwargs,
++            **kwargs
++        )
++    
++    @classmethod
++    def list_providers(cls) -> Dict[str, Dict[str, Any]]:
++        """List all registered model providers.
++        
++        Returns:
++            Dict[str, Dict[str, Any]]: Dictionary of registered providers and their configurations
++        """
++        # Return a copy to prevent accidental modification
++        return {k: {kk: vv for kk, vv in v.items() if kk != "class"} 
++                for k, v in cls._model_providers.items()}
+diff --git a/medrax/tools/__init__.py b/medrax/tools/__init__.py
+index 7ca0d1eb..0f54ae5b 100644
+--- a/medrax/tools/__init__.py
++++ b/medrax/tools/__init__.py
+@@ -9,3 +9,6 @@
+ from .generation import *
+ from .dicom import *
+ from .utils import *
++from .web_browser import *
++from .python_tool import *
++
+diff --git a/medrax/tools/classification/__init__.py b/medrax/tools/classification/__init__.py
+new file mode 100644
+index 00000000..9cb822ce
+--- /dev/null
++++ b/medrax/tools/classification/__init__.py
+@@ -0,0 +1,11 @@
++"""Classification tools for chest X-ray analysis."""
++
++from .torchxrayvision import TorchXRayVisionClassifierTool, TorchXRayVisionInput
++from .arcplus import ArcPlusClassifierTool, ArcPlusInput
++
++__all__ = [
++    "TorchXRayVisionClassifierTool",
++    "TorchXRayVisionInput", 
++    "ArcPlusClassifierTool",
++    "ArcPlusInput"
++] 
+\ No newline at end of file
+diff --git a/medrax/tools/classification/arcplus.py b/medrax/tools/classification/arcplus.py
+new file mode 100644
+index 00000000..d722ae5a
+--- /dev/null
++++ b/medrax/tools/classification/arcplus.py
+@@ -0,0 +1,392 @@
++import os
++from typing import ClassVar, Dict, List, Optional, Tuple, Type
++
++import numpy as np
++import torch
++import torch.nn as nn
++import torchvision.transforms as transforms
++from PIL import Image
++from pydantic import BaseModel, Field
++from timm.models.swin_transformer import SwinTransformer
++
++from langchain_core.callbacks import (
++    AsyncCallbackManagerForToolRun,
++    CallbackManagerForToolRun,
++)
++from langchain_core.tools import BaseTool
++
++
++class OmniSwinTransformer(SwinTransformer):
++    """OmniSwinTransformer with multiple classification heads and optional projector."""
++
++    def __init__(self, num_classes_list, projector_features=None, use_mlp=False, *args, **kwargs):
++        super().__init__(*args, **kwargs)
++        assert num_classes_list is not None
++
++        self.projector = None
++        if projector_features:
++            encoder_features = self.num_features
++            self.num_features = projector_features
++            if use_mlp:
++                self.projector = nn.Sequential(
++                    nn.Linear(encoder_features, self.num_features),
++                    nn.ReLU(inplace=True),
++                    nn.Linear(self.num_features, self.num_features),
++                )
++            else:
++                self.projector = nn.Linear(encoder_features, self.num_features)
++
++        self.omni_heads = []
++        for num_classes in num_classes_list:
++            self.omni_heads.append(
++                nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
++            )
++        self.omni_heads = nn.ModuleList(self.omni_heads)
++
++    def forward(self, x, head_n=None):
++        x = self.forward_features(x)
++        if self.projector:
++            x = self.projector(x)
++        if head_n is not None:
++            return x, self.omni_heads[head_n](x)
++        else:
++            return [head(x) for head in self.omni_heads]
++
++    def generate_embeddings(self, x, after_proj=True):
++        x = self.forward_features(x)
++        if after_proj and self.projector:
++            x = self.projector(x)
++        return x
++
++
++class ArcPlusInput(BaseModel):
++    """Input for ArcPlus chest X-ray analysis tool. Only supports JPG or PNG images."""
++
++    image_path: str = Field(
++        ..., description="Path to the radiology image file, only supports JPG or PNG images"
++    )
++
++
++class ArcPlusClassifierTool(BaseTool):
++    """Tool that classifies chest X-ray images using the ArcPlus OmniSwinTransformer model.
++
++    This tool uses a pre-trained OmniSwinTransformer model (ArcPlus) to analyze chest X-ray images
++    and predict the likelihood of various pathologies across multiple medical datasets. The model
++    employs a Swin Transformer architecture with multiple classification heads, each specialized
++    for different medical datasets and conditions.
++
++    The ArcPlus model is trained on 6 different medical datasets:
++    - MIMIC-CXR: 14 pathologies including common chest conditions
++    - CheXpert: 14 pathologies with standardized labeling
++    - NIH ChestX-ray14: 14 pathologies from large-scale dataset
++    - RSNA: 3 classes for pneumonia detection
++    - VinDr-CXR: 6 categories including tuberculosis and lung tumors
++    - Shenzhen: 1 class for tuberculosis detection
++
++    Key Features:
++    - Multi-head architecture with 6 specialized classification heads
++    - 768x768 input resolution for high-detail analysis
++    - Projector layer with 1376 features for enhanced representation
++    - Sigmoid activation for multi-label classification
++    - Covers 52+ distinct pathology categories across datasets
++
++    The model outputs probabilities (0 to 1) for each condition, with higher values
++    indicating higher likelihood of the pathology being present in the image.
++    """
++
++    name: str = "arcplus_classifier"
++    description: str = (
++        "Advanced chest X-ray classification tool using ArcPlus OmniSwinTransformer with multi-dataset training. "
++        "Analyzes chest X-ray images and provides probability predictions for 52+ pathologies across 6 medical datasets. "
++        "Input: Path to chest X-ray image file (JPG/PNG). "
++        "Output: Dictionary mapping pathology names to probabilities (0-1). "
++        "Features: Multi-head architecture, 768px resolution, projector layer, specialized for medical imaging. "
++        "Pathologies include: Atelectasis, Cardiomegaly, Consolidation, Edema, Enlarged Cardiomediastinum, "
++        "Fracture, Lung Lesion, Lung Opacity, Pleural Effusion, Pneumonia, Pneumothorax, Mass, Nodule, "
++        "Emphysema, Fibrosis, PE, Lung Tumor, Tuberculosis, and many more across MIMIC, CheXpert, NIH, "
++        "RSNA, VinDr, and Shenzhen datasets. Higher probabilities indicate higher likelihood of condition presence."
++    )
++    args_schema: Type[BaseModel] = ArcPlusInput
++    model: OmniSwinTransformer = None
++    device: Optional[str] = "cuda"
++    normalize: transforms.Normalize = None
++    disease_list: List[str] = None
++    num_classes_list: List[int] = None
++
++    # Disease mappings from the analysis
++    mimic_diseases: ClassVar[List[str]] = [
++        "Atelectasis",
++        "Cardiomegaly",
++        "Consolidation",
++        "Edema",
++        "Enlarged Cardiomediastinum",
++        "Fracture",
++        "Lung Lesion",
++        "Lung Opacity",
++        "No Finding",
++        "Pleural Effusion",
++        "Pleural Other",
++        "Pneumonia",
++        "Pneumothorax",
++        "Support Devices",
++    ]
++    chexpert_diseases: ClassVar[List[str]] = [
++        "No Finding",
++        "Enlarged Cardiomediastinum",
++        "Cardiomegaly",
++        "Lung Opacity",
++        "Lung Lesion",
++        "Edema",
++        "Consolidation",
++        "Pneumonia",
++        "Atelectasis",
++        "Pneumothorax",
++        "Pleural Effusion",
++        "Pleural Other",
++        "Fracture",
++        "Support Devices",
++    ]
++    nih14_diseases: ClassVar[List[str]] = [
++        "Atelectasis",
++        "Cardiomegaly",
++        "Effusion",
++        "Infiltration",
++        "Mass",
++        "Nodule",
++        "Pneumonia",
++        "Pneumothorax",
++        "Consolidation",
++        "Edema",
++        "Emphysema",
++        "Fibrosis",
++        "Pleural_Thickening",
++        "Hernia",
++    ]
++    rsna_diseases: ClassVar[List[str]] = ["No Lung Opacity/Not Normal", "Normal", "Lung Opacity"]
++    vindr_diseases: ClassVar[List[str]] = [
++        "PE",
++        "Lung tumor",
++        "Pneumonia",
++        "Tuberculosis",
++        "Other diseases",
++        "No finding",
++    ]
++    shenzhen_diseases: ClassVar[List[str]] = ["TB"]
++
++    def __init__(self, cache_dir: str = None, device: Optional[str] = "cuda"):
++        """Initialize the ArcPlus Classifier Tool.
++
++        Args:
++            cache_dir (str, optional): Directory containing the pre-trained ArcPlus model checkpoint.
++                The tool will automatically look for 'Ark6_swinLarge768_ep50.pth.tar' in this directory.
++                If None, model will be initialized with random weights (not recommended for inference).
++                Default: None.
++            device (str, optional): Device to run the model on ('cuda' for GPU, 'cpu' for CPU).
++                GPU is recommended for better performance. Default: "cuda".
++
++        Model Architecture Details:
++            - OmniSwinTransformer with 6 classification heads
++            - Input resolution: 768x768 pixels
++            - Projector features: 1376 dimensions
++            - Multi-head configuration: [14, 14, 14, 3, 6, 1] classes per head
++            - Total pathologies: 52+ across 6 medical datasets
++            - Preprocessing: ImageNet normalization (mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
++
++        Raises:
++            FileNotFoundError: If cache_dir is provided but model file doesn't exist.
++            RuntimeError: If model loading fails or device is unavailable.
++        """
++        super().__init__()
++
++        # Create combined disease list from all supported datasets
++        self.disease_list = (
++            self.mimic_diseases
++            + self.chexpert_diseases
++            + self.nih14_diseases
++            + self.rsna_diseases
++            + self.vindr_diseases
++            + self.shenzhen_diseases
++        )
++
++        # Multi-head configuration: [MIMIC, CheXpert, NIH, RSNA, VinDr, Shenzhen]
++        self.num_classes_list = [14, 14, 14, 3, 6, 1]
++
++        # Initialize the OmniSwinTransformer model with ArcPlus architecture
++        self.model = OmniSwinTransformer(
++            num_classes_list=self.num_classes_list,
++            projector_features=1376,  # Enhanced feature representation
++            use_mlp=False,  # Linear projector (not MLP)
++            img_size=768,  # High-resolution input
++            patch_size=4,
++            window_size=12,
++            embed_dim=192,
++            depths=(2, 2, 18, 2),  # Swin-Large configuration
++            num_heads=(6, 12, 24, 48),
++        )
++
++        # Load pre-trained weights if provided
++        if cache_dir:
++            model_path = os.path.join(cache_dir, "Ark6_swinLarge768_ep50.pth.tar")
++            self._load_checkpoint(model_path)
++
++        self.model.eval()
++        self.device = torch.device(device) if device else "cuda"
++        self.model = self.model.to(self.device)
++
++        # ImageNet normalization parameters for optimal performance
++        self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
++
++    def _load_checkpoint(self, model_path: str) -> None:
++        """
++        Load the ArcPlus model checkpoint.
++
++        Args:
++            model_path (str): Path to the model checkpoint file.
++        """
++        # Load the checkpoint (set weights_only=False for PyTorch 2.6+ compatibility)
++        checkpoint = torch.load(model_path, map_location=torch.device("cpu"), weights_only=False)
++        state_dict = checkpoint["teacher"]  # Use 'teacher' key
++
++        # Remove "module." prefix if present (improved logic from example)
++        if any([True if "module." in k else False for k in state_dict.keys()]):
++            state_dict = {
++                k.replace("module.", ""): v
++                for k, v in state_dict.items()
++                if k.startswith("module.")
++            }
++
++        # Load the model weights
++        msg = self.model.load_state_dict(state_dict, strict=False)
++
++    def _process_image(self, image_path: str) -> torch.Tensor:
++        """
++        Process the input chest X-ray image for model inference.
++
++        This method loads the image, applies necessary transformations,
++        and prepares it as a torch.Tensor for model input.
++
++        Args:
++            image_path (str): The file path to the chest X-ray image.
++
++        Returns:
++            torch.Tensor: A processed image tensor ready for model inference.
++
++        Raises:
++            FileNotFoundError: If the specified image file does not exist.
++            ValueError: If the image cannot be properly loaded or processed.
++        """
++        try:
++            # Load and preprocess image following the example pattern
++            image = Image.open(image_path).convert("RGB").resize((768, 768))
++
++            # Convert to numpy array and normalize to [0, 1]
++            image_array = np.array(image) / 255.0
++
++            # Apply ImageNet normalization
++            image_tensor = torch.from_numpy(image_array).float()
++            image_tensor = image_tensor.permute(2, 0, 1)  # HWC to CHW
++            image_tensor = self.normalize(image_tensor)
++
++            # Add batch dimension and move to device
++            image_tensor = image_tensor.unsqueeze(0).to(self.device)
++
++            return image_tensor
++
++        except Exception as e:
++            raise ValueError(f"Error processing image {image_path}: {str(e)}")
++
++    def _run(
++        self,
++        image_path: str,
++        run_manager: Optional[CallbackManagerForToolRun] = None,
++    ) -> Tuple[Dict[str, float], Dict]:
++        """Classify the chest X-ray image using ArcPlus SwinTransformer.
++
++        Args:
++            image_path (str): The path to the chest X-ray image file.
++            run_manager (Optional[CallbackManagerForToolRun]): The callback manager for the tool run.
++
++        Returns:
++            Tuple[Dict[str, float], Dict]: A tuple containing the classification results
++                                           (pathologies and their probabilities from 0 to 1)
++                                           and any additional metadata.
++
++        Raises:
++            Exception: If there's an error processing the image or during classification.
++        """
++        try:
++            # Process the image
++            image_tensor = self._process_image(image_path)
++
++            # Run model inference
++            with torch.no_grad():
++                pre_logits = self.model(image_tensor)
++
++                # Apply sigmoid to each output head (as seen in example)
++                preds = [torch.sigmoid(out) for out in pre_logits]
++
++                # Concatenate all predictions into single tensor
++                preds = torch.cat(preds, dim=1)
++
++                # Convert to numpy
++                predictions = preds.cpu().numpy().flatten()
++
++            # Map predictions to disease names
++            if len(predictions) != len(self.disease_list):
++                print(
++                    f"Warning: Expected {len(self.disease_list)} predictions, got {len(predictions)}"
++                )
++                # Pad or truncate as needed
++                if len(predictions) < len(self.disease_list):
++                    predictions = np.pad(
++                        predictions, (0, len(self.disease_list) - len(predictions))
++                    )
++                else:
++                    predictions = predictions[: len(self.disease_list)]
++
++            # Create output dictionary mapping disease names to probabilities
++            output = dict(zip(self.disease_list, predictions.astype(float)))
++
++            metadata = {
++                "image_path": image_path,
++                "model": "ArcPlus OmniSwinTransformer",
++                "analysis_status": "completed",
++                "num_predictions": len(predictions),
++                "num_heads": len(self.num_classes_list),
++                "projector_features": 1376,
++                "note": "Probabilities range from 0 to 1, with higher values indicating higher likelihood of the condition.",
++            }
++
++            return output, metadata
++
++        except Exception as e:
++            return {"error": str(e)}, {
++                "image_path": image_path,
++                "analysis_status": "failed",
++                "error_details": str(e),
++            }
++
++    async def _arun(
++        self,
++        image_path: str,
++        run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
++    ) -> Tuple[Dict[str, float], Dict]:
++        """Asynchronously classify the chest X-ray image using ArcPlus SwinTransformer.
++
++        This method currently calls the synchronous version, as the model inference
++        is not inherently asynchronous. For true asynchronous behavior, consider
++        using a separate thread or process.
++
++        Args:
++            image_path (str): The path to the chest X-ray image file.
++            run_manager (Optional[AsyncCallbackManagerForToolRun]): The async callback manager for the tool run.
++
++        Returns:
++            Tuple[Dict[str, float], Dict]: A tuple containing the classification results
++                                           (pathologies and their probabilities from 0 to 1)
++                                           and any additional metadata.
++
++        Raises:
++            Exception: If there's an error processing the image or during classification.
++        """
++        return self._run(image_path)
+diff --git a/medrax/tools/classification.py b/medrax/tools/classification/torchxrayvision.py
+similarity index 94%
+rename from medrax/tools/classification.py
+rename to medrax/tools/classification/torchxrayvision.py
+index e8cdaf9a..5c06a914 100644
+--- a/medrax/tools/classification.py
++++ b/medrax/tools/classification/torchxrayvision.py
+@@ -13,15 +13,15 @@
+ from langchain_core.tools import BaseTool
+ 
+ 
+-class ChestXRayInput(BaseModel):
+-    """Input for chest X-ray analysis tools. Only supports JPG or PNG images."""
++class TorchXRayVisionInput(BaseModel):
++    """Input for TorchXRayVision chest X-ray analysis tools. Only supports JPG or PNG images."""
+ 
+     image_path: str = Field(
+         ..., description="Path to the radiology image file, only supports JPG or PNG images"
+     )
+ 
+ 
+-class ChestXRayClassifierTool(BaseTool):
++class TorchXRayVisionClassifierTool(BaseTool):
+     """Tool that classifies chest X-ray images for multiple pathologies.
+ 
+     This tool uses a pre-trained DenseNet model to analyze chest X-ray images and
+@@ -35,9 +35,9 @@ class ChestXRayClassifierTool(BaseTool):
+     A higher value indicates a higher likelihood of the condition being present.
+     """
+ 
+-    name: str = "chest_xray_classifier"
++    name: str = "torchxrayvision_classifier"
+     description: str = (
+-        "A tool that analyzes chest X-ray images and classifies them for 18 different pathologies. "
++        "A tool that analyzes chest X-ray images and classifies them for 18 different pathologies using TorchXRayVision DenseNet. "
+         "Input should be the path to a chest X-ray image file. "
+         "Output is a dictionary of pathologies and their predicted probabilities (0 to 1). "
+         "Pathologies include: Atelectasis, Cardiomegaly, Consolidation, Edema, Effusion, Emphysema, "
+@@ -45,7 +45,7 @@ class ChestXRayClassifierTool(BaseTool):
+         "Lung Opacity, Mass, Nodule, Pleural Thickening, Pneumonia, and Pneumothorax. "
+         "Higher values indicate a higher likelihood of the condition being present."
+     )
+-    args_schema: Type[BaseModel] = ChestXRayInput
++    args_schema: Type[BaseModel] = TorchXRayVisionInput
+     model: xrv.models.DenseNet = None
+     device: Optional[str] = "cuda"
+     transform: torchvision.transforms.Compose = None
+diff --git a/medrax/tools/python_tool.py b/medrax/tools/python_tool.py
+new file mode 100644
+index 00000000..5aee0f4e
+--- /dev/null
++++ b/medrax/tools/python_tool.py
+@@ -0,0 +1,63 @@
++"""Python sandbox tool for executing Python code in a secure environment.
++
++This module provides a pre-configured PyodideSandboxTool instance for the medical agent.
++
++Note: Deno must be installed on the host system for this tool to work.
++https://docs.deno.com/runtime/getting_started/installation
++
++The python_sandbox instance is configured with:
++- pip_packages: Pre-installs a list of common data analysis packages for efficiency.
++- stateful=True: Enables the sandbox to maintain variables, functions, and
++  imports between calls. The agent state must be configured to handle the
++  session_bytes and session_metadata for this to work.
++- allow_net=True: Allows the sandbox to make network requests, which is
++  necessary for `micropip` to install packages from PyPI. This should be
++  used with caution in production environments.
++"""
++
++from langchain_sandbox import PyodideSandboxTool
++from typing import Optional, List
++
++
++def create_python_sandbox(
++    pip_packages: Optional[List[str]] = None,
++    stateful: bool = True,
++    allow_net: bool = True,
++    **kwargs,
++) -> PyodideSandboxTool:
++    """Create a pre-configured PyodideSandboxTool instance for the medical agent.
++
++    Args:
++        pip_packages (list, optional): List of pip packages to pre-install.
++            Defaults to common medical analysis packages.
++        stateful (bool, optional): Whether to maintain state between calls.
++            Defaults to True.
++        allow_net (bool, optional): Whether to allow network requests.
++            Defaults to True.
++        deno_path (str, optional): Path to the Deno executable.
++            Defaults to "/home/adib/deno-2.1.0-x86_64-unknown-linux-gnu/bin/deno".
++        **kwargs: Additional keyword arguments passed to PyodideSandboxTool.
++
++    Returns:
++        PyodideSandboxTool: Configured sandbox with medical analysis packages
++    """
++    if pip_packages is None:
++        pip_packages = [
++            "pandas",
++            "numpy",
++            "pydicom",
++            "SimpleITK",
++            "scikit-image",
++            "Pillow",
++            "scikit-learn",
++            "matplotlib",
++            "seaborn",
++            "openpyxl",
++        ]
++
++    return PyodideSandboxTool(
++        pip_packages=pip_packages,
++        stateful=stateful,
++        allow_net=allow_net,
++        **kwargs,
++    )
+diff --git a/medrax/tools/web_browser.py b/medrax/tools/web_browser.py
+new file mode 100644
+index 00000000..21a8f8a0
+--- /dev/null
++++ b/medrax/tools/web_browser.py
+@@ -0,0 +1,215 @@
++"""Web browser tool for MedRAX2.
++
++This module implements a web browsing tool for MedRAX2, allowing the agent
++to search the web, visit URLs, and extract information from web pages.
++"""
++
++import os
++import re
++import json
++import time
++from typing import Dict, Optional, Any, Type, Tuple
++from urllib.parse import urlparse
++
++import requests
++from bs4 import BeautifulSoup
++from langchain_core.tools import BaseTool
++from pydantic import BaseModel, Field
++
++
++class WebBrowserSchema(BaseModel):
++    """Schema for web browser tool."""
++    query: str = Field("", description="The search query (leave empty if visiting a URL)")
++    url: str = Field("", description="The URL to visit (leave empty if performing a search)")
++
++
++class SearchQuerySchema(BaseModel):
++    """Schema for web search queries."""
++    query: str = Field(..., description="The search query string")
++
++
++class VisitUrlSchema(BaseModel):
++    """Schema for URL visits."""
++    url: str = Field(..., description="The URL to visit")
++
++
++class WebBrowserTool(BaseTool):
++    """Tool for browsing the web, searching for information, and visiting URLs.
++    
++    This tool provides the agent with internet browsing capabilities, including:
++    1. Performing web searches using a search engine API
++    2. Visiting specific URLs and extracting their content
++    3. Following links within pages
++    """
++    name: str = "WebBrowserTool"
++    description: str = "Search the web for information or visit specific URLs to retrieve content"
++    search_api_key: Optional[str] = None
++    search_engine_id: Optional[str] = None
++    user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
++    max_results: int = 5
++    args_schema: Type[BaseModel] = WebBrowserSchema
++    
++    def __init__(self, search_api_key: Optional[str] = None, search_engine_id: Optional[str] = None, **kwargs):
++        """Initialize the web browser tool.
++        
++        Args:
++            search_api_key: Google Custom Search API key (optional)
++            search_engine_id: Google Custom Search Engine ID (optional)
++            **kwargs: Additional keyword arguments
++        """
++        super().__init__(**kwargs)
++        # Try to get API keys from environment variables if not provided
++        self.search_api_key = search_api_key or os.environ.get("GOOGLE_SEARCH_API_KEY")
++        self.search_engine_id = search_engine_id or os.environ.get("GOOGLE_SEARCH_ENGINE_ID")
++        
++    def search_web(self, query: str) -> Dict[str, Any]:
++        """Search the web using Google Custom Search API.
++        
++        Args:
++            query: The search query string
++            
++        Returns:
++            Dict containing search results
++        """
++        if not self.search_api_key or not self.search_engine_id:
++            return {
++                "error": "Search API key or engine ID not configured. Please set GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_ENGINE_ID environment variables."
++            }
++            
++        url = "https://www.googleapis.com/customsearch/v1"
++        params = {
++            "key": self.search_api_key,
++            "cx": self.search_engine_id,
++            "q": query,
++            "num": self.max_results
++        }
++        
++        try:
++            response = requests.get(url, params=params, timeout=10)
++            response.raise_for_status()
++            results = response.json()
++            
++            if "items" not in results:
++                return {"results": [], "message": "No results found"}
++                
++            formatted_results = []
++            for item in results["items"]:
++                formatted_results.append({
++                    "title": item.get("title"),
++                    "link": item.get("link"),
++                    "snippet": item.get("snippet"),
++                    "source": item.get("displayLink")
++                })
++                
++            return {
++                "results": formatted_results,
++                "message": f"Found {len(formatted_results)} results for query: {query}"
++            }
++            
++        except Exception as e:
++            return {"error": f"Search failed: {str(e)}"}
++    
++    def visit_url(self, url: str) -> Dict[str, Any]:
++        """Visit a URL and extract its content.
++        
++        Args:
++            url: The URL to visit
++            
++        Returns:
++            Dict containing the page content, title, and metadata
++        """
++        try:
++            # Validate URL
++            parsed_url = urlparse(url)
++            if not parsed_url.scheme or not parsed_url.netloc:
++                return {"error": f"Invalid URL: {url}"}
++                
++            headers = {"User-Agent": self.user_agent}
++            response = requests.get(url, headers=headers, timeout=15)
++            response.raise_for_status()
++            
++            # Parse the HTML content
++            soup = BeautifulSoup(response.text, "html.parser")
++            
++            # Extract title
++            title = soup.title.string if soup.title else "No title"
++            
++            # Extract main content (remove scripts, styles, etc.)
++            for script in soup(["script", "style", "meta", "noscript"]):
++                script.extract()
++                
++            # Get text content
++            text_content = soup.get_text(separator="\n", strip=True)
++            # Clean up whitespace
++            text_content = re.sub(r'\n+', '\n', text_content)
++            text_content = re.sub(r' +', ' ', text_content)
++            
++            # Extract links
++            links = []
++            for link in soup.find_all("a", href=True):
++                href = link["href"]
++                # Handle relative URLs
++                if href.startswith("/"):
++                    base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
++                    href = base_url + href
++                if href.startswith(("http://", "https://")):
++                    links.append({
++                        "text": link.get_text(strip=True) or href,
++                        "url": href
++                    })
++            
++            # Extract images (limited to first 3)
++            images = []
++            for i, img in enumerate(soup.find_all("img", src=True)[:3]):
++                src = img["src"]
++                # Handle relative URLs
++                if src.startswith("/"):
++                    base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
++                    src = base_url + src
++                if src.startswith(("http://", "https://")):
++                    images.append(src)
++            
++            return {
++                "title": title,
++                "content": text_content[:10000] if len(text_content) > 10000 else text_content,
++                "url": url,
++                "links": links[:10],  # Limit to 10 links
++                "images": images,
++                "content_type": response.headers.get("Content-Type", ""),
++                "content_length": len(text_content),
++                "truncated": len(text_content) > 10000
++            }
++            
++        except Exception as e:
++            return {"error": f"Failed to visit {url}: {str(e)}"}
++
++    async def _arun(self, query: str = "", url: str = "") -> str:
++        """Run the tool asynchronously."""
++        return json.dumps(self._run(query=query, url=url))
++    
++    def _run(self, query: str = "", url: str = "") -> Tuple[Dict[str, Any], Dict[str, Any]]:
++        """Run the web browser tool.
++    
++        Args:
++            query: Search query (if searching)
++            url: URL to visit (if visiting a specific page)
++        
++        Returns:
++            Tuple[Dict[str, Any], Dict[str, Any]]: A tuple containing the results and metadata
++        """
++        metadata = {
++            "query": query if query else "",
++            "url": url if url else "",
++            "timestamp": time.time(),
++            "tool": "WebBrowserTool"
++        }
++        
++        if url:
++            result = self.visit_url(url)
++            return result, metadata
++        elif query:
++            result = self.search_web(query)
++            return result, metadata
++        else:
++            return {"error": "Please provide either a search query or a URL to visit"}, metadata
++
+diff --git a/pyproject.toml b/pyproject.toml
+index 94d8a948..0111fefe 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -10,7 +10,7 @@ authors = [
+     {name = "Adibvafa Fallahpour", email = "adibvafa.fallahpour@mail.utoronto.ca"},
+ ]
+ license = {file = "LICENSE"}
+-requires-python = ">=3.10"
++requires-python = ">=3.11"
+ dependencies = [
+     "requests>=2.25.0",
+     "numpy>=1.19.0",
+@@ -58,6 +58,9 @@ dependencies = [
+     "jupyter>=1.0.0",
+     "albumentations>=1.0.0",
+     "pyarrow>=10.0.0",
++    "langchain-google-genai>=0.1.0",
++    "ray>=2.9.0",
++    "langchain-sandbox>=0.1.0",
+ ]
+ 
+ [project.optional-dependencies]
+@@ -76,7 +79,7 @@ exclude = ["med_env*", "demo*"]
+ 
+ [tool.black]
+ line-length = 100
+-target-version = ['py310']
++target-version = ['py311']
+ 
+ [tool.isort]
+ profile = "black"
+diff --git a/quickstart.py b/quickstart.py
+index 7af6bcf9..9354f462 100644
+--- a/quickstart.py
++++ b/quickstart.py
+@@ -11,7 +11,7 @@
+ 
+ # Initialize global variables
+ logger = logging.getLogger('benchmark')
+-model_name = 'chatgpt-4o-latest'  # default value
++model_name = 'gpt-4.1-2025-04-14'  # default value
+ temperature = 0.2  # default value
+ log_filename = None
+ 
+@@ -199,7 +199,7 @@ def main():
+     # Add command line argument parsing
+     parser = argparse.ArgumentParser(description='Run medical image analysis benchmark')
+     parser.add_argument('--use-urls', action='store_true', help='Use image URLs instead of local files')
+-    parser.add_argument('--model', type=str, default='chatgpt-4o-latest', help='Model name to use')
++    parser.add_argument('--model', type=str, default='gpt-4.1-2025-04-14', help='Model name to use')
+     parser.add_argument('--temperature', type=float, default=0.2, help='Temperature for model inference')
+     parser.add_argument('--log-prefix', type=str, help='Prefix for log filename (default: model name)')
+     parser.add_argument('--max-cases', type=int, default=None, help='Maximum number of cases to process (default: all)')

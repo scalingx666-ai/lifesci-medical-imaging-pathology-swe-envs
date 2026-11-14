@@ -1,0 +1,63 @@
+version = "1.0"
+
+[task]
+name = "default/dave3d__dicom2stl-70"
+description = "Fix --anisotropic being ignored after other filter options"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "dicom2stl",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "dave3d/dicom2stl"
+ref = "e01d05e759749716321a82159230c192528df960"
+reference = "https://github.com/dave3d/dicom2stl/pull/70"
+source_access = "auto"
+built_at = "2026-11-14T07:13:08.796646+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:b2ec700ce08c28ca328f47021f05a05c7300094b5606d531281ddd0acf73a66f"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-10-16T12:33:12Z"
+diff_format = "unified"
+context_files = [
+    "dicom2stl/utils/parseargs.py",
+    "tests/test_parseargs.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 29
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

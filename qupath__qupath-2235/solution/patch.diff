@@ -1,0 +1,16 @@
+diff --git a/qupath-extension-script-editor/src/main/java/qupath/lib/gui/scripting/richtextfx/CustomCodeArea.java b/qupath-extension-script-editor/src/main/java/qupath/lib/gui/scripting/richtextfx/CustomCodeArea.java
+index 7d5b70e3e8..05a1e7f069 100644
+--- a/qupath-extension-script-editor/src/main/java/qupath/lib/gui/scripting/richtextfx/CustomCodeArea.java
++++ b/qupath-extension-script-editor/src/main/java/qupath/lib/gui/scripting/richtextfx/CustomCodeArea.java
+@@ -36,10 +36,7 @@ class CustomCodeArea extends CodeArea {
+     public void paste() {
+         var text = DefaultScriptEditor.getClipboardText(false);
+         if (text != null) {
+-            if (text.equals(Clipboard.getSystemClipboard().getString()))
+-                super.paste();
+-            else
+-                replaceSelection(text);
++            replaceSelection(text);
+         }
+     }
+ }

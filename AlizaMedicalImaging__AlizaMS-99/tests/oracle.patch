@@ -1,0 +1,175 @@
+diff --git a/mdcm/Source/Common/mdcmDataEvent.h b/mdcm/Source/Common/mdcmDataEvent.h
+index ac1a3fbe..cd1811e8 100644
+--- a/mdcm/Source/Common/mdcmDataEvent.h
++++ b/mdcm/Source/Common/mdcmDataEvent.h
+@@ -68,8 +68,9 @@ class DataEvent : public AnyEvent
+     return Bytes;
+   }
+ 
++  void operator=(const DataEvent &) = delete;
++
+ private:
+-  void operator=(const DataEvent &);
+   const char * Bytes{};
+   size_t       Length{};
+ };
+diff --git a/mdcm/Source/Common/mdcmEvent.h b/mdcm/Source/Common/mdcmEvent.h
+index 2e7db549..08e99a91 100644
+--- a/mdcm/Source/Common/mdcmEvent.h
++++ b/mdcm/Source/Common/mdcmEvent.h
+@@ -34,18 +34,11 @@ class MDCM_EXPORT Event
+   Event();
+   Event(const Event &);
+   virtual ~Event();
+-  virtual Event *
+-  MakeObject() const = 0;
+-  virtual void
+-  Print(std::ostream &) const;
+-  virtual const char *
+-  GetEventName() const = 0;
+-  virtual bool
+-  CheckEvent(const Event *) const = 0;
+-
+-private:
+-  void
+-  operator=(const Event &); // Not implemented.
++  virtual Event * MakeObject() const = 0;
++  virtual void Print(std::ostream &) const;
++  virtual const char * GetEventName() const = 0;
++  virtual bool CheckEvent(const Event *) const = 0;
++  void operator=(const Event &) = delete;
+ };
+ 
+ inline std::ostream &
+@@ -63,21 +56,20 @@ operator<<(std::ostream & os, const Event & e)
+     typedef super Superclass;                                       \
+     classname() {}                                                  \
+     virtual ~classname() {}                                         \
+-    virtual const char * GetEventName() const override              \
++    const char * GetEventName() const override                      \
+     {                                                               \
+       return #classname;                                            \
+     }                                                               \
+-    virtual bool CheckEvent(const ::mdcm::Event * e) const override \
++    bool CheckEvent(const ::mdcm::Event * e) const override         \
+     {                                                               \
+       return dynamic_cast<const Self *>(e) ? true : false;          \
+     }                                                               \
+-    virtual ::mdcm::Event * MakeObject() const override             \
++    ::mdcm::Event * MakeObject() const override                     \
+     {                                                               \
+       return new Self;                                              \
+     }                                                               \
+     classname(const Self & s) : super(s) {}                         \
+-  private:                                                          \
+-    void operator=(const Self &);                                   \
++    void operator=(const Self &) = delete;                          \
+   }
+ 
+ mdcmEventMacro(NoEvent, Event);
+diff --git a/mdcm/Source/DataStructureAndEncodingDefinition/mdcmDataSetEvent.h b/mdcm/Source/DataStructureAndEncodingDefinition/mdcmDataSetEvent.h
+index 1d5aba95..74580d67 100644
+--- a/mdcm/Source/DataStructureAndEncodingDefinition/mdcmDataSetEvent.h
++++ b/mdcm/Source/DataStructureAndEncodingDefinition/mdcmDataSetEvent.h
+@@ -38,36 +38,36 @@ class DataSetEvent : public AnyEvent
+ public:
+   typedef DataSetEvent Self;
+   typedef AnyEvent     Superclass;
++  DataSetEvent(const Self & s)
++    : AnyEvent(s) {}
+   DataSetEvent(DataSet const * ds = nullptr)
+     : m_DataSet(ds)
+   {}
+-  virtual ~DataSetEvent() {}
+-  virtual const char *
++  ~DataSetEvent() override = default;
++  const char *
+   GetEventName() const override
+   {
+     return "DataSetEvent";
+   }
+-  virtual bool
++  bool
+   CheckEvent(const ::mdcm::Event * e) const override
+   {
+     return (dynamic_cast<const Self *>(e) == nullptr ? false : true);
+   }
+-  virtual ::mdcm::Event *
++  ::mdcm::Event *
+   MakeObject() const override
+   {
+     return new Self;
+   }
+-  DataSetEvent(const Self & s)
+-    : AnyEvent(s) {}
+   const DataSet &
+   GetDataSet() const
+   {
+     return *m_DataSet;
+   }
+ 
++  void operator=(const Self &) = delete;
++
+ private:
+-  void
+-  operator=(const Self &);
+   const DataSet * m_DataSet;
+ };
+ 
+diff --git a/mdcm/Source/MediaStorageAndFileFormat/mdcmJPEGCodec.h b/mdcm/Source/MediaStorageAndFileFormat/mdcmJPEGCodec.h
+index 6e645e12..82e67903 100644
+--- a/mdcm/Source/MediaStorageAndFileFormat/mdcmJPEGCodec.h
++++ b/mdcm/Source/MediaStorageAndFileFormat/mdcmJPEGCodec.h
+@@ -41,7 +41,7 @@ class MDCM_EXPORT JPEGCodec : public ImageCodec
+ {
+ public:
+   JPEGCodec();
+-  virtual ~JPEGCodec() override;
++  ~JPEGCodec() override;
+   bool
+   CanDecode(const TransferSyntax &) const override;
+   bool
+@@ -57,7 +57,7 @@ class MDCM_EXPORT JPEGCodec : public ImageCodec
+   void
+   ComputeOffsetTable(bool);
+   virtual bool
+-  GetHeaderInfo(std::istream &) override;
++  GetHeaderInfo(std::istream &);
+   virtual bool
+   GetHeaderInfoAndTS(std::istream &, TransferSyntax &);
+   void
+@@ -77,7 +77,7 @@ class MDCM_EXPORT JPEGCodec : public ImageCodec
+   bool
+   StopEncode(std::ostream &) override;
+   virtual bool
+-  DecodeByStreams(std::istream &, std::ostream &) override;
++  DecodeByStreams(std::istream &, std::ostream &);
+   virtual bool
+   InternalCode(const char *, size_t, std::ostream &);
+   bool
+diff --git a/mdcm/Source/MediaStorageAndFileFormat/mdcmPixmapReader.h b/mdcm/Source/MediaStorageAndFileFormat/mdcmPixmapReader.h
+index 7e51d7eb..2bd27a85 100644
+--- a/mdcm/Source/MediaStorageAndFileFormat/mdcmPixmapReader.h
++++ b/mdcm/Source/MediaStorageAndFileFormat/mdcmPixmapReader.h
+@@ -65,7 +65,7 @@ class MDCM_EXPORT PixmapReader : public Reader
+   GetPixmap() const;
+   Pixmap &
+   GetPixmap();
+-  virtual bool
++  bool
+   Read() override;
+ 
+ protected:
+diff --git a/mdcm/Source/MediaStorageAndFileFormat/mdcmSurfaceWriter.h b/mdcm/Source/MediaStorageAndFileFormat/mdcmSurfaceWriter.h
+index e225f81b..74e9ac06 100644
+--- a/mdcm/Source/MediaStorageAndFileFormat/mdcmSurfaceWriter.h
++++ b/mdcm/Source/MediaStorageAndFileFormat/mdcmSurfaceWriter.h
+@@ -38,7 +38,7 @@ class MDCM_EXPORT SurfaceWriter : public SegmentWriter
+ {
+ public:
+   SurfaceWriter()= default;
+-  virtual ~SurfaceWriter() override = default;
++  ~SurfaceWriter() override = default;
+   bool
+   Write() override;
+   unsigned long

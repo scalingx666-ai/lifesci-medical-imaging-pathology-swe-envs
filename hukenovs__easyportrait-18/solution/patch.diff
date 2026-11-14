@@ -1,0 +1,59 @@
+diff --git a/pipelines/tools/test.py b/pipelines/tools/test.py
+index a643b08..41b7fbe 100644
+--- a/pipelines/tools/test.py
++++ b/pipelines/tools/test.py
+@@ -5,6 +5,8 @@
+ import shutil
+ import time
+ import warnings
++import numpy as np
++import random
+ 
+ import mmcv
+ import torch
+@@ -116,6 +118,15 @@ def parse_args():
+ 
+ 
+ def main():
++    seed = 1001
++    torch.manual_seed(seed)
++    torch.cuda.manual_seed(seed)
++    torch.cuda.manual_seed_all(seed)
++    np.random.seed(seed)
++    torch.backends.cudnn.deterministic = True
++    torch.backends.cudnn.benchmark = False
++    random.seed(seed)
++    #torch.use_deterministic_algorithms(True)
+     args = parse_args()
+     assert args.out or args.eval or args.format_only or args.show \
+         or args.show_dir, \
+diff --git a/pipelines/tools/train.py b/pipelines/tools/train.py
+index c4219b0..2b00549 100644
+--- a/pipelines/tools/train.py
++++ b/pipelines/tools/train.py
+@@ -5,6 +5,8 @@
+ import os.path as osp
+ import time
+ import warnings
++import numpy as np
++import random
+ 
+ import mmcv
+ import torch
+@@ -109,6 +111,16 @@ def parse_args():
+ 
+ 
+ def main():
++    seed = 1001
++    torch.manual_seed(seed)
++    torch.cuda.manual_seed(seed)
++    torch.cuda.manual_seed_all(seed)
++    np.random.seed(seed)
++    torch.backends.cudnn.deterministic = True
++    torch.backends.cudnn.benchmark = False
++    random.seed(seed)
++    #torch.use_deterministic_algorithms(True)
++    
+     args = parse_args()
+ 
+     cfg = Config.fromfile(args.config)

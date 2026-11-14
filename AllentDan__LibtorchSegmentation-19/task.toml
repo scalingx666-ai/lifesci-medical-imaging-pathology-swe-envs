@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/AllentDan__LibtorchSegmentation-19"
+description = "fix a bug saving best checkpoint"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "LibtorchSegmentation",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "AllentDan/LibtorchSegmentation"
+ref = "f872f93507c4e11ab02b1b7420d5030741775744"
+reference = "https://github.com/AllentDan/LibtorchSegmentation/pull/19"
+source_access = "auto"
+built_at = "2026-11-14T07:10:53.820181+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:feafe684fd42ede8521212c178213373d7b83e9052bf66707d967bc67e3cf738"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2021-11-17T07:32:06Z"
+diff_format = "unified"
+context_files = [
+    "src/Segmentor.h",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 4
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

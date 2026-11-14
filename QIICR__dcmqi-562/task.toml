@@ -1,0 +1,64 @@
+version = "1.0"
+
+[task]
+name = "default/QIICR__dcmqi-562"
+description = "CI: let the artifact upload retry actually retry"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "dcmqi",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "QIICR/dcmqi"
+ref = "0ed03e9d67fca0be8264b4008cd4cf8576059d9a"
+reference = "https://github.com/QIICR/dcmqi/pull/562"
+source_access = "auto"
+built_at = "2026-11-14T07:12:46.070263+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:5eb2e52a0ea3b7add20021026c4cab1e937759e3af4fa10f0e82ab09a31eb968"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-09-11T18:26:41Z"
+diff_format = "unified"
+context_files = [
+    ".github/workflows/cmake-linux.yml",
+    ".github/workflows/cmake-macos.yml",
+    ".github/workflows/cmake-win.yml",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 8
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,2848 @@
+diff --git a/examples/demo_e2e_extraction.py b/examples/demo_e2e_extraction.py
+index 573846c..ab0a729 100644
+--- a/examples/demo_e2e_extraction.py
++++ b/examples/demo_e2e_extraction.py
+@@ -23,7 +23,12 @@
+ with open("metadata.json", "w") as outfile:
+     outfile.write(json.dumps(metadata, indent=4))
+ 
+-# create a DICOM from E2E
++# create DICOM(s) from E2E
++# Writes, per volume / fundus image found in the file:
++#   {stem}_oct_{n}.dcm    - OPT volume
++#   {stem}_fundus_{n}.dcm - fundus / enface (if present)
++#   {stem}_seg_{n}.dcm    - Height Map Segmentation when layer contours exist
++# See demo_e2e_heightmap_seg.py for SEG details and inspection.
+ dcm = create_dicom_from_oct(filepath)
+ # Output dir can be specified, otherwise will
+ # default to current working directory.
+diff --git a/examples/demo_e2e_heightmap_seg.py b/examples/demo_e2e_heightmap_seg.py
+new file mode 100644
+index 0000000..2ebd668
+--- /dev/null
++++ b/examples/demo_e2e_heightmap_seg.py
+@@ -0,0 +1,131 @@
++"""Demonstrate E2E layer segmentation export as Height Map Segmentation DICOM.
++
++When an E2E volume includes Heidelberg layer contours, create_dicom_from_oct()
++also writes a Height Map Segmentation Storage file (SOP Class UID
++1.2.840.10008.5.1.4.1.1.66.8) alongside the OPT volume and fundus images:
++
++    {stem}_oct_{n}.dcm   - Ophthalmic Tomography (OPT) volume
++    {stem}_fundus_{n}.dcm - fundus / enface image (if present)
++    {stem}_seg_{n}.dcm   - Height Map Segmentation (layer surfaces)
++
++How height values are stored (DICOM PS3.3 A.91 / C.8.20.5)
++----------------------------------------------------------
++* SegmentationType = HEIGHTMAP; heights live in Float Pixel Data (7FE0,0008),
++  not Pixel Data (7FE0,0010).
++* Array shape after reshape: (n_layers, n_bscans, n_ascans)
++  - frame i  <-> one retinal surface (see SegmentSequence[i])
++  - row      <-> OPT B-scan frame index
++  - column   <-> A-scan column (same as OPT Columns)
++* Each float is axial height in fractional B-scan pixels from the *top*
++  of that B-scan (row 0 of the OPT frame). Valid range is [0, OPT.Rows].
++* Missing samples use Float Pixel Padding Value (-1.0 here).
++* Millimetres: height_mm = height_px * RealWorldValueSlope (RWVM functional
++  group; intercept 0). Padding values must not be mapped.
++* Layer names/codes: SegmentSequence (SegmentLabel, CID 4273 property type).
++* Companion OPT: same StudyInstanceUID and FrameOfReferenceUID; OPT SOP is
++  referenced via Derivation Image / Referenced Series.
++
++See also: examples/demo_fda_heightmap_seg.py for the FDA path.
++"""
++
++from pathlib import Path
++
++import numpy as np
++import pydicom
++
++from oct_converter.dicom import create_dicom_from_oct
++from oct_converter.dicom.heightmap import (
++    HEIGHTMAP_PADDING_VALUE,
++    HEIDELBERG_LAYER_NAMES,
++)
++from oct_converter.readers import E2E
++
++
++def read_heightmap_seg(path: str | Path) -> tuple[np.ndarray, np.ndarray, list[str]]:
++    """Load a Height Map SEG DICOM written by oct_converter.
++
++    Returns:
++        heights_px: float32 array (n_layers, n_bscans, n_ascans), pixels from
++            top of B-scan; padding samples are left as FloatPixelPaddingValue.
++        heights_mm: same shape; padding set to NaN; px * RWVM slope.
++        labels: SegmentLabel per layer (frame order).
++    """
++    seg = pydicom.dcmread(str(path))
++    heights_px = np.frombuffer(seg.FloatPixelData, dtype="<f4").reshape(
++        int(seg.NumberOfFrames), int(seg.Rows), int(seg.Columns)
++    )
++    pad = float(getattr(seg, "FloatPixelPaddingValue", HEIGHTMAP_PADDING_VALUE))
++    labels = [str(item.SegmentLabel) for item in seg.SegmentSequence]
++
++    rwvm = seg.SharedFunctionalGroupsSequence[0].RealWorldValueMappingSequence[0]
++    slope = float(rwvm.RealWorldValueSlope)
++    heights_mm = heights_px.astype(np.float64) * slope
++    heights_mm[heights_px == pad] = np.nan
++    return heights_px, heights_mm, labels
++
++
++filepath = "../path/to/sample.E2E"
++output_dir = Path("../path/to/e2e_dicom_out")
++
++# Inspect contours already attached to each OCT volume (chunk type 10019).
++e2e = E2E(filepath)
++for volume in e2e.read_oct_volume():
++    if not volume.contours:
++        print(f"{volume.volume_id}: no layer contours")
++        continue
++    print(f"{volume.volume_id} laterality={volume.laterality}")
++    for key, slices in volume.contours.items():
++        layer_id = int(key.replace("contour", ""))
++        name = HEIDELBERG_LAYER_NAMES.get(layer_id, key)
++        n_valid = sum(
++            1 for s in slices if s is not None and np.isfinite(s).any()
++        )
++        print(f"  {key} ({name}): {n_valid}/{len(slices)} B-scans with data")
++    # Overlay contours on a montage of B-scans
++    volume.peek(show_contours=True)
++
++# Convert: writes OPT (+ fundus) and, when contours exist, Height Map SEG.
++written = create_dicom_from_oct(filepath, output_dir=str(output_dir))
++for path in written:
++    print(f"wrote {path}")
++
++# Read and inspect Height Map Segmentation DICOMs.
++for path in written:
++    if "_seg_" not in Path(path).name:
++        continue
++    seg = pydicom.dcmread(str(path))
++    heights_px, heights_mm, labels = read_heightmap_seg(path)
++
++    print("\nHeight Map Segmentation")
++    print(f"  SOP Class:  {seg.SOPClassUID}")
++    print(f"  Modality:   {seg.Modality}")
++    print(f"  Type:       {seg.SegmentationType}")
++    print(f"  shape:      {heights_px.shape}  (layers, B-scans, A-scans)")
++    print(f"  FOR UID:    {seg.FrameOfReferenceUID}")
++
++    for item in seg.SegmentSequence:
++        print(
++            f"  Segment {item.SegmentNumber}: {item.SegmentLabel} "
++            f"({item.SegmentedPropertyTypeCodeSequence[0].CodeMeaning})"
++        )
++
++    valid = np.isfinite(heights_mm)
++    print(
++        f"  Height range (valid): "
++        f"[{heights_px[valid].min():.2f}, {heights_px[valid].max():.2f}] px / "
++        f"[{heights_mm[valid].min():.4f}, {heights_mm[valid].max():.4f}] mm"
++        if valid.any()
++        else "  No valid height samples"
++    )
++
++    # Example: ILM surface on B-scan 0 (if present).
++    if "ILM" in labels:
++        ilm = heights_px[labels.index("ILM")]
++        print(f"  ILM B-scan 0 (px): min={np.nanmin(np.where(ilm == HEIGHTMAP_PADDING_VALUE, np.nan, ilm)):.2f}")
++
++    source = (
++        seg.SharedFunctionalGroupsSequence[0]
++        .DerivationImageSequence[0]
++        .SourceImageSequence[0]
++    )
++    print(f"  Derived from OPT SOP Instance: {source.ReferencedSOPInstanceUID}")
+diff --git a/examples/demo_fda_heightmap_seg.py b/examples/demo_fda_heightmap_seg.py
+new file mode 100644
+index 0000000..8d37d3c
+--- /dev/null
++++ b/examples/demo_fda_heightmap_seg.py
+@@ -0,0 +1,151 @@
++"""Demonstrate FDA layer segmentation export as Height Map Segmentation DICOM.
++
++When an FDA volume includes Topcon layer contours, create_dicom_from_oct()
++also writes a Height Map Segmentation Storage file (SOP Class UID
++1.2.840.10008.5.1.4.1.1.66.8) alongside the OPT volume and fundus images:
++
++    {stem}.dcm                 - Ophthalmic Tomography (OPT) volume
++    {stem}_fundus.dcm          - color fundus (if present)
++    {stem}_fundus_grayscale.dcm - grayscale fundus (if present)
++    {stem}_seg.dcm             - Height Map Segmentation (layer surfaces)
++
++How height values are stored (DICOM PS3.3 A.91 / C.8.20.5)
++----------------------------------------------------------
++* SegmentationType = HEIGHTMAP; heights live in Float Pixel Data (7FE0,0008),
++  not Pixel Data (7FE0,0010).
++* Array shape after reshape: (n_layers, n_bscans, n_ascans)
++  - frame i  <-> one retinal surface (see SegmentSequence[i])
++  - row      <-> OPT B-scan frame index
++  - column   <-> A-scan column (same as OPT Columns)
++* Each float is axial height in fractional B-scan pixels from the *top*
++  of that B-scan (row 0 of the OPT frame). Valid range is [0, OPT.Rows].
++* Missing samples use Float Pixel Padding Value (-1.0 here).
++* Millimetres: height_mm = height_px * RealWorldValueSlope (RWVM functional
++  group; intercept 0). Padding values must not be mapped.
++* Layer names/codes: SegmentSequence (SegmentLabel, CID 4273 property type).
++* Companion OPT: same StudyInstanceUID and FrameOfReferenceUID; OPT SOP is
++  referenced via Derivation Image / Referenced Series.
++
++Minimal read example::
++
++    import numpy as np
++    import pydicom
++
++    seg = pydicom.dcmread("sample_seg.dcm")
++    heights = np.frombuffer(seg.FloatPixelData, dtype="<f4").reshape(
++        int(seg.NumberOfFrames), int(seg.Rows), int(seg.Columns)
++    )
++    pad = float(seg.FloatPixelPaddingValue)  # -1.0
++    labels = [s.SegmentLabel for s in seg.SegmentSequence]
++    slope = float(
++        seg.SharedFunctionalGroupsSequence[0]
++        .RealWorldValueMappingSequence[0]
++        .RealWorldValueSlope
++    )
++    heights_mm = np.where(heights == pad, np.nan, heights * slope)
++
++See also: examples/demo_e2e_heightmap_seg.py for the E2E path.
++"""
++
++from pathlib import Path
++
++import numpy as np
++import pydicom
++
++from oct_converter.dicom import create_dicom_from_oct
++from oct_converter.dicom.heightmap import (
++    HEIGHTMAP_PADDING_VALUE,
++    TOPCON_LAYER_LABELS,
++)
++from oct_converter.readers import FDA
++
++
++def read_heightmap_seg(path: str | Path) -> tuple[np.ndarray, np.ndarray, list[str]]:
++    """Load a Height Map SEG DICOM written by oct_converter.
++
++    Returns:
++        heights_px: float32 array (n_layers, n_bscans, n_ascans), pixels from
++            top of B-scan; padding samples are left as FloatPixelPaddingValue.
++        heights_mm: same shape; padding set to NaN; px * RWVM slope.
++        labels: SegmentLabel per layer (frame order).
++    """
++    seg = pydicom.dcmread(str(path))
++    heights_px = np.frombuffer(seg.FloatPixelData, dtype="<f4").reshape(
++        int(seg.NumberOfFrames), int(seg.Rows), int(seg.Columns)
++    )
++    pad = float(getattr(seg, "FloatPixelPaddingValue", HEIGHTMAP_PADDING_VALUE))
++    labels = [str(item.SegmentLabel) for item in seg.SegmentSequence]
++
++    rwvm = seg.SharedFunctionalGroupsSequence[0].RealWorldValueMappingSequence[0]
++    slope = float(rwvm.RealWorldValueSlope)
++    heights_mm = heights_px.astype(np.float64) * slope
++    heights_mm[heights_px == pad] = np.nan
++    return heights_px, heights_mm, labels
++
++
++filepath = "../path/to/sample.fda"
++output_dir = Path("../path/to/fda_dicom_out")
++
++# Inspect contours already attached to the OCT volume (@CONTOUR_INFO).
++fda = FDA(filepath)
++volume = fda.read_oct_volume()
++if not volume.contours:
++    print("no layer contours")
++else:
++    print(f"laterality={volume.laterality}")
++    for key, arr in volume.contours.items():
++        data = np.asarray(arr)
++        label = TOPCON_LAYER_LABELS.get(key, key)
++        n_valid = int(np.isfinite(data).sum()) if data.size else 0
++        print(
++            f"  {key} (-> {label}): shape={data.shape}, "
++            f"{n_valid}/{data.size} finite samples"
++        )
++    volume.peek(show_contours=True)
++
++# Convert: writes OPT (+ fundus) and, when contours exist, Height Map SEG.
++written = create_dicom_from_oct(filepath, output_dir=str(output_dir))
++for path in written:
++    print(f"wrote {path}")
++
++# Read and inspect Height Map Segmentation DICOMs.
++for path in written:
++    if not Path(path).stem.endswith("_seg"):
++        continue
++    seg = pydicom.dcmread(str(path))
++    heights_px, heights_mm, labels = read_heightmap_seg(path)
++
++    print("\nHeight Map Segmentation")
++    print(f"  SOP Class:  {seg.SOPClassUID}")
++    print(f"  Modality:   {seg.Modality}")
++    print(f"  Type:       {seg.SegmentationType}")
++    print(f"  shape:      {heights_px.shape}  (layers, B-scans, A-scans)")
++    print(f"  FOR UID:    {seg.FrameOfReferenceUID}")
++
++    for item in seg.SegmentSequence:
++        print(
++            f"  Segment {item.SegmentNumber}: {item.SegmentLabel} "
++            f"({item.SegmentedPropertyTypeCodeSequence[0].CodeMeaning})"
++        )
++
++    valid = np.isfinite(heights_mm)
++    print(
++        f"  Height range (valid): "
++        f"[{heights_px[valid].min():.2f}, {heights_px[valid].max():.2f}] px / "
++        f"[{heights_mm[valid].min():.4f}, {heights_mm[valid].max():.4f}] mm"
++        if valid.any()
++        else "  No valid height samples"
++    )
++
++    # Example: ILM surface on B-scan 0 (if present).
++    if "ILM" in labels:
++        ilm = heights_px[labels.index("ILM")]
++        masked = np.where(ilm == HEIGHTMAP_PADDING_VALUE, np.nan, ilm)
++        print(f"  ILM B-scan 0 (px): min={np.nanmin(masked[0]):.2f}")
++
++    source = (
++        seg.SharedFunctionalGroupsSequence[0]
++        .DerivationImageSequence[0]
++        .SourceImageSequence[0]
++    )
++    print(f"  Derived from OPT SOP Instance: {source.ReferencedSOPInstanceUID}")
+diff --git a/oct_converter/dicom/dicom.py b/oct_converter/dicom/dicom.py
+index 051f8e7..dc56ac4 100644
+--- a/oct_converter/dicom/dicom.py
++++ b/oct_converter/dicom/dicom.py
+@@ -12,6 +12,7 @@
+     ExplicitVRLittleEndian,
+     OphthalmicPhotography16BitImageStorage,
+     OphthalmicTomographyImageStorage,
++    UID,
+     generate_uid,
+ )
+ from pydicom.valuerep import DSfloat
+@@ -20,16 +21,67 @@
+ from oct_converter.dicom.e2e_meta import e2e_dicom_metadata
+ from oct_converter.dicom.fda_meta import fda_dicom_metadata
+ from oct_converter.dicom.fds_meta import fds_dicom_metadata
++from oct_converter.dicom.heightmap import (
++    HEIGHTMAP_PADDING_VALUE,
++    contours_to_heightmaps,
++)
+ from oct_converter.dicom.img_meta import img_dicom_metadata
+ from oct_converter.dicom.metadata import DicomMetadata
+ from oct_converter.dicom.poct_meta import poct_dicom_metadata
+ from oct_converter.exceptions import InvalidOCTReaderError
+ from oct_converter.readers import BOCT, E2E, FDA, FDS, IMG, POCT
++from oct_converter.readers.scan_geometry import (
++    ScanGeometry,
++    circle_reference_coordinates,
++    scan_pattern_code,
++)
+ 
+ # Deterministic implementation UID based on package name and version
+ version = metadata.version("oct_converter")
+ implementation_uid = generate_uid(entropy_srcs=["oct_converter", version])
+ 
++# PS3.4 Height Map Segmentation Storage (not yet in all pydicom releases)
++HeightMapSegmentationStorage = UID("1.2.840.10008.5.1.4.1.1.66.8")
++
++# Acquisition timestamps from readers are either datetime or this string form.
++_ACQUISITION_DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
++
++
++def _coerce_datetime(value: datetime | str | None) -> datetime | None:
++    """Normalize reader acquisition timestamps to ``datetime`` or ``None``."""
++    if value is None or value == "":
++        return None
++    if isinstance(value, datetime):
++        return value
++    if isinstance(value, str):
++        return datetime.strptime(value, _ACQUISITION_DATETIME_FORMAT)
++    raise TypeError(f"Expected datetime or str, got {type(value)!r}")
++
++
++def set_content_date_time(ds: Dataset, when: datetime | None = None) -> None:
++    """Set ContentDate / ContentTime (when this DICOM instance was created)."""
++    when = when or datetime.now()
++    ds.ContentDate = when.strftime("%Y%m%d")
++    ds.ContentTime = when.strftime("%H%M%S.%f")
++
++
++def format_dicom_date(value: datetime | str | None) -> str:
++    """Format a timestamp as DICOM DA (YYYYMMDD), or ``\"\"`` if missing."""
++    dt = _coerce_datetime(value)
++    return dt.strftime("%Y%m%d") if dt else ""
++
++
++def format_dicom_time(value: datetime | str | None) -> str:
++    """Format a timestamp as DICOM TM (HHMMSS.ffffff), or ``\"\"`` if missing."""
++    dt = _coerce_datetime(value)
++    return dt.strftime("%H%M%S.%f") if dt else ""
++
++
++def format_acquisition_datetime(value: datetime | str | None) -> str:
++    """Format a timestamp as DICOM DT, or ``\"\"`` if missing."""
++    dt = _coerce_datetime(value)
++    return dt.strftime("%Y%m%d%H%M%S.%f") if dt else ""
++
+ 
+ def opt_base_dicom(filepath: Path) -> Dataset:
+     """Creates the base dicom to be populated.
+@@ -61,9 +113,9 @@ def populate_patient_info(ds: Dataset, meta: DicomMetadata) -> Dataset:
+             ds: Dataset, updated with patient information
+     """
+     # Patient Module PS3.3 C.7.1.1
+-    ds.PatientName = f"{meta.patient_info.last_name}^{meta.patient_info.first_name}"
+-    ds.PatientID = meta.patient_info.patient_id
+-    ds.PatientSex = meta.patient_info.patient_sex
++    ds.PatientName = f"{meta.patient_info.last_name or ''}^{meta.patient_info.first_name or ''}"
++    ds.PatientID = meta.patient_info.patient_id or ""
++    ds.PatientSex = meta.patient_info.patient_sex or ""
+     ds.PatientBirthDate = (
+         meta.patient_info.patient_dob.strftime("%Y%m%d")
+         if meta.patient_info.patient_dob
+@@ -97,51 +149,44 @@ def populate_manufacturer_info(ds: Dataset, meta: DicomMetadata) -> Dataset:
+     return ds
+ 
+ 
+-def populate_opt_series(ds: Dataset, meta: DicomMetadata) -> Dataset:
++def populate_opt_series(
++    ds: Dataset,
++    meta: DicomMetadata,
++    study_instance_uid: str | None = None,
++    series_instance_uid: str | None = None,
++    sop_instance_uid: str | None = None,
++) -> Dataset:
+     """Populates study and series modules, PS3.3 C.7.2.1, PS3.3 C.7.3.1,
+     PS3.3 C.8.17.6, and PS3.3 C.12.1
+ 
+     Args:
+             ds: current dataset
+             meta: DICOM metadata information
++            study_instance_uid: Optional shared Study Instance UID
++            series_instance_uid: Optional Series Instance UID
++            sop_instance_uid: Optional SOP Instance UID
+     Returns:
+             ds: Dataset, updated with study and series information
+     """
+-    # General study module PS3.3 C.7.2.1
+-    # Deterministic StudyInstanceUID based on study ID
+-    # ds.StudyInstanceUID = generate_uid(entropy_srcs=[
+-    # 	# str(uuid.uuid4()),
+-    # 	str(meta.series_info.study_id)
+-    # ])
+-
+-    # # General series module PS3.3 C.7.3.1
+-    # ds.SeriesInstanceUID = generate_uid(entropy_srcs=[
+-    # 	# str(uuid.uuid4()),
+-    # 	str(meta.series_info.series_id)
+-    # ])
+-    ds.StudyInstanceUID = generate_uid()
+-    ds.SeriesInstanceUID = generate_uid()
++    # General study / series UIDs (optional overrides keep OPT/SEG/fundus linked)
++    ds.StudyInstanceUID = study_instance_uid or generate_uid()
++    ds.SeriesInstanceUID = series_instance_uid or generate_uid()
+     ds.StudyID = meta.series_info.study_id
+-    ds.StudyDate = (
+-        meta.series_info.acquisition_date.strftime("%Y%m%d")
+-        if meta.series_info.acquisition_date
+-        else ""
+-    )
+-    ds.StudyTime = (
+-        meta.series_info.acquisition_date.strftime("%H%M%S.%f")
+-        if meta.series_info.acquisition_date
+-        else ""
+-    )
++    ds.StudyDate = format_dicom_date(meta.series_info.acquisition_date)
++    ds.StudyTime = format_dicom_time(meta.series_info.acquisition_date)
+     ds.Laterality = meta.series_info.laterality
+     ds.ProtocolName = meta.series_info.protocol
+     ds.SeriesDescription = meta.series_info.description
+     # Ophthalmic Tomography Series PS3.3 C.8.17.6
+     ds.Modality = "OPT"
+-    ds.SeriesNumber = int(meta.series_info.series_id)
++    try:
++        ds.SeriesNumber = int(meta.series_info.series_id)
++    except (TypeError, ValueError):
++        ds.SeriesNumber = 1
+ 
+     # SOP Common module PS3.3 C.12.1
+     ds.SOPClassUID = OphthalmicTomographyImageStorage
+-    ds.SOPInstanceUID = generate_uid()
++    ds.SOPInstanceUID = sop_instance_uid or generate_uid()
+     return ds
+ 
+ 
+@@ -192,40 +237,53 @@ def opt_shared_functional_groups(ds: Dataset, meta: DicomMetadata) -> Dataset:
+ 
+ 
+ def write_opt_dicom(
+-    meta: DicomMetadata, frames: t.List[np.ndarray], filepath: Path
+-) -> Path:
++    meta: DicomMetadata,
++    frames: t.List[np.ndarray],
++    filepath: Path,
++    study_instance_uid: str | None = None,
++    frame_of_reference_uid: str | None = None,
++    series_instance_uid: str | None = None,
++    sop_instance_uid: str | None = None,
++    fundus_ds: Dataset | None = None,
++) -> FileDataset:
+     """Writes required DICOM metadata and oct pixel data to .dcm file.
+ 
+     Args:
+             meta: DICOM metadata information
+             frames: list of frames of pixel data
+             filepath: Path to where output file is being saved
++            study_instance_uid: Optional shared Study Instance UID
++            frame_of_reference_uid: Optional shared Frame of Reference UID
++            series_instance_uid: Optional Series Instance UID
++            sop_instance_uid: Optional SOP Instance UID
++            fundus_ds: Optional companion fundus FileDataset for Ophthalmic
++                Frame Location (circular / linear scan overlay on localizer)
+     Returns:
+-            Path to created DICOM file
++            FileDataset of the written OPT instance (path is ``filepath``)
+     """
+     ds = opt_base_dicom(filepath)
+     ds = populate_patient_info(ds, meta)
+     ds = populate_manufacturer_info(ds, meta)
+-    ds = populate_opt_series(ds, meta)
++    ds = populate_opt_series(
++        ds,
++        meta,
++        study_instance_uid=study_instance_uid,
++        series_instance_uid=series_instance_uid,
++        sop_instance_uid=sop_instance_uid,
++    )
++    ds.file_meta.MediaStorageSOPInstanceUID = ds.SOPInstanceUID
+     ds = populate_ocular_region(ds, meta)
+     ds = opt_shared_functional_groups(ds, meta)
+ 
+-    # TODO: Frame of reference if fundus image present
++    # Frame of Reference Module PS3.3 C.7.4.1
++    ds.FrameOfReferenceUID = frame_of_reference_uid or generate_uid()
+ 
+     # OPT Image Module PS3.3 C.8.17.7
+     ds.ImageType = ["DERIVED", "SECONDARY"]
+     ds.SamplesPerPixel = 1
+-    if meta.series_info.acquisition_date:
+-        # Convert string to datetime object if it's a string
+-        if isinstance(meta.series_info.acquisition_date, str):
+-            input_datetime = datetime.strptime(
+-                meta.series_info.acquisition_date, "%Y-%m-%d %H:%M:%S"
+-            )
+-        else:
+-            input_datetime = meta.series_info.acquisition_date
+-        ds.AcquisitionDateTime = input_datetime.strftime("%Y%m%d%H%M%S.%f")
+-    else:
+-        ds.AcquisitionDateTime = ""
++    ds.AcquisitionDateTime = format_acquisition_datetime(
++        meta.series_info.acquisition_date
++    )
+ 
+     ds.AcquisitionNumber = 1
+     ds.PhotometricInterpretation = "MONOCHROME2"
+@@ -239,14 +297,25 @@ def write_opt_dicom(
+     ds.NumberOfFrames = len(frames)
+ 
+     # Multi-frame Functional Groups Module PS3.3 C.7.6.16
+-    dt = datetime.now()
+-    ds.ContentDate = dt.strftime("%Y%m%d")
+-    timeStr = dt.strftime("%H%M%S.%f")  # long format with micro seconds
+-    ds.ContentTime = timeStr
++    set_content_date_time(ds)
+     ds.InstanceNumber = 1
+ 
++    # Scan Pattern Type (CID 4272) — Ophthalmic Tomography Parameters
++    geom = meta.scan_geometry
++    scheme, value, meaning = scan_pattern_code(
++        ScanGeometry(
++            scan_type=geom.scan_type if geom else "volume",
++            start_angle=geom.start_angle if geom else None,
++            centre=tuple(geom.centre) if geom and geom.centre else None,
++            radius=geom.radius if geom else None,
++        )
++        if geom
++        else None,
++        len(frames),
++    )
++    ds.ScanPatternTypeCodeSequence = [_code_dataset(scheme, value, meaning)]
++
+     per_frame = []
+-    pixel_data_bytes = list()
+     # Normalize
+     frames = normalize_volume(frames)
+     # Convert to a 3d volume
+@@ -263,36 +332,344 @@ def write_opt_dicom(
+         frame_fgs.FrameContentSequence[0].InStackPositionNumber = i + 1
+         frame_fgs.FrameContentSequence[0].StackID = "1"
+ 
+-        # Pixel data
+-        frame_dat = pixel_data[i, :, :]
+-        pixel_data_bytes.append(frame_dat.tobytes())
++        # Ophthalmic Frame Location Macro (circular / linear vs fundus)
++        if fundus_ds is not None and geom is not None:
++            loc = Dataset()
++            loc.ReferencedSOPClassUID = fundus_ds.SOPClassUID
++            loc.ReferencedSOPInstanceUID = fundus_ds.SOPInstanceUID
++            loc.PurposeOfReferenceCodeSequence = [
++                _code_dataset("DCM", "121311", "Localizer")
++            ]
++            if geom.scan_type == "circular" and geom.centre and geom.radius is not None:
++                loc.OphthalmicImageOrientation = "NONLINEAR"
++                loc.ReferenceCoordinates = circle_reference_coordinates(
++                    tuple(geom.centre),
++                    float(geom.radius),
++                    float(geom.start_angle or 0.0),
++                    int(ds.Columns),
++                )
++                frame_fgs.OphthalmicFrameLocationSequence = [loc]
++            else:
++                line_start = geom.line_start
++                line_end = geom.line_end
++                if geom.frame_lines and i < len(geom.frame_lines):
++                    fl = geom.frame_lines[i]
++                    if fl and fl.get("line_start") and fl.get("line_end"):
++                        line_start = fl["line_start"]
++                        line_end = fl["line_end"]
++                if line_start and line_end:
++                    loc.OphthalmicImageOrientation = "LINEAR"
++                    # DICOM (row, col) = (y, x)
++                    sx, sy = line_start
++                    ex, ey = line_end
++                    loc.ReferenceCoordinates = [
++                        float(sy),
++                        float(sx),
++                        float(ey),
++                        float(ex),
++                    ]
++                    frame_fgs.OphthalmicFrameLocationSequence = [loc]
++
+         per_frame.append(frame_fgs)
+     ds.PerFrameFunctionalGroupsSequence = per_frame
+     ds.PixelData = pixel_data.tobytes()
+     ds.save_as(
+         filepath, implicit_vr=False, little_endian=True, enforce_file_format=True
+     )
++    return ds
++
++
++def _code_dataset(scheme: str, value: str, meaning: str) -> Dataset:
++    """Build a DICOM coded-entry sequence item."""
++    item = Dataset()
++    item.CodeValue = value
++    item.CodingSchemeDesignator = scheme
++    item.CodeMeaning = meaning
++    return item
++
++
++def write_heightmap_seg_dicom(
++    meta: DicomMetadata,
++    contours: dict,
++    opt_ds: Dataset,
++    filepath: Path,
++    axial_spacing_mm: float | None = None,
++) -> Path | None:
++    """Write a Height Map Segmentation DICOM from OCT layer contours.
++
++    Accepts E2E (``contour{id}`` lists) or FDA (named 2-D arrays) contour
++    dicts; see ``contours_to_heightmaps``.
++
++    Args:
++            meta: DICOM metadata (patient/equipment/geometry)
++            contours: ``OCTVolumeWithMetaData.contours`` dict
++            opt_ds: Companion OPT FileDataset (must include FOR and SOP UIDs)
++            filepath: Output path for the SEG file
++            axial_spacing_mm: Axial (B-scan row) spacing in mm for RWVM.
++                Defaults to OPT pixel spacing row component when available.
++    Returns:
++            Path to written SEG file, or None if no contours to encode.
++    """
++    num_bscans = int(opt_ds.NumberOfFrames)
++    width = int(opt_ds.Columns)
++    opt_rows = int(opt_ds.Rows)
++    layers = contours_to_heightmaps(contours, num_bscans, width)
++    if not layers:
++        return None
++
++    # Prefer caller-supplied axial spacing; fall back to OPT row spacing.
++    if axial_spacing_mm is None:
++        if meta.image_geometry.pixel_spacing:
++            axial_spacing_mm = float(meta.image_geometry.pixel_spacing[0])
++        else:
++            axial_spacing_mm = 1.0
++
++    # Heightmap Pixel Measures: row = B-scan spacing, col = OPT column spacing
++    opt_col_spacing = float(meta.image_geometry.pixel_spacing[1]) if meta.image_geometry.pixel_spacing else 1.0
++    slice_thickness = float(meta.image_geometry.slice_thickness)
++    image_orientation = list(meta.image_geometry.image_orientation) or [
++        1,
++        0,
++        0,
++        0,
++        1,
++        0,
++    ]
++
++    file_meta = FileMetaDataset()
++    file_meta.MediaStorageSOPClassUID = HeightMapSegmentationStorage
++    file_meta.MediaStorageSOPInstanceUID = generate_uid()
++    file_meta.ImplementationClassUID = implementation_uid
++    file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
++
++    ds = FileDataset(str(filepath), {}, file_meta=file_meta, preamble=b"\0" * 128)
++
++    ds = populate_patient_info(ds, meta)
++    # Equipment without OPT-only AcquisitionDeviceType (still useful)
++    ds.Manufacturer = meta.manufacturer_info.manufacturer
++    ds.ManufacturerModelName = meta.manufacturer_info.manufacturer_model
++    ds.DeviceSerialNumber = meta.manufacturer_info.device_serial
++    ds.SoftwareVersions = meta.manufacturer_info.software_version
++
++    # Study / Series / SOP
++    ds.StudyInstanceUID = opt_ds.StudyInstanceUID
++    ds.SeriesInstanceUID = generate_uid()
++    ds.FrameOfReferenceUID = opt_ds.FrameOfReferenceUID
++    ds.Modality = "SEG"
++    try:
++        ds.SeriesNumber = int(meta.series_info.series_id) + 1000
++    except (TypeError, ValueError):
++        ds.SeriesNumber = 1000
++    ds.Laterality = meta.series_info.laterality
++    ds.SeriesDescription = (
++        f"{meta.series_info.description} Height Map Segmentation"
++        if meta.series_info.description
++        else "Height Map Segmentation"
++    )
++    ds.SOPClassUID = HeightMapSegmentationStorage
++    ds.SOPInstanceUID = file_meta.MediaStorageSOPInstanceUID
++
++    # General Image / Height Map Segmentation Image Module
++    ds.ImageType = ["DERIVED", "PRIMARY"]
++    ds.ContentLabel = "HEIGHTMAP"
++    ds.ContentDescription = "Retinal layer height map segmentation"
++    ds.ContentCreatorName = "oct_converter"
++    ds.SamplesPerPixel = 1
++    ds.PhotometricInterpretation = "MONOCHROME2"
++    ds.SegmentationType = "HEIGHTMAP"
++    ds.NumberOfFrames = len(layers)
++    ds.Rows = num_bscans
++    ds.Columns = width
++    ds.InstanceNumber = 1
++
++    # Floating Point Image Pixel Module PS3.3 C.7.6.24
++    ds.BitsAllocated = 32
++    ds.FloatPixelPaddingValue = HEIGHTMAP_PADDING_VALUE
++    # Keep padding range a single value outside [0, OPT.Rows]
++    ds.FloatPixelPaddingRangeLimit = HEIGHTMAP_PADDING_VALUE
++
++    set_content_date_time(ds)
++    ds.AcquisitionDateTime = format_acquisition_datetime(
++        meta.series_info.acquisition_date
++    )
++
++    # Segment Sequence
++    segment_seq = []
++    algorithm_name = (
++        meta.manufacturer_info.manufacturer_model
++        or meta.manufacturer_info.manufacturer
++        or "oct_converter"
++    )
++    for idx, layer in enumerate(layers, start=1):
++        seg = Dataset()
++        seg.SegmentNumber = idx
++        seg.SegmentLabel = layer.code.label
++        seg.SegmentAlgorithmType = "AUTOMATIC"
++        seg.SegmentAlgorithmName = str(algorithm_name)
++        algo_id = Dataset()
++        algo_id.AlgorithmName = str(algorithm_name)
++        algo_id.AlgorithmVersion = version
++        algo_id.AlgorithmFamilyCodeSequence = [
++            _code_dataset("DCM", "123103", "Edge Detection")
++        ]
++        seg.SegmentationAlgorithmIdentificationSequence = [algo_id]
++        seg.SegmentedPropertyCategoryCodeSequence = [
++            _code_dataset(
++                layer.code.category_scheme,
++                layer.code.category_value,
++                layer.code.category_meaning,
++            )
++        ]
++        seg.SegmentedPropertyTypeCodeSequence = [
++            _code_dataset(
++                layer.code.type_scheme,
++                layer.code.type_value,
++                layer.code.type_meaning,
++            )
++        ]
++        segment_seq.append(seg)
++    ds.SegmentSequence = segment_seq
++
++    # Dimension organization (minimal)
++    dim_uid = generate_uid()
++    dim_org = Dataset()
++    dim_org.DimensionOrganizationUID = dim_uid
++    ds.DimensionOrganizationSequence = [dim_org]
++    dim_index = Dataset()
++    dim_index.DimensionOrganizationUID = dim_uid
++    dim_index.DimensionIndexPointer = (0x0062, 0x000B)  # Referenced Segment Number
++    dim_index.FunctionalGroupPointer = (0x0062, 0x000A)  # Segment Identification Seq
++    ds.DimensionIndexSequence = [dim_index]
++
++    # Shared functional groups: Pixel Measures, Derivation Image, RWVM, Plane Orientation
++    shared = Dataset()
++
++    pm = Dataset()
++    pm.PixelSpacing = [slice_thickness, opt_col_spacing]
++    shared.PixelMeasuresSequence = [pm]
++
++    if num_bscans > 1:
++        po = Dataset()
++        # Heightmap plane is orthogonal to OPT B-scans: rows along slice, cols along OPT cols
++        # OPT orientation is [row_dir, col_dir]; heightmap row ~ OPT slice (Z), col ~ OPT col
++        shared.PlaneOrientationSequence = [
++            Dataset()
++        ]
++        # Approximate: row direction along patient Z of OPT stack, col along OPT column
++        shared.PlaneOrientationSequence[0].ImageOrientationPatient = [
++            0,
++            0,
++            1,
++            image_orientation[3],
++            image_orientation[4],
++            image_orientation[5],
++        ]
++
++    # Derivation Image Functional Group
++    purpose = _code_dataset(
++        "DCM", "121322", "Source Image for Image Processing Operation"
++    )
++    derivation_code = _code_dataset("DCM", "113076", "Segmentation")
++    source = Dataset()
++    source.ReferencedSOPClassUID = opt_ds.SOPClassUID
++    source.ReferencedSOPInstanceUID = opt_ds.SOPInstanceUID
++    source.PurposeOfReferenceCodeSequence = [purpose]
++    deriv_item = Dataset()
++    deriv_item.DerivationCodeSequence = [derivation_code]
++    deriv_item.SourceImageSequence = [source]
++    shared.DerivationImageSequence = [deriv_item]
++
++    # Real World Value Mapping: pixel height -> mm
++    rwvm = Dataset()
++    rwvm.DoubleFloatRealWorldValueFirstValueMapped = 0.0
++    rwvm.DoubleFloatRealWorldValueLastValueMapped = float(max(opt_rows, 1))
++    rwvm.RealWorldValueIntercept = 0.0
++    rwvm.RealWorldValueSlope = float(axial_spacing_mm)
++    rwvm.LUTExplanation = "Axial distance from top of B-scan"
++    measurement = Dataset()
++    measurement.CodeValue = "mm"
++    measurement.CodingSchemeDesignator = "UCUM"
++    measurement.CodeMeaning = "mm"
++    rwvm.MeasurementUnitsCodeSequence = [measurement]
++    shared.RealWorldValueMappingSequence = [rwvm]
++
++    ds.SharedFunctionalGroupsSequence = [shared]
++
++    # Per-frame functional groups + float pixel data
++    per_frame = []
++    float_frames = []
++    for idx, layer in enumerate(layers, start=1):
++        fg = Dataset()
++        # Segment Identification
++        seg_id = Dataset()
++        seg_id.ReferencedSegmentNumber = idx
++        fg.SegmentIdentificationSequence = [seg_id]
++        # Frame Content
++        fc = Dataset()
++        fc.DimensionIndexValues = [idx]
++        fc.InStackPositionNumber = idx
++        fc.StackID = "1"
++        fg.FrameContentSequence = [fc]
++        if num_bscans > 1:
++            pp = Dataset()
++            pp.ImagePositionPatient = [0, 0, 0]
++            fg.PlanePositionSequence = [pp]
++        per_frame.append(fg)
++        float_frames.append(layer.data.astype(np.float32))
++
++    ds.PerFrameFunctionalGroupsSequence = per_frame
++
++    # Common Instance Reference: referenced OPT series
++    ref_inst = Dataset()
++    ref_inst.ReferencedSOPClassUID = opt_ds.SOPClassUID
++    ref_inst.ReferencedSOPInstanceUID = opt_ds.SOPInstanceUID
++    ref_series = Dataset()
++    ref_series.SeriesInstanceUID = opt_ds.SeriesInstanceUID
++    ref_series.ReferencedInstanceSequence = [ref_inst]
++    ds.ReferencedSeriesSequence = [ref_series]
++
++    pixel_stack = np.stack(float_frames, axis=0)
++    ds.FloatPixelData = pixel_stack.astype("<f4").tobytes()
++    ds.save_as(
++        filepath, implicit_vr=False, little_endian=True, enforce_file_format=True
++    )
+     return filepath
+ 
+ 
+ def write_fundus_dicom(
+-    meta: DicomMetadata, frames: t.List[np.ndarray], filepath: Path
+-) -> Path:
++    meta: DicomMetadata,
++    frames: t.List[np.ndarray],
++    filepath: Path,
++    study_instance_uid: str | None = None,
++    series_instance_uid: str | None = None,
++    sop_instance_uid: str | None = None,
++) -> FileDataset:
+     """Writes required DICOM metadata and fundus pixel data to .dcm file.
+ 
+     Args:
+             meta: DICOM metadata information
+             frames: list of frames of pixel data
+             filepath: Path to where output file is being saved
++            study_instance_uid: Optional shared Study Instance UID
++            series_instance_uid: Optional Series Instance UID
++            sop_instance_uid: Optional SOP Instance UID
+     Returns:
+-            Path to created DICOM file
++            FileDataset of the written fundus instance
+     """
+     ds = opt_base_dicom(filepath)
+     ds = populate_patient_info(ds, meta)
+     ds = populate_manufacturer_info(ds, meta)
+-    ds = populate_opt_series(ds, meta)
++    ds = populate_opt_series(
++        ds,
++        meta,
++        study_instance_uid=study_instance_uid,
++        series_instance_uid=series_instance_uid,
++        sop_instance_uid=sop_instance_uid,
++    )
+     ds.Modality = "OP"
+     ds.SOPClassUID = OphthalmicPhotography16BitImageStorage
++    ds.file_meta.MediaStorageSOPClassUID = OphthalmicPhotography16BitImageStorage
++    ds.file_meta.MediaStorageSOPInstanceUID = ds.SOPInstanceUID
+     ds = populate_ocular_region(ds, meta)
+ 
+     ds.PixelSpacing = meta.image_geometry.pixel_spacing
+@@ -308,10 +685,8 @@ def write_fundus_dicom(
+     if ds.ProtocolName in enface_to_type:
+         ds.ImageType.append(enface_to_type.get(ds.ProtocolName))
+     ds.SamplesPerPixel = 1
+-    ds.AcquisitionDateTime = (
+-        meta.series_info.acquisition_date.strftime("%Y%m%d%H%M%S.%f")
+-        if meta.series_info.acquisition_date
+-        else ""
++    ds.AcquisitionDateTime = format_acquisition_datetime(
++        meta.series_info.acquisition_date
+     )
+     ds.AcquisitionNumber = 1
+     ds.PhotometricInterpretation = "MONOCHROME2"
+@@ -325,12 +700,9 @@ def write_fundus_dicom(
+     ds.NumberOfFrames = 1
+ 
+     # Multi-frame Functional Groups Module PS3.3 C.7.6.16
+-    dt = datetime.now()
+-    ds.ContentDate = dt.strftime("%Y%m%d")
+-    timeStr = dt.strftime("%H%M%S.%f")  # long format with micro seconds
+-    ds.ContentTime = timeStr
++    set_content_date_time(ds)
+     ds.InstanceNumber = 1
+-    pixel_data = np.array(frames).astype(np.uint16)
++    pixel_data = _as_grayscale_uint16(frames)
+     ds.Rows = pixel_data.shape[0]
+     ds.Columns = pixel_data.shape[1]
+ 
+@@ -338,11 +710,36 @@ def write_fundus_dicom(
+     ds.save_as(
+         filepath, implicit_vr=False, little_endian=True, enforce_file_format=True
+     )
+-    return filepath
++    return ds
++
++
++def _as_grayscale_uint16(frames: t.Any) -> np.ndarray:
++    """Coerce fundus pixel input to a 2-D uint16 grayscale image.
++
++    RGB / RGBA arrays (HWC or CHW) are reduced to luminance so MONOCHROME2
++    PixelData length matches Rows x Columns. Plain 2-D arrays are cast only.
++    """
++    arr = np.asarray(frames)
++    if arr.ndim == 2:
++        gray = arr
++    elif arr.ndim == 3 and arr.shape[-1] in (3, 4):
++        rgb = arr[..., :3].astype(np.float32)
++        gray = 0.299 * rgb[..., 0] + 0.587 * rgb[..., 1] + 0.114 * rgb[..., 2]
++    elif arr.ndim == 3 and arr.shape[0] in (3, 4):
++        rgb = arr[:3].astype(np.float32)
++        gray = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
++    else:
++        raise ValueError(
++            f"Expected 2-D grayscale or 3-channel fundus image, got shape {arr.shape}"
++        )
++    return np.ascontiguousarray(gray, dtype=np.uint16)
+ 
+ 
+ def write_color_fundus_dicom(
+-    meta: DicomMetadata, frames: t.List[np.ndarray], filepath: Path
++    meta: DicomMetadata,
++    frames: t.List[np.ndarray],
++    filepath: Path,
++    study_instance_uid: str | None = None,
+ ) -> Path:
+     """Writes required DICOM metadata and RGB fundus pixel data to .dcm file.
+ 
+@@ -350,15 +747,18 @@ def write_color_fundus_dicom(
+             meta: DICOM metadata information
+             frames: list of frames of pixel data
+             filepath: Path to where output file is being saved
++            study_instance_uid: Optional shared Study Instance UID
+     Returns:
+             Path to created DICOM file
+     """
+     ds = opt_base_dicom(filepath)
+     ds = populate_patient_info(ds, meta)
+     ds = populate_manufacturer_info(ds, meta)
+-    ds = populate_opt_series(ds, meta)
++    ds = populate_opt_series(ds, meta, study_instance_uid=study_instance_uid)
+     ds.Modality = "OP"
+     ds.SOPClassUID = OphthalmicPhotography16BitImageStorage
++    ds.file_meta.MediaStorageSOPClassUID = OphthalmicPhotography16BitImageStorage
++    ds.file_meta.MediaStorageSOPInstanceUID = ds.SOPInstanceUID
+     ds = populate_ocular_region(ds, meta)
+ 
+     ds.PixelSpacing = meta.image_geometry.pixel_spacing
+@@ -374,10 +774,8 @@ def write_color_fundus_dicom(
+     if ds.ProtocolName in enface_to_type:
+         ds.ImageType.append(enface_to_type.get(ds.ProtocolName))
+     ds.SamplesPerPixel = 1
+-    ds.AcquisitionDateTime = (
+-        meta.series_info.acquisition_date.strftime("%Y%m%d%H%M%S.%f")
+-        if meta.series_info.acquisition_date
+-        else ""
++    ds.AcquisitionDateTime = format_acquisition_datetime(
++        meta.series_info.acquisition_date
+     )
+     ds.AcquisitionNumber = 1
+     ds.PhotometricInterpretation = "RGB"
+@@ -391,10 +789,7 @@ def write_color_fundus_dicom(
+     ds.NumberOfFrames = 1
+ 
+     # Multi-frame Functional Groups Module PS3.3 C.7.6.16
+-    dt = datetime.now()
+-    ds.ContentDate = dt.strftime("%Y%m%d")
+-    timeStr = dt.strftime("%H%M%S.%f")  # long format with micro seconds
+-    ds.ContentTime = timeStr
++    set_content_date_time(ds)
+     ds.InstanceNumber = 1
+ 
+     pixel_data = np.array(frames).astype(np.uint16)
+@@ -418,6 +813,7 @@ def create_dicom_from_oct(
+     extract_scan_repeats: bool = False,
+     scalex: float = 0.01,
+     slice_thickness: float = 0.05,
++    apply_registration: bool = False,
+ ) -> list:
+     """Creates a DICOM file with the data parsed from
+     the input file.
+@@ -434,6 +830,9 @@ def create_dicom_from_oct(
+             extract_scan_repeats: If .e2e file, allows for extracting all scan repeats
+             scalex: If .e2e file, allows for manually setting x scale (in mm)
+             slice_thickness: If .e2e file, allows for manually setting z scale (in mm)
++            apply_registration: If .e2e file, apply Heidelberg B-scan
++                registration to OCT pixels and layer contours before writing
++                DICOM. Defaults to False.
+ 
+     Returns:
+             list: list of Path(s) to DICOM file
+@@ -468,6 +867,7 @@ def create_dicom_from_oct(
+             extract_scan_repeats,
+             scalex,
+             slice_thickness,
++            apply_registration=apply_registration,
+         )
+     else:
+         raise TypeError(
+@@ -523,7 +923,7 @@ def create_dicom_from_boct(
+         filename = f"{Path(input_file).stem}_{str(count)}.dcm"
+         filepath = Path(output_dir, filename)
+         file = write_opt_dicom(meta, oct.volume, filepath)
+-        files.append(file)
++        files.append(filepath)
+ 
+     return files
+ 
+@@ -534,6 +934,7 @@ def create_dicom_from_e2e(
+     extract_scan_repeats: bool = False,
+     scalex: float = 0.01,
+     slice_thickness: float = 0.05,
++    apply_registration: bool = False,
+ ) -> list:
+     """Creates DICOM file(s) with the data parsed from
+     the input file.
+@@ -544,12 +945,18 @@ def create_dicom_from_e2e(
+             extract_scan_repeats: If True, will extract all scan repeats
+             scalex: Manually set scale of x axis
+             slice_thickness: Manually set scale of z axis
++            apply_registration: Apply Heidelberg B-scan registration to
++                OCT pixels and contours before writing. Defaults to False.
+ 
+     Returns:
+             list: List of path(s) to DICOM file(s)
+     """
+     e2e = E2E(input_file)
+-    oct_volumes = e2e.read_oct_volume(scalex=scalex, slice_thickness=slice_thickness)
++    oct_volumes = e2e.read_oct_volume(
++        scalex=scalex,
++        slice_thickness=slice_thickness,
++        apply_registration=apply_registration,
++    )
+     fundus_images = e2e.read_fundus_image(
+         extract_scan_repeats=extract_scan_repeats, scalex=scalex
+     )
+@@ -557,22 +964,66 @@ def create_dicom_from_e2e(
+         raise ValueError("No OCT volumes or fundus images found in e2e input file.")
+ 
+     files = []
++    # Map series key -> fundus FileDataset for Ophthalmic Frame Location
++    fundus_by_id: dict[str, Dataset] = {}
++    # Shared Study UID per E2E file
++    study_uid = generate_uid()
+ 
+     if len(fundus_images) > 0:
+         for count, fundus in enumerate(fundus_images):
+             meta = e2e_dicom_metadata(fundus)
+             filename = f"{Path(input_file).stem}_fundus_{str(count)}.dcm"
+             filepath = Path(output_dir, filename)
+-            file = write_fundus_dicom(meta, fundus.image, filepath)
+-            files.append(file)
++            fundus_ds = write_fundus_dicom(
++                meta, fundus.image, filepath, study_instance_uid=study_uid
++            )
++            files.append(filepath)
++            if fundus.image_id:
++                # Strip trailing underscores used for scan-repeat disambiguation
++                key = fundus.image_id.rstrip("_")
++                fundus_by_id.setdefault(key, fundus_ds)
++                fundus_by_id[fundus.image_id] = fundus_ds
+ 
+     if len(oct_volumes) > 0:
+         for count, oct in enumerate(oct_volumes):
+             meta = e2e_dicom_metadata(oct)
++            for_uid = generate_uid()
+             filename = f"{Path(input_file).stem}_oct_{str(count)}.dcm"
+             filepath = Path(output_dir, filename)
+-            file = write_opt_dicom(meta, oct.volume, filepath)
+-            files.append(file)
++            fundus_ds = None
++            if oct.volume_id:
++                fundus_ds = fundus_by_id.get(oct.volume_id) or fundus_by_id.get(
++                    oct.volume_id.rstrip("_")
++                )
++            # Fallback: single fundus for single OCT
++            if fundus_ds is None and len(fundus_by_id) == 1:
++                fundus_ds = next(iter(fundus_by_id.values()))
++            opt_ds = write_opt_dicom(
++                meta,
++                oct.volume,
++                filepath,
++                study_instance_uid=study_uid,
++                frame_of_reference_uid=for_uid,
++                fundus_ds=fundus_ds,
++            )
++            files.append(filepath)
++
++            if oct.contours:
++                # Axial spacing is scaley (E2E pixel_spacing[1]).
++                axial_mm = None
++                if oct.pixel_spacing and len(oct.pixel_spacing) >= 2:
++                    axial_mm = float(oct.pixel_spacing[1])
++                seg_filename = f"{Path(input_file).stem}_seg_{str(count)}.dcm"
++                seg_filepath = Path(output_dir, seg_filename)
++                seg_path = write_heightmap_seg_dicom(
++                    meta,
++                    oct.contours,
++                    opt_ds,
++                    seg_filepath,
++                    axial_spacing_mm=axial_mm,
++                )
++                if seg_path is not None:
++                    files.append(seg_path)
+ 
+     return files
+ 
+@@ -584,6 +1035,10 @@ def create_dicom_from_fda(
+     """Creates DICOM file(s) with the data parsed from
+     the input file.
+ 
++    When layer contours are present on the OCT volume, also writes a Height
++    Map Segmentation companion (``{stem}_seg.dcm``) sharing Study and Frame
++    of Reference UIDs with the OPT volume.
++
+     Args:
+             input_file: FDA file with OCT data
+             output_dir: Output directory
+@@ -595,10 +1050,34 @@ def create_dicom_from_fda(
+     fda = FDA(input_file)
+     oct = fda.read_oct_volume()
+     meta = fda_dicom_metadata(oct)
++    study_uid = generate_uid()
++    for_uid = generate_uid()
+     output_filename = f"{Path(input_file).stem}.dcm"
+     filepath = Path(output_dir, output_filename)
+-    file = write_opt_dicom(meta, oct.volume, filepath)
+-    files.append(file)
++    opt_ds = write_opt_dicom(
++        meta,
++        oct.volume,
++        filepath,
++        study_instance_uid=study_uid,
++        frame_of_reference_uid=for_uid,
++    )
++    files.append(filepath)
++
++    # Write SEG before fundus mutates image_geometry.pixel_spacing.
++    if oct.contours:
++        axial_mm = None
++        if oct.pixel_spacing and len(oct.pixel_spacing) >= 3:
++            axial_mm = float(oct.pixel_spacing[2])
++        seg_filepath = Path(output_dir, f"{Path(input_file).stem}_seg.dcm")
++        seg_path = write_heightmap_seg_dicom(
++            meta,
++            oct.contours,
++            opt_ds,
++            seg_filepath,
++            axial_spacing_mm=axial_mm,
++        )
++        if seg_path is not None:
++            files.append(seg_path)
+ 
+     # Attempt to parse fundus images
+     fundus = fda.read_fundus_image()
+@@ -606,7 +1085,9 @@ def create_dicom_from_fda(
+         output_filename = f"{Path(input_file).stem}_fundus.dcm"
+         filepath = Path(output_dir, output_filename)
+         meta.image_geometry.pixel_spacing = [1, 1]
+-        file = write_color_fundus_dicom(meta, fundus.image, filepath)
++        file = write_color_fundus_dicom(
++            meta, fundus.image, filepath, study_instance_uid=study_uid
++        )
+         files.append(file)
+ 
+     fundus_grayscale = fda.read_fundus_image_gray_scale()
+@@ -614,8 +1095,13 @@ def create_dicom_from_fda(
+         output_filename = f"{Path(input_file).stem}_fundus_grayscale.dcm"
+         filepath = Path(output_dir, output_filename)
+         meta.image_geometry.pixel_spacing = [1, 1]
+-        file = write_fundus_dicom(meta, fundus_grayscale.image, filepath)
+-        files.append(file)
++        write_fundus_dicom(
++            meta,
++            fundus_grayscale.image,
++            filepath,
++            study_instance_uid=study_uid,
++        )
++        files.append(filepath)
+ 
+     return files
+ 
+@@ -641,7 +1127,7 @@ def create_dicom_from_fds(
+     output_filename = f"{Path(input_file).stem}.dcm"
+     filepath = Path(output_dir, output_filename)
+     file = write_opt_dicom(meta, oct.volume, filepath)
+-    files.append(file)
++    files.append(filepath)
+ 
+     # Attempt to parse fundus images
+     fundus = fds.read_fundus_image()
+@@ -680,7 +1166,7 @@ def create_dicom_from_img(
+     output_filename = f"{Path(input_file).stem}.dcm"
+     filepath = Path(output_dir, output_filename)
+     file = write_opt_dicom(meta, oct.volume, filepath)
+-    return [file]
++    return [filepath]
+ 
+ 
+ def create_dicom_from_poct(
+@@ -705,6 +1191,6 @@ def create_dicom_from_poct(
+         filename = f"{Path(input_file).stem}_{str(count)}.dcm"
+         filepath = Path(output_dir, filename)
+         file = write_opt_dicom(meta, oct.volume, filepath)
+-        files.append(file)
++        files.append(filepath)
+ 
+     return files
+diff --git a/oct_converter/dicom/e2e_meta.py b/oct_converter/dicom/e2e_meta.py
+index 46106c8..d75f948 100644
+--- a/oct_converter/dicom/e2e_meta.py
++++ b/oct_converter/dicom/e2e_meta.py
+@@ -9,6 +9,7 @@
+     OPTAcquisitionDevice,
+     OPTAnatomyStructure,
+     PatientMeta,
++    ScanGeometryMeta,
+     SeriesMeta,
+ )
+ from oct_converter.image_types import FundusImageWithMetaData, OCTVolumeWithMetaData
+@@ -24,17 +25,17 @@ def e2e_patient_meta(meta: dict) -> PatientMeta:
+     """
+     patient = PatientMeta()
+ 
+-    patient_data = meta.get("patient_data")
+-    if patient_data:
+-        # Heidelberg's updated anonymization process wipes
+-        # this section of metadata
+-        patient.first_name = patient_data[0].get("first_name")
+-        patient.last_name = patient_data[0].get("surname")
+-        patient.patient_id = patient_data[0].get("patient_id")
+-        patient.patient_sex = patient_data[0].get("sex")
+-        # TODO patient.patient_dob
+-        # Currently, E2E's patient_dob is incorrect, see
+-        # the E2E reader for more context.
++    patient_data = meta.get("patient_data") or [{}]
++    patient_row = patient_data[0] if patient_data else {}
++    # Coerce missing/None fields to "" so DICOM writers do not fail on
++    # anonymized E2E files that omit patient metadata.
++    patient.first_name = patient_row.get("first_name") or ""
++    patient.last_name = patient_row.get("surname") or ""
++    patient.patient_id = patient_row.get("patient_id") or ""
++    patient.patient_sex = patient_row.get("sex") or ""
++    # TODO patient.patient_dob
++    # Currently, E2E's patient_dob is incorrect, see
++    # the E2E reader for more context.
+ 
+     return patient
+ 
+@@ -132,6 +133,22 @@ def e2e_image_params() -> OCTImageParams:
+     return image_params
+ 
+ 
++def e2e_scan_geometry_meta(image: OCTVolumeWithMetaData) -> ScanGeometryMeta | None:
++    """Map OCTVolumeWithMetaData.scan_geometry dict to ScanGeometryMeta."""
++    geom = getattr(image, "scan_geometry", None)
++    if not geom:
++        return None
++    return ScanGeometryMeta(
++        scan_type=geom.get("type", "volume"),
++        start_angle=geom.get("start_angle"),
++        centre=list(geom["centre"]) if geom.get("centre") else None,
++        radius=geom.get("radius"),
++        line_start=list(geom["line_start"]) if geom.get("line_start") else None,
++        line_end=list(geom["line_end"]) if geom.get("line_end") else None,
++        frame_lines=geom.get("frame_lines"),
++    )
++
++
+ def e2e_dicom_metadata(
+     image: FundusImageWithMetaData | OCTVolumeWithMetaData,
+ ) -> DicomMetadata:
+@@ -142,7 +159,6 @@ def e2e_dicom_metadata(
+     Returns:
+         DicomMetadata: Populated DicomMetadata created with fundus or oct metadata
+     """
+-
+     patient_info = e2e_patient_meta(image.metadata)
+     manufacturer_info = e2e_manu_meta()
+     oct_image_params = e2e_image_params()
+@@ -155,6 +171,7 @@ def e2e_dicom_metadata(
+             image.metadata,
+         )
+         image_geometry = e2e_image_geom(image.pixel_spacing)
++        scan_geometry = e2e_scan_geometry_meta(image)
+     else:
+         series_info = e2e_series_meta(
+             image.image_id,
+@@ -163,6 +180,7 @@ def e2e_dicom_metadata(
+             image.metadata,
+         )
+         image_geometry = e2e_image_geom(image.pixel_spacing)
++        scan_geometry = None
+ 
+     return DicomMetadata(
+         patient_info=patient_info,
+@@ -170,4 +188,5 @@ def e2e_dicom_metadata(
+         manufacturer_info=manufacturer_info,
+         image_geometry=image_geometry,
+         oct_image_params=oct_image_params,
++        scan_geometry=scan_geometry,
+     )
+diff --git a/oct_converter/dicom/heightmap.py b/oct_converter/dicom/heightmap.py
+new file mode 100644
+index 0000000..bdee6be
+--- /dev/null
++++ b/oct_converter/dicom/heightmap.py
+@@ -0,0 +1,262 @@
++"""Height Map Segmentation helpers for OCT layer contours.
++
++Converts vendor contour arrays (Heidelberg E2E, Topcon FDA) into Height Map
++Segmentation frames and maps surfaces to CID 4273 Retinal Segmentation
++Surface codes.
++"""
++
++from __future__ import annotations
++
++import re
++import typing as t
++from dataclasses import dataclass
++
++import numpy as np
++
++# Float padding must fall outside [0, OPT.Rows] (PS3.3 C.8.20.5.1).
++HEIGHTMAP_PADDING_VALUE = -1.0
++
++# Heidelberg layer id -> short name (eyepy SEG_MAPPING convention).
++HEIDELBERG_LAYER_NAMES: dict[int, str] = {
++    0: "ILM",
++    1: "BM",
++    2: "RNFL",
++    3: "GCL",
++    4: "IPL",
++    5: "INL",
++    6: "OPL",
++    7: "ONL",
++    8: "ELM",
++    9: "IOS",
++    10: "OPT",
++    11: "CHO",
++    12: "VIT",
++    13: "ANT",
++    14: "PR1",
++    15: "PR2",
++    16: "RPE",
++    17: "IPL+",
++    18: "IPL-",
++}
++
++# CID 4273 Retinal Segmentation Surface keyed by SegmentLabel.
++# Values: (coding scheme, code value, code meaning).
++SURFACE_CID4273: dict[str, tuple[str, str, str]] = {
++    "ILM": ("SCT", "280677004", "ILM - Internal limiting membrane"),
++    "BM": ("DCM", "128300", "Outer surface of Bruch's Membrane"),
++    "RNFL": ("DCM", "128289", "Outer surface of RNFL"),
++    "GCL": ("DCM", "128290", "Outer surface of GCL"),
++    "IPL": ("DCM", "128291", "Outer surface of IPL"),
++    "INL": ("DCM", "128292", "Outer surface of INL"),
++    "OPL": ("DCM", "128293", "Outer surface of OPL"),
++    "ELM": ("SCT", "76710003", "ELM - External limiting membrane"),
++    "RPE": ("DCM", "128298", "Surface of the center of the RPE"),
++}
++
++# Topcon FDA contour key -> (SegmentLabel used for CID lookup / display).
++# Composite boundary names map to the outer surface of the proximal layer.
++TOPCON_LAYER_LABELS: dict[str, str] = {
++    "ILM": "ILM",
++    "RNFL_GCL": "RNFL",
++    "GCL_IPL": "GCL",
++    "IPL_INL": "IPL",
++    "INL_OPL": "INL",
++    "ELM": "ELM",
++    "BM": "BM",
++    "IZ_RPE": "RPE",
++    # No exact CID 4273 match — SegmentLabel kept as source key; private fallback.
++    "MZ_EZ": "MZ_EZ",
++    "CSI": "CSI",
++}
++
++# Stable synthetic ids for Topcon layers (offset avoids Heidelberg id collisions).
++_TOPCON_LAYER_IDS: dict[str, int] = {
++    name: 1000 + i for i, name in enumerate(TOPCON_LAYER_LABELS)
++}
++
++# BCID 7150 Segmentation Property Categories
++ANATOMICAL_STRUCTURE_CATEGORY = ("SRT", "T-D0050", "Anatomical Structure")
++
++# Fallback for unmapped surface labels
++_GENERIC_PROPERTY_TYPE = ("OCT-converter", "L-0001", "Unspecified retinal surface")
++
++
++@dataclass(frozen=True)
++class LayerCode:
++    """DICOM coded concept for a segmented retinal surface."""
++
++    layer_id: int
++    label: str
++    category_scheme: str
++    category_value: str
++    category_meaning: str
++    type_scheme: str
++    type_value: str
++    type_meaning: str
++
++
++@dataclass
++class HeightmapLayer:
++    """One heightmap frame ready for Height Map Segmentation encoding."""
++
++    layer_id: int
++    code: LayerCode
++    data: np.ndarray  # float32, shape (num_bscans, width)
++
++
++def parse_contour_id(contour_key: str) -> int | None:
++    """Extract numeric Heidelberg layer id from keys like ``contour0``."""
++    match = re.fullmatch(r"contour(\d+)", contour_key)
++    if match:
++        return int(match.group(1))
++    return None
++
++
++def layer_code_for_label(label: str, layer_id: int) -> LayerCode:
++    """Map a surface label to CID 4273 (or a generic fallback)."""
++    cat_scheme, cat_value, cat_meaning = ANATOMICAL_STRUCTURE_CATEGORY
++    if label in SURFACE_CID4273:
++        type_scheme, type_value, type_meaning = SURFACE_CID4273[label]
++    else:
++        type_scheme, type_value, type_meaning = _GENERIC_PROPERTY_TYPE
++        type_meaning = f"Unspecified retinal surface ({label})"
++    return LayerCode(
++        layer_id=layer_id,
++        label=label,
++        category_scheme=cat_scheme,
++        category_value=cat_value,
++        category_meaning=cat_meaning,
++        type_scheme=type_scheme,
++        type_value=type_value,
++        type_meaning=type_meaning,
++    )
++
++
++def layer_code_for_id(layer_id: int) -> LayerCode:
++    """Map a Heidelberg contour id to CID 4273 (or a generic fallback)."""
++    label = HEIDELBERG_LAYER_NAMES.get(layer_id, f"contour{layer_id}")
++    return layer_code_for_label(label, layer_id)
++
++
++def contours_to_heightmaps(
++    contours: dict,
++    num_bscans: int,
++    width: int,
++    padding_value: float = HEIGHTMAP_PADDING_VALUE,
++) -> list[HeightmapLayer]:
++    """Convert ``OCTVolumeWithMetaData.contours`` into heightmap layers.
++
++    Accepts both vendor schemas:
++
++    * **E2E / Heidelberg:** ``contour{id}`` -> list of length ``num_bscans``,
++      each entry a 1-D float array of length ``width`` or ``None``.
++    * **FDA / Topcon:** named key (``ILM``, ``BM``, …) -> 2-D array of shape
++      ``(n_bscans, width)`` with axial heights from the top of each B-scan.
++
++    Args:
++        contours: Contour mapping from an OCT volume.
++        num_bscans: Number of OPT B-scan frames (heightmap rows).
++        width: Number of A-scan columns (must match OPT Columns).
++        padding_value: Value for missing / invalid samples (outside [0, OPT.Rows]).
++
++    Returns:
++        List of HeightmapLayer sorted by layer id. Empty if no usable contours.
++    """
++    if not contours:
++        return []
++
++    layers: list[HeightmapLayer] = []
++    for key in sorted(contours.keys(), key=_contour_sort_key):
++        value = contours[key]
++        heidelberg_id = parse_contour_id(key)
++
++        if heidelberg_id is not None and _is_e2e_slice_list(value):
++            heightmap = _heightmap_from_slice_list(
++                value, num_bscans, width, padding_value
++            )
++            layers.append(
++                HeightmapLayer(
++                    layer_id=heidelberg_id,
++                    code=layer_code_for_id(heidelberg_id),
++                    data=heightmap,
++                )
++            )
++            continue
++
++        if _is_fda_heightmap(value):
++            label = TOPCON_LAYER_LABELS.get(key, key)
++            layer_id = _TOPCON_LAYER_IDS.get(key, 2000 + len(layers))
++            heightmap = _heightmap_from_2d(value, num_bscans, width, padding_value)
++            layers.append(
++                HeightmapLayer(
++                    layer_id=layer_id,
++                    code=layer_code_for_label(label, layer_id),
++                    data=heightmap,
++                )
++            )
++
++    return layers
++
++
++def _is_e2e_slice_list(value: t.Any) -> bool:
++    if isinstance(value, np.ndarray) and value.ndim == 2:
++        return False
++    if not isinstance(value, (list, tuple)):
++        return False
++    return True
++
++
++def _is_fda_heightmap(value: t.Any) -> bool:
++    arr = np.asarray(value) if not isinstance(value, np.ndarray) else value
++    return isinstance(arr, np.ndarray) and arr.ndim == 2
++
++
++def _heightmap_from_slice_list(
++    slice_list: t.Sequence,
++    num_bscans: int,
++    width: int,
++    padding_value: float,
++) -> np.ndarray:
++    heightmap = np.full((num_bscans, width), padding_value, dtype=np.float32)
++    for i in range(num_bscans):
++        if i >= len(slice_list):
++            break
++        contour = slice_list[i]
++        if contour is None:
++            continue
++        arr = np.asarray(contour, dtype=np.float32)
++        if arr.ndim != 1:
++            continue
++        n = min(width, arr.shape[0])
++        row = np.full(width, padding_value, dtype=np.float32)
++        row[:n] = arr[:n]
++        invalid = ~np.isfinite(row) | (row < 0)
++        row[invalid] = padding_value
++        heightmap[i] = row
++    return heightmap
++
++
++def _heightmap_from_2d(
++    array: np.ndarray,
++    num_bscans: int,
++    width: int,
++    padding_value: float,
++) -> np.ndarray:
++    arr = np.asarray(array, dtype=np.float32)
++    heightmap = np.full((num_bscans, width), padding_value, dtype=np.float32)
++    n_rows = min(num_bscans, arr.shape[0])
++    n_cols = min(width, arr.shape[1])
++    block = arr[:n_rows, :n_cols].copy()
++    invalid = ~np.isfinite(block) | (block < 0)
++    block[invalid] = padding_value
++    heightmap[:n_rows, :n_cols] = block
++    return heightmap
++
++
++def _contour_sort_key(key: str) -> t.Tuple[int, str]:
++    layer_id = parse_contour_id(key)
++    if layer_id is not None:
++        return (layer_id, key)
++    if key in _TOPCON_LAYER_IDS:
++        return (_TOPCON_LAYER_IDS[key], key)
++    return (10**9, key)
+diff --git a/oct_converter/dicom/metadata.py b/oct_converter/dicom/metadata.py
+index abd249c..a8be041 100644
+--- a/oct_converter/dicom/metadata.py
++++ b/oct_converter/dicom/metadata.py
+@@ -118,6 +118,21 @@ class ImageGeometry:
+     image_orientation: list[float] = field(default_factory=list)
+ 
+ 
++@dataclasses.dataclass
++class ScanGeometryMeta:
++    """OPT scan pattern / fundus-relative geometry for DICOM encoding."""
++
++    scan_type: str = "volume"  # circular | linear | volume
++    start_angle: t.Optional[float] = None
++    centre: t.Optional[list[float]] = None
++    radius: t.Optional[float] = None
++    line_start: t.Optional[list[float]] = None
++    line_end: t.Optional[list[float]] = None
++    # Per-frame line endpoints for multi-B-scan volumes: list of
++    # {"line_start": [x,y], "line_end": [x,y]} or None
++    frame_lines: t.Optional[list] = None
++
++
+ @dataclasses.dataclass
+ class OCTImageParams:
+     # PS3.3 C.8.17.9
+@@ -144,3 +159,4 @@ class DicomMetadata:
+ 
+     image_geometry: ImageGeometry
+     oct_image_params: OCTImageParams
++    scan_geometry: t.Optional[ScanGeometryMeta] = None
+diff --git a/oct_converter/image_types/oct.py b/oct_converter/image_types/oct.py
+index 7411b3d..42b5009 100644
+--- a/oct_converter/image_types/oct.py
++++ b/oct_converter/image_types/oct.py
+@@ -36,6 +36,7 @@ class OCTVolumeWithMetaData(object):
+ 
+         contours: contours data.
+         pixel_spacing: (x, y, z) pixel spacing in mm.
++        scan_geometry: circular / linear / volume scan geometry relative to fundus.
+         metadata: all metadata available in the OCT scan.
+     """
+ 
+@@ -52,6 +53,7 @@ def __init__(
+         laterality: str | None = None,
+         contours: dict | None = None,
+         pixel_spacing: list[float] | None = None,
++        scan_geometry: dict | None = None,
+         metadata: dict | None = None,
+         header: dict | None = None,
+         oct_header: dict | None = None,
+@@ -75,6 +77,7 @@ def __init__(
+ 
+         # geom data
+         self.pixel_spacing = pixel_spacing
++        self.scan_geometry = scan_geometry
+ 
+         # metadata
+         self.metadata = metadata
+diff --git a/oct_converter/readers/binary_structs/e2e_binary.py b/oct_converter/readers/binary_structs/e2e_binary.py
+index 3e8e9b4..c9677dd 100644
+--- a/oct_converter/readers/binary_structs/e2e_binary.py
++++ b/oct_converter/readers/binary_structs/e2e_binary.py
+@@ -82,6 +82,19 @@ def Latin1String(n):
+     "height" / Int32un,
+     "width" / Int32un,
+ )
++# Chunk type 5: fundus / IR image info (Heidelberg ImageInfo05).
++# Used to convert B-scan FOV positions to fundus pixels.
++# laterality is a single UTF-16LE wchar (2 bytes).
++fundus_info_structure = Struct(
++    "mystery1" / Int16un,
++    "laterality" / Int16un,
++    "capture_datetime" / Int64un,
++    "ir_image_size_x" / Int16un,
++    "ir_image_size_y" / Int16un,
++    "zero1" / Int32un,
++    "zero2" / Int32un,
++    "scan_angle" / Int16un,
++)
+ patient_id_structure = Struct(
+     "first_name" / Latin1String(31),
+     "surname" / Latin1String(51),
+@@ -95,6 +108,7 @@ def Latin1String(n):
+     "laterality" / PaddedString(1, "ascii"),
+     "unknown2" / Int8un,
+ )
++# Chunk type 10019 (0x2713): legacy layer contours (may include leading zeros).
+ contour_structure = Struct(
+     "unknown0" / Int32un,
+     "id" / Int32un,
+@@ -102,6 +116,24 @@ def Latin1String(n):
+     "width" / Int32un,
+ )
+ 
++# Chunk type 0x2723: current ContourSegment layout (matches Heyex / private_eye).
++# Header is the same four int32s, then 20 bytes padding, then ``width`` float32s.
++contour_structure_v2 = Struct(
++    "mystery_1" / Int32un,
++    "id" / Int32un,
++    "mystery_2" / Int32un,
++    "width" / Int32un,
++    "padding" / Bytes(20),
++)
++
++# Chunk type 0x271C (10012): B-scan registration / shape-adjust.
++# Body = int32 + 12 floats + 12 floats.
++bscan_registration_structure = Struct(
++    "mystery_1" / Int32un,
++    "values_1" / Array(12, Float32l),
++    "values_2" / Array(12, Float32l),
++)
++
+ # following the spec from
+ # https://github.com/neurodial/LibE2E/blob/d26d2d9db64c5f765c0241ecc22177bb0c440c87/E2E/dataelements/bscanmetadataelement.cpp#L75
+ bscan_metadata = Struct(
+diff --git a/oct_converter/readers/e2e.py b/oct_converter/readers/e2e.py
+index 6723458..c8e5533 100644
+--- a/oct_converter/readers/e2e.py
++++ b/oct_converter/readers/e2e.py
+@@ -12,6 +12,44 @@
+ 
+ from oct_converter.image_types import FundusImageWithMetaData, OCTVolumeWithMetaData
+ from oct_converter.readers.binary_structs import e2e_binary
++from oct_converter.readers.scan_geometry import build_volume_scan_geometry
++from oct_converter.readers.registration import (
++    apply_registration_to_contour_slice,
++    apply_registration_to_volume_slice,
++    registration_from_values,
++)
++
++
++def _compact_sparse_volume_slices(volume, contours=None, bscan_by_slice=None):
++    """Drop unset slice placeholders and reindex per-slice data to match.
++
++    E2E volumes are pre-allocated as sparse lists (``0`` placeholders) keyed
++    by ``slice_id // 2``. Layer contours and B-scan metadata use the same
++    slice indices, so all must be compacted together after extraction.
++    """
++    if not volume:
++        return volume, contours, bscan_by_slice
++
++    valid_indices = [i for i, slc in enumerate(volume) if not isinstance(slc, int)]
++    compact_volume = [volume[i] for i in valid_indices]
++
++    compact_contours = None
++    if contours is not None:
++        compact_contours = {}
++        for contour_name, slice_list in contours.items():
++            compact_contours[contour_name] = [
++                slice_list[i] if i < len(slice_list) else None for i in valid_indices
++            ]
++
++    compact_bscan = None
++    if bscan_by_slice is not None:
++        compact_bscan = {
++            new_idx: bscan_by_slice[old_idx]
++            for new_idx, old_idx in enumerate(valid_indices)
++            if old_idx in bscan_by_slice
++        }
++
++    return compact_volume, compact_contours, compact_bscan
+ 
+ 
+ class E2E(object):
+@@ -34,10 +72,10 @@ def __init__(self, filepath: str | Path) -> None:
+         self.sex = None
+         self.first_name = None
+         self.surname = None
++        self.patient_id = None
+         self.acquisition_date = None
+         self.birthdate = None
+         self.pixel_spacing = None
+-        self.patient_id = None
+ 
+         # get initial directory structure
+         with open(self.filepath, "rb") as f:
+@@ -69,6 +107,7 @@ def read_oct_volume(
+         legacy_intensity_transform: bool = False,
+         scalex: float = 0.01,
+         slice_thickness: float = 0.05,
++        apply_registration: bool = False,
+     ) -> list[OCTVolumeWithMetaData]:
+         """Reads OCT data.
+ 
+@@ -76,6 +115,10 @@ def read_oct_volume(
+              legacy_intensity_transform: if True, use intensity transform used in v<=0.5.7. Defaults to False.
+              scalex: Manually set scale of x axis
+              slice_thickness: Manually set scale of z axis
++             apply_registration: If True, apply Heidelberg per-B-scan affine
++                 registration (chunk 0x271C) to B-scan pixels and layer
++                 contours so they match Heyex display space.
++                 Defaults to False for backwards compatibility.
+ 
+         Returns:
+             A list of OCTVolumeWithMetaData.
+@@ -119,12 +162,20 @@ def _make_lut():
+             )  # for storage of slices not caught by extraction
+             laterality_dict = {}
+             laterality = None
++            # volume_string -> {slice_index: bscan_metadata}
++            bscan_meta_dict: dict = defaultdict(dict)
++            # volume_string -> {slice_index: BScanRegistration}
++            registration_dict: dict = defaultdict(dict)
++            # volume_string -> fundus / IR ImageInfo05 (chunk type 5)
++            fundus_info_dict: dict = {}
+             for volume, num_slices in volume_dict.items():
+                 if num_slices > 0:
+                     # num_slices + 1 here due to evidence that a slice was being missed off the end in extraction
+                     volume_array_dict[volume] = [0] * int(num_slices + 1)
+ 
+             contour_dict = defaultdict(lambda: defaultdict(dict))
++            # Legacy 0x2713 contours; used only when 0x2723 is absent for a key.
++            contour_dict_legacy = defaultdict(lambda: defaultdict(dict))
+ 
+             # traverse all chunks and extract slices
+             for start, pos in chunk_stack:
+@@ -168,6 +219,17 @@ def _make_lut():
+                     except Exception:
+                         pass
+ 
++                elif chunk.type == 5:  # fundus / IR image info
++                    try:
++                        raw = f.read(min(int(chunk.size), 36))
++                        info = e2e_binary.fundus_info_structure.parse(raw)
++                        volume_string = "{}_{}_{}".format(
++                            chunk.patient_db_id, chunk.study_id, chunk.series_id
++                        )
++                        fundus_info_dict[volume_string] = info
++                    except Exception:
++                        pass
++
+                 elif chunk.type == 10004:  # bscan metadata
+                     raw = f.read(104)
+                     bscan_metadata = e2e_binary.bscan_metadata.parse(raw)
+@@ -190,6 +252,34 @@ def _make_lut():
+                             bscan_metadata.scaley,
+                             slice_thickness,
+                         ]
++                    volume_string = "{}_{}_{}".format(
++                        chunk.patient_db_id, chunk.study_id, chunk.series_id
++                    )
++                    slice_index = int(chunk.slice_id / 2)
++                    bscan_meta_dict[volume_string][slice_index] = bscan_metadata
++
++                elif chunk.type == 0x271C:  # B-scan registration / shape-adjust
++                    raw = f.read(int(chunk.size) if chunk.size else 100)
++                    try:
++                        reg_raw = e2e_binary.bscan_registration_structure.parse(raw)
++                        values_1 = [float(v) for v in reg_raw.values_1]
++                        reg = registration_from_values(
++                            scale_x=values_1[0],
++                            dx=values_1[2],
++                            dy=values_1[8],
++                            shear_y_angle=values_1[6],
++                            values_1=values_1,
++                        )
++                        volume_string = "{}_{}_{}".format(
++                            chunk.patient_db_id, chunk.study_id, chunk.series_id
++                        )
++                        slice_index = int(chunk.slice_id / 2)
++                        registration_dict[volume_string][slice_index] = reg
++                    except Exception:
++                        warnings.warn(
++                            f"Could not parse B-scan registration at slice_id={chunk.slice_id}",
++                            UserWarning,
++                        )
+ 
+                 elif chunk.type == 3:  # scan preamble data
+                     raw = f.read(chunk.size)
+@@ -205,7 +295,47 @@ def _make_lut():
+                     if laterality and (volume_string not in laterality_dict):
+                         laterality_dict[volume_string] = laterality
+ 
+-                elif chunk.type == 10019:  # contour data
++                elif chunk.type == 0x2723:  # ContourSegment (preferred)
++                    raw = f.read(36)  # 16-byte header + 20-byte padding
++                    try:
++                        contour_hdr = e2e_binary.contour_structure_v2.parse(raw)
++                    except Exception:
++                        warnings.warn(
++                            f"Could not parse ContourSegment header at "
++                            f"slice_id={chunk.slice_id}",
++                            UserWarning,
++                        )
++                        continue
++                    if contour_hdr.width > 0:
++                        volume_string = "{}_{}_{}".format(
++                            chunk.patient_db_id, chunk.study_id, chunk.series_id
++                        )
++                        slice_id = int(chunk.slice_id / 2)
++                        contour_name = f"contour{contour_hdr.id}"
++                        try:
++                            raw_volume = np.frombuffer(
++                                f.read(contour_hdr.width * 4), dtype=np.float32
++                            )
++                            contour = np.array(raw_volume, dtype=np.float32, copy=True)
++                            # Match Heyex / private_eye: only max-float is invalid.
++                            max_float = np.finfo(np.float32).max
++                            contour[contour == max_float] = np.nan
++                        except Exception:
++                            warnings.warn(
++                                (
++                                    f"Could not read ContourSegment "
++                                    f"image id {volume_string} "
++                                    f"contour name {contour_name} "
++                                    f"slice id {slice_id}."
++                                ),
++                                UserWarning,
++                            )
++                        else:
++                            (
++                                contour_dict[volume_string][contour_name][slice_id]
++                            ) = contour
++
++                elif chunk.type == 10019:  # legacy contour data (0x2713)
+                     raw = f.read(16)
+                     contour_data = e2e_binary.contour_structure.parse(raw)
+ 
+@@ -234,7 +364,9 @@ def _make_lut():
+                             )
+                         else:
+                             (
+-                                contour_dict[volume_string][contour_name][slice_id]
++                                contour_dict_legacy[volume_string][contour_name][
++                                    slice_id
++                                ]
+                             ) = contour
+ 
+                 elif chunk.type == 1073741824:  # image data
+@@ -284,6 +416,13 @@ def _make_lut():
+                                         image
+                                     ]
+ 
++            # Prefer 0x2723 ContourSegment; fall back to legacy 0x2713 when absent.
++            for volume_id, contours in contour_dict_legacy.items():
++                for contour_name, by_slice in contours.items():
++                    for slice_id, contour in by_slice.items():
++                        if slice_id not in contour_dict[volume_id][contour_name]:
++                            contour_dict[volume_id][contour_name][slice_id] = contour
++
+             contour_data = {}
+             for volume_id, contours in contour_dict.items():
+                 if volume_id in volume_dict:
+@@ -298,6 +437,34 @@ def _make_lut():
+                     for slice_id, contour in contour_values.items():
+                         (contour_data[volume_id][contour_name][slice_id]) = contour
+ 
++            # Optional Heidelberg registration: warp B-scans + contours into
++            # Heyex display space.
++            if apply_registration:
++                for vol_key, slices in volume_array_dict.items():
++                    regs = registration_dict.get(vol_key) or {}
++                    if not regs:
++                        continue
++                    for slice_idx, reg in regs.items():
++                        if slice_idx >= len(slices) or isinstance(
++                            slices[slice_idx], int
++                        ):
++                            continue
++                        img = slices[slice_idx]
++                        height, width = img.shape[:2]
++                        slices[slice_idx] = apply_registration_to_volume_slice(
++                            img, reg
++                        )
++                        if vol_key not in contour_data:
++                            continue
++                        for cname, clist in contour_data[vol_key].items():
++                            if (
++                                slice_idx < len(clist)
++                                and clist[slice_idx] is not None
++                            ):
++                                clist[slice_idx] = apply_registration_to_contour_slice(
++                                    clist[slice_idx], reg, width, height
++                                )
++
+             # Read metadata to attach to OCTVolumeWithMetaData
+             metadata = self.read_all_metadata()
+ 
+@@ -305,10 +472,29 @@ def _make_lut():
+             for key, volume in chain(
+                 volume_array_dict.items(), volume_array_dict_additional.items()
+             ):
+-                # remove any initalised volumes that never had image data attached
+-                volume = [slc for slc in volume if not isinstance(slc, int)]
++                contours = contour_data.get(key)
++                bscan_by_slice = bscan_meta_dict.get(key) or {}
++                volume, contours, bscan_by_slice = _compact_sparse_volume_slices(
++                    volume, contours, bscan_by_slice
++                )
+                 if volume is None or len(volume) == 0:
+                     continue
++                scan_geometry = None
++                pixel_spacing = self.pixel_spacing
++                if bscan_by_slice:
++                    fundus_info = fundus_info_dict.get(key)
++                    # If this series has no type-5 chunk, reuse the only localizer
++                    # in the file (common when OCT and IR share one IR info block).
++                    if fundus_info is None and len(fundus_info_dict) == 1:
++                        fundus_info = next(iter(fundus_info_dict.values()))
++                    scan_geometry, pixel_spacing = build_volume_scan_geometry(
++                        bscan_by_slice=bscan_by_slice,
++                        num_slices=len(volume),
++                        num_columns=int(volume[0].shape[1]),
++                        default_pixel_spacing=self.pixel_spacing,
++                        slice_thickness=slice_thickness,
++                        fundus_info=fundus_info,
++                    )
+                 oct_volumes.append(
+                     OCTVolumeWithMetaData(
+                         volume=volume,
+@@ -320,8 +506,9 @@ def _make_lut():
+                         acquisition_date=self.acquisition_date,
+                         volume_id=key,
+                         laterality=laterality_dict.get(key),
+-                        contours=contour_data.get(key),
+-                        pixel_spacing=self.pixel_spacing,
++                        contours=contours,
++                        pixel_spacing=pixel_spacing,
++                        scan_geometry=scan_geometry,
+                         metadata=metadata,
+                     )
+                 )
+@@ -459,12 +646,26 @@ def read_all_metadata(self):
+         """
+ 
+         def _convert_to_dict(container):
+-            """Converts a container object to a dictionary"""
+-            return dict(
+-                (name, getattr(container, name))
++            """Converts a container object to a JSON-serializable dictionary.
++
++            Construct ``Bytes`` fields (e.g. ContourSegment padding) become hex
++            strings so ``json.dumps(read_all_metadata())`` keeps working.
++            """
++
++            def _json_safe(value):
++                if isinstance(value, (bytes, bytearray, memoryview)):
++                    return bytes(value).hex()
++                if isinstance(value, dict):
++                    return {k: _json_safe(v) for k, v in value.items()}
++                if isinstance(value, (list, tuple)):
++                    return [_json_safe(v) for v in value]
++                return value
++
++            return {
++                name: _json_safe(getattr(container, name))
+                 for name in container
+                 if not name.startswith("_")
+-            )
++            }
+ 
+         metadata = dict()
+         metadata["image_data"] = []
+@@ -540,7 +741,15 @@ def _convert_to_dict(container):
+                         _convert_to_dict(laterality_data)
+                     )
+ 
+-                elif chunk.type == 10019:  # contour data
++                elif chunk.type == 0x2723:  # ContourSegment (preferred)
++                    raw = f.read(36)
++                    try:
++                        contour_data = e2e_binary.contour_structure_v2.parse(raw)
++                        metadata["contour_data"].append(_convert_to_dict(contour_data))
++                    except Exception:
++                        pass
++
++                elif chunk.type == 10019:  # legacy contour data (0x2713)
+                     raw = f.read(16)
+                     contour_data = e2e_binary.contour_structure.parse(raw)
+                     metadata["contour_data"].append(_convert_to_dict(contour_data))
+diff --git a/oct_converter/readers/fda.py b/oct_converter/readers/fda.py
+index 99cbfdd..71496e9 100644
+--- a/oct_converter/readers/fda.py
++++ b/oct_converter/readers/fda.py
+@@ -44,12 +44,12 @@ def get_list_of_file_chunks(self, printing: bool = False) -> t.Tuple[dict, dict]
+ 
+             eof = False
+             while not eof:
+-                chunk_name_size = np.fromstring(f.read(1), dtype=np.uint8)[0]
++                chunk_name_size = np.frombuffer(f.read(1), dtype=np.uint8)[0]
+                 if chunk_name_size == 0:
+                     eof = True
+                 else:
+                     chunk_name = f.read(chunk_name_size)
+-                    chunk_size = np.fromstring(f.read(4), dtype=np.uint32)[0]
++                    chunk_size = np.frombuffer(f.read(4), dtype=np.uint32)[0]
+                     chunk_location = f.tell()
+                     f.seek(chunk_size, 1)
+                     if chunk_name in chunk_dict.keys():
+@@ -69,7 +69,7 @@ def get_list_of_file_chunks(self, printing: bool = False) -> t.Tuple[dict, dict]
+             print("")
+         return chunk_dict, header
+ 
+-    def read_oct_volume(self) -> OCTVolumeWithMetaData:
++    def read_oct_volume(self, verbose=False) -> OCTVolumeWithMetaData:
+         """Reads OCT data.
+ 
+         Notes:
+@@ -95,7 +95,7 @@ def read_oct_volume(self) -> OCTVolumeWithMetaData:
+             contours = {k: oct_header.get("height") - v for k, v in contours.items()}
+ 
+         # read all other metadata
+-        metadata = self.read_all_metadata()
++        metadata = self.read_all_metadata(verbose=verbose)
+         patient_info = metadata.get("patient_info_02") or metadata.get(
+             "patient_info", {}
+         )
+@@ -109,7 +109,6 @@ def read_oct_volume(self) -> OCTVolumeWithMetaData:
+             patient_dob = datetime(*patient_info.get("birth_date"))
+         except (TypeError, ValueError):
+             patient_dob = None
+-
+         oct_volume = OCTVolumeWithMetaData(
+             volume,
+             patient_id=patient_info.get("patient_id"),
+@@ -125,6 +124,7 @@ def read_oct_volume(self) -> OCTVolumeWithMetaData:
+             header=self.header,
+             oct_header=oct_header,
+         )
++    
+         return oct_volume
+ 
+     def read_oct_data_chunk(self) -> t.Tuple[np.ndarray, dict]:
+@@ -144,7 +144,7 @@ def read_oct_data_chunk(self) -> t.Tuple[np.ndarray, dict]:
+ 
+                 volume = []
+                 for i in range(oct_header.number_slices):
+-                    size = np.fromstring(f.read(4), dtype=np.int32)[0]
++                    size = np.frombuffer(f.read(4), dtype=np.int32)[0]
+                     raw_slice = f.read(size)
+                     image = Image.open(io.BytesIO(raw_slice))
+                     volume.append(np.asarray(image))
+@@ -159,7 +159,7 @@ def read_oct_data_chunk(self) -> t.Tuple[np.ndarray, dict]:
+                 number_pixels = (
+                     oct_header.width * oct_header.height * oct_header.number_slices
+                 )
+-                raw_volume = np.fromstring(f.read(number_pixels * 2), dtype=np.uint16)
++                raw_volume = np.frombuffer(f.read(number_pixels * 2), dtype=np.uint16)
+                 volume = np.array(raw_volume)
+                 volume = volume.reshape(
+                     oct_header.width,
+@@ -257,8 +257,9 @@ def read_fundus_image_gray_scale(self) -> FundusImageWithMetaData:
+             img_trc_02_header = fda_binary.img_trc_02_header.parse(raw)
+             number_pixels = img_trc_02_header.width * img_trc_02_header.height * 1
+             raw_image = f.read(img_trc_02_header.size)
+-            image = Image.open(io.BytesIO(raw_image))
+-            image = np.asarray(image)
++            # TRC JPEGs are often encoded as RGB with identical channels;
++            # force true 2-D grayscale for DICOM MONOCHROME2 export.
++            image = np.asarray(Image.open(io.BytesIO(raw_image)).convert("L"))
+         fundus_gray_scale_image = FundusImageWithMetaData(image)
+         return fundus_gray_scale_image
+ 
+@@ -327,7 +328,7 @@ def read_all_metadata(self, verbose: bool = False):
+             json_key = key.decode().split("@")[-1].lower()
+             try:
+                 metadata[json_key] = self.read_any_info_and_make_dict(key)
+-            except KeyError:
++            except (KeyError):
+                 if verbose:
+                     print(f"{key} there is no method for getting info from this chunk.")
+         return metadata
+@@ -346,7 +347,10 @@ def read_any_info_and_make_dict(self, chunk_name: str) -> dict:
+             return None
+         with open(self.filepath, "rb") as f:
+             chunk_location, chunk_size = self.chunk_dict[chunk_name]
+-            f.seek(chunk_location)  # Set the chunk’s current position.
++            if chunk_location.__class__ is list:
++                f.seek(chunk_location[0])
++            else:
++                f.seek(chunk_location)  # Set the chunk’s current position.
+             raw = f.read()
+             header_name = f"{chunk_name.decode().split('@')[-1].lower()}_header"
+             chunk_info_header = dict(fda_binary.__dict__[header_name].parse(raw))
+diff --git a/oct_converter/readers/fds.py b/oct_converter/readers/fds.py
+index efe2fcd..c8d65c6 100644
+--- a/oct_converter/readers/fds.py
++++ b/oct_converter/readers/fds.py
+@@ -46,12 +46,12 @@ def get_list_of_file_chunks(self, printing: bool = False) -> t.Tuple[dict, dict]
+ 
+             eof = False
+             while not eof:
+-                chunk_name_size = np.fromstring(f.read(1), dtype=np.uint8)[0]
++                chunk_name_size = np.frombuffer(f.read(1), dtype=np.uint8)[0]
+                 if chunk_name_size == 0:
+                     eof = True
+                 else:
+                     chunk_name = f.read(chunk_name_size)
+-                    chunk_size = np.fromstring(f.read(4), dtype=np.uint32)[0]
++                    chunk_size = np.frombuffer(f.read(4), dtype=np.uint32)[0]
+                     chunk_location = f.tell()
+                     f.seek(chunk_size, 1)
+                     chunk_dict[chunk_name] = [chunk_location, chunk_size]
+@@ -79,7 +79,7 @@ def read_oct_volume(self) -> OCTVolumeWithMetaData:
+             number_pixels = (
+                 oct_header.width * oct_header.height * oct_header.number_slices
+             )
+-            raw_volume = np.fromstring(f.read(number_pixels * 2), dtype=np.uint16)
++            raw_volume = np.frombuffer(f.read(number_pixels * 2), dtype=np.uint16)
+             volume = np.array(raw_volume)
+             volume = volume.reshape(
+                 oct_header.width, oct_header.height, oct_header.number_slices, order="F"
+@@ -135,7 +135,7 @@ def read_fundus_image(self) -> FundusImageWithMetaData:
+             raw = f.read(21)
+             fundus_header = fds_binary.fundus_header.parse(raw)
+             # number_pixels = fundus_header.width * fundus_header.height * fundus_header.number_slices
+-            raw_image = np.fromstring(f.read(fundus_header.size), dtype=np.uint8)
++            raw_image = np.frombuffer(f.read(fundus_header.size), dtype=np.uint8)
+             # raw_image = [struct.unpack('B', f.read(1)) for pixel in range(fundus_header.size)]
+             image = np.array(raw_image)
+             image = image.reshape(
+diff --git a/oct_converter/readers/registration.py b/oct_converter/readers/registration.py
+new file mode 100644
+index 0000000..a37766b
+--- /dev/null
++++ b/oct_converter/readers/registration.py
+@@ -0,0 +1,203 @@
++"""Heidelberg B-scan registration (E2E chunk 0x271C).
++
++Applies the per-B-scan affine shape-adjust stored in the E2E: shear (Y),
++scale (X), and translation about the B-scan centre. Used on B-scan pixels
++(inverse map) and layer contours (forward map) so they stay aligned in
++Heyex display space.
++"""
++
++from __future__ import annotations
++
++import math
++import warnings
++from dataclasses import dataclass
++
++import cv2
++import numpy as np
++
++
++@dataclass(frozen=True)
++class BScanRegistration:
++    """Parameters from Heidelberg B-scan registration chunk (0x271C)."""
++
++    scale_x: float
++    dx: float
++    dy: float
++    shear_y_angle: float
++
++    def is_identity(self, atol: float = 1e-6) -> bool:
++        return (
++            abs(self.scale_x - 1.0) <= atol
++            and abs(self.dx) <= atol
++            and abs(self.dy) <= atol
++            and abs(self.shear_y_angle) <= atol
++        )
++
++
++def registration_from_values(
++    scale_x: float,
++    dx: float,
++    dy: float,
++    shear_y_angle: float,
++    values_1: list[float] | None = None,
++) -> BScanRegistration:
++    """Build registration; warn if constant slots differ from the known layout."""
++    if values_1 is not None and len(values_1) >= 12:
++        # Known constant pattern for unused slots in values_1
++        expected = [None, 0.0, None, 0.0, 0.0, 0.0, None, 1.0, None, 0.0, 0.0, 0.0]
++        for index, (exp, act) in enumerate(zip(expected, values_1)):
++            if exp is not None and abs(float(act) - exp) > 1e-3:
++                warnings.warn(
++                    f"Unexpected BScanRegistration value at index {index}: "
++                    f"expected {exp}, got {act}",
++                    UserWarning,
++                    stacklevel=2,
++                )
++                break
++    return BScanRegistration(
++        scale_x=float(scale_x),
++        dx=float(dx),
++        dy=float(dy),
++        shear_y_angle=float(shear_y_angle),
++    )
++
++
++def build_inverse_registration_matrix(
++    width: int,
++    height: int,
++    registration: BScanRegistration,
++) -> np.ndarray:
++    """3×3 inverse affine (homogeneous) for Heidelberg registration.
++
++    Parameters in the E2E segment describe an inverse transform relative to
++    the image centre — convenient for warping the B-scan.
++    """
++    shear_factor_y = math.tan(registration.shear_y_angle)
++    dx = registration.dx
++    dy = registration.dy
++    scale_x = registration.scale_x
++
++    change_origin = np.array(
++        [
++            [1.0, 0.0, -width / 2.0],
++            [0.0, 1.0, -height / 2.0],
++            [0.0, 0.0, 1.0],
++        ],
++        dtype=np.float64,
++    )
++    revert_origin = np.array(
++        [
++            [1.0, 0.0, width / 2.0],
++            [0.0, 1.0, height / 2.0],
++            [0.0, 0.0, 1.0],
++        ],
++        dtype=np.float64,
++    )
++    shear = np.array(
++        [
++            [1.0, 0.0, 0.0],
++            [shear_factor_y, 1.0, 0.0],
++            [0.0, 0.0, 1.0],
++        ],
++        dtype=np.float64,
++    )
++    scale = np.array(
++        [
++            [scale_x, 0.0, 0.0],
++            [0.0, 1.0, 0.0],
++            [0.0, 0.0, 1.0],
++        ],
++        dtype=np.float64,
++    )
++    translate = np.array(
++        [
++            [1.0, 0.0, dx],
++            [0.0, 1.0, dy],
++            [0.0, 0.0, 1.0],
++        ],
++        dtype=np.float64,
++    )
++
++    transform = np.eye(3, dtype=np.float64)
++    # Applied right-to-left: change_origin → shear → scale → translate → revert
++    for mat in (change_origin, shear, scale, translate, revert_origin):
++        transform = mat @ transform
++    return transform
++
++
++def apply_registration_to_image(
++    image: np.ndarray,
++    inv_reg_matrix: np.ndarray,
++) -> np.ndarray:
++    """Warp B-scan with the inverse registration matrix (Heyex display space)."""
++    height, width = image.shape[:2]
++    m = inv_reg_matrix[:2, :].astype(np.float64)
++    # OpenCV: dst(x,y) sampled from src(M @ [x,y,1]) — inverse map
++    warped = cv2.warpAffine(
++        image,
++        m,
++        (width, height),
++        flags=cv2.INTER_LINEAR,
++        borderMode=cv2.BORDER_CONSTANT,
++        borderValue=0,
++    )
++    return warped.astype(image.dtype, copy=False)
++
++
++def apply_registration_to_contour(
++    contour_line: np.ndarray,
++    reg_matrix: np.ndarray,
++) -> np.ndarray:
++    """Transform a 1-D layer height array with the forward registration matrix.
++
++    Contour samples are (x=index, y=height). After the affine, x may land on a
++    different column; out-of-bounds samples are dropped (NaN).
++    """
++    contour_line = np.asarray(contour_line, dtype=np.float64)
++    width = len(contour_line)
++    ret = np.full(width, np.nan, dtype=np.float64)
++
++    xs = np.arange(width, dtype=np.float64)
++    ys = contour_line
++    valid_in = np.isfinite(ys)
++    if not np.any(valid_in):
++        return ret.astype(np.float32)
++
++    ones = np.ones(np.count_nonzero(valid_in), dtype=np.float64)
++    coords = np.stack([xs[valid_in], ys[valid_in], ones], axis=0)  # 3×N
++    transformed = reg_matrix @ coords
++    x_out = transformed[0]
++    y_out = transformed[1]
++    x_idx = np.floor(x_out).astype(np.int64)
++    in_bounds = (x_idx >= 0) & (x_idx < width)
++    for xi, yi in zip(x_idx[in_bounds], y_out[in_bounds]):
++        ret[xi] = yi
++    return ret.astype(np.float32)
++
++
++def apply_registration_to_volume_slice(
++    image: np.ndarray,
++    registration: BScanRegistration | None,
++) -> np.ndarray:
++    """Register one B-scan image; no-op if registration is missing/identity."""
++    if registration is None or registration.is_identity():
++        return image
++    height, width = image.shape[:2]
++    inv = build_inverse_registration_matrix(width, height, registration)
++    return apply_registration_to_image(image, inv)
++
++
++def apply_registration_to_contour_slice(
++    contour_line: np.ndarray,
++    registration: BScanRegistration | None,
++    width: int,
++    height: int,
++) -> np.ndarray:
++    """Register one contour line; no-op if registration is missing/identity."""
++    if registration is None or registration.is_identity():
++        return contour_line
++    if contour_line is None:
++        return contour_line
++    inv = build_inverse_registration_matrix(width, height, registration)
++    forward = np.linalg.inv(inv)
++    return apply_registration_to_contour(contour_line, forward)
+diff --git a/oct_converter/readers/scan_geometry.py b/oct_converter/readers/scan_geometry.py
+new file mode 100644
+index 0000000..f5e07ce
+--- /dev/null
++++ b/oct_converter/readers/scan_geometry.py
+@@ -0,0 +1,382 @@
++"""Scan geometry helpers for Heidelberg E2E circular / linear B-scans."""
++
++from __future__ import annotations
++
++import math
++import typing as t
++from dataclasses import dataclass
++
++# Heidelberg BScanType values (chunk 10004 scanType)
++BSCAN_TYPE_LINE = 1
++BSCAN_TYPE_CIRCLE = 2
++
++
++@dataclass
++class ScanGeometry:
++    """Geometry of an OPT scan relative to a fundus / localizer image."""
++
++    scan_type: str  # "circular" | "linear" | "volume"
++    start_angle: float | None = None  # radians from +x, [0, 2pi)
++    centre: tuple[float, float] | None = None  # (x, y) fundus pixels
++    radius: float | None = None
++    line_start: tuple[float, float] | None = None
++    line_end: tuple[float, float] | None = None
++
++    @property
++    def is_circular(self) -> bool:
++        return self.scan_type == "circular"
++
++    def to_dict(self) -> dict:
++        return {
++            "type": self.scan_type,
++            "start_angle": self.start_angle,
++            "centre": self.centre,
++            "radius": self.radius,
++            "line_start": self.line_start,
++            "line_end": self.line_end,
++        }
++
++
++def angle_from_origin(
++    point: tuple[float, float], origin: tuple[float, float]
++) -> float:
++    """Angle of vector origin→point from +x axis, in [0, 2π)."""
++    angle = math.atan2(point[1] - origin[1], point[0] - origin[0])
++    if angle < 0:
++        angle += 2 * math.pi
++    return angle
++
++
++def distance(a: tuple[float, float], b: tuple[float, float]) -> float:
++    return math.hypot(a[0] - b[0], a[1] - b[1])
++
++
++def fov_to_pixels(
++    point: tuple[float, float],
++    scan_angle: float,
++    size_x: float,
++    size_y: float,
++) -> tuple[float, float]:
++    """Convert FOV-degree position to fundus pixel coordinates.
++
++    Uses fraction = 0.5 + position / scan_angle, then scales by IR image size.
++    """
++    if scan_angle == 0:
++        return point
++    fraction_x = 0.5 + point[0] / scan_angle
++    fraction_y = 0.5 + point[1] / scan_angle
++    return (size_x * fraction_x, size_y * fraction_y)
++
++
++# Heidelberg interior-eye approximate conversion: 15° ≈ 4.4 mm
++INTERIOR_DEGREES_TO_MM = 4.4 / 15.0
++
++
++def heidelberg_resolutions_mm(
++    line_start_fov: tuple[float, float],
++    line_end_fov: tuple[float, float],
++    num_columns: int,
++    scaley: float,
++    first_start_fov: tuple[float, float] | None = None,
++    last_start_fov: tuple[float, float] | None = None,
++    num_slices: int = 1,
++) -> tuple[float, float, float]:
++    """Return (res_width_mm, res_height_mm, res_depth_mm) for linear/volume scans.
++
++    Width/depth come from FOV degree spans × INTERIOR_DEGREES_TO_MM;
++    height is the B-scan axial scale (scaley).
++    """
++    scan_angle = distance(line_start_fov, line_end_fov)
++    width_mm = scan_angle * INTERIOR_DEGREES_TO_MM
++    res_width = width_mm / num_columns if num_columns else width_mm
++    res_height = float(scaley)
++    res_depth = 0.0
++    if (
++        num_slices > 1
++        and first_start_fov is not None
++        and last_start_fov is not None
++    ):
++        angle_z = distance(first_start_fov, last_start_fov)
++        res_depth = (angle_z / (num_slices - 1)) * INTERIOR_DEGREES_TO_MM
++    return res_width, res_height, res_depth
++
++
++def circular_resolutions_mm(
++    line_start_fov: tuple[float, float],
++    centre_fov: tuple[float, float],
++    num_columns: int,
++    scaley: float,
++) -> tuple[float, float, float]:
++    """Return (res_width_mm, res_height_mm, res_depth_mm) for circular scans.
++
++    Lateral spacing uses circle perimeter (diameter × π) in interior-eye mm.
++    """
++    diameter = distance(line_start_fov, centre_fov) * 2
++    width_mm = diameter * math.pi * INTERIOR_DEGREES_TO_MM
++    res_width = width_mm / num_columns if num_columns else width_mm
++    return res_width, float(scaley), 0.0
++
++
++def fundus_localizer_params(
++    fundus_info: t.Any | None,
++) -> tuple[tuple[float, float] | None, float | None]:
++    """Extract (fundus_size_xy, scan_angle_deg) from E2E chunk-type-5 info.
++
++    Returns (None, None) when size or angle look invalid.
++    """
++    if fundus_info is None:
++        return None, None
++    try:
++        fx = float(fundus_info.ir_image_size_x)
++        fy = float(fundus_info.ir_image_size_y)
++        sa = float(fundus_info.scan_angle)
++    except (AttributeError, TypeError, ValueError):
++        return None, None
++    if fx > 0 and fy > 0 and 0 < sa < 180:
++        return (fx, fy), sa
++    return None, None
++
++
++def geometry_from_bscan_metadata(
++    scan_type_raw: int,
++    pos_x1: float,
++    pos_y1: float,
++    pos_x2: float,
++    pos_y2: float,
++    centre_x: float,
++    centre_y: float,
++    fundus_size: tuple[float, float] | None = None,
++    scan_angle: float | None = None,
++    num_slices: int = 1,
++) -> ScanGeometry:
++    """Build ScanGeometry from E2E bscan_metadata fields (FOV degrees).
++
++    ``line_start`` / ``line_end`` / ``centre`` / ``radius`` are fundus-pixel
++    coordinates only when ``fundus_size`` and ``scan_angle`` allow FOV→pixel
++    conversion. Otherwise those fields are left ``None`` so callers do not
++    treat FOV degrees as pixel indices (e.g. DICOM ReferenceCoordinates).
++    Circular ``start_angle`` is still derived from FOV positions (scale-invariant).
++    """
++    line_start_fov = (float(pos_x1), float(pos_y1))
++    line_end_fov = (float(pos_x2), float(pos_y2))
++    centre_fov = (float(centre_x), float(centre_y))
++
++    can_convert = (
++        fundus_size is not None
++        and scan_angle is not None
++        and scan_angle > 0
++        and fundus_size[0] > 0
++        and fundus_size[1] > 0
++    )
++    if can_convert:
++        size_x, size_y = fundus_size
++        line_start = fov_to_pixels(line_start_fov, scan_angle, size_x, size_y)
++        line_end = fov_to_pixels(line_end_fov, scan_angle, size_x, size_y)
++        centre = fov_to_pixels(centre_fov, scan_angle, size_x, size_y)
++        radius = distance(line_start, centre)
++    else:
++        line_start = None
++        line_end = None
++        centre = None
++        radius = None
++
++    if scan_type_raw == BSCAN_TYPE_CIRCLE:
++        return ScanGeometry(
++            scan_type="circular",
++            # Angle from FOV vectors is valid even without pixel conversion.
++            start_angle=angle_from_origin(line_start_fov, centre_fov),
++            centre=centre,
++            radius=radius,
++            line_start=line_start,
++            line_end=line_end,
++        )
++    if num_slices > 1:
++        return ScanGeometry(
++            scan_type="volume",
++            line_start=line_start,
++            line_end=line_end,
++        )
++    return ScanGeometry(
++        scan_type="linear",
++        line_start=line_start,
++        line_end=line_end,
++    )
++
++
++def build_volume_scan_geometry(
++    bscan_by_slice: dict[int, t.Any],
++    num_slices: int,
++    num_columns: int,
++    default_pixel_spacing: list[float] | None,
++    slice_thickness: float,
++    fundus_info: t.Any | None = None,
++) -> tuple[dict | None, list[float] | None]:
++    """Derive scan_geometry dict and pixel_spacing for one E2E OCT volume.
++
++    Args:
++        bscan_by_slice: Map of slice index → bscan_metadata (chunk 10004).
++        num_slices: Number of B-scans in the volume list.
++        num_columns: A-scan count (B-scan width).
++        default_pixel_spacing: Fallback ``[scalex, scaley, slice_thickness]``.
++        slice_thickness: Default Z spacing when depth cannot be derived.
++        fundus_info: Optional chunk-type-5 fundus / IR localizer info.
++
++    Returns:
++        (scan_geometry_dict or None, pixel_spacing [x, y, z] or default).
++    """
++    if not bscan_by_slice:
++        return None, default_pixel_spacing
++
++    fundus_size, scan_angle = fundus_localizer_params(fundus_info)
++    first_idx = min(bscan_by_slice.keys())
++    last_idx = max(bscan_by_slice.keys())
++    first_md = bscan_by_slice[first_idx]
++    last_md = bscan_by_slice[last_idx]
++
++    geom = geometry_from_bscan_metadata(
++        scan_type_raw=int(first_md.scanType),
++        pos_x1=float(first_md.posX1),
++        pos_y1=float(first_md.posY1),
++        pos_x2=float(first_md.posX2),
++        pos_y2=float(first_md.posY2),
++        centre_x=float(first_md.centrePosX),
++        centre_y=float(first_md.centrePosY),
++        fundus_size=fundus_size,
++        scan_angle=scan_angle,
++        num_slices=num_slices,
++    )
++    scan_geometry = geom.to_dict()
++
++    # Per-frame line endpoints for volume / raster OPT DICOM (fundus pixels only)
++    if (
++        geom.scan_type != "circular"
++        and len(bscan_by_slice) > 1
++        and geom.line_start is not None
++    ):
++        frame_lines: list[dict | None] = []
++        for slice_idx in range(num_slices):
++            md = bscan_by_slice.get(slice_idx)
++            if md is None:
++                frame_lines.append(None)
++                continue
++            g = geometry_from_bscan_metadata(
++                scan_type_raw=int(md.scanType),
++                pos_x1=float(md.posX1),
++                pos_y1=float(md.posY1),
++                pos_x2=float(md.posX2),
++                pos_y2=float(md.posY2),
++                centre_x=float(md.centrePosX),
++                centre_y=float(md.centrePosY),
++                fundus_size=fundus_size,
++                scan_angle=scan_angle,
++                num_slices=1,
++            )
++            frame_lines.append(
++                {
++                    "line_start": list(g.line_start) if g.line_start else None,
++                    "line_end": list(g.line_end) if g.line_end else None,
++                }
++            )
++        scan_geometry["frame_lines"] = frame_lines
++
++    try:
++        if geom.scan_type == "circular":
++            res_w, res_h, res_d = circular_resolutions_mm(
++                (float(first_md.posX1), float(first_md.posY1)),
++                (float(first_md.centrePosX), float(first_md.centrePosY)),
++                num_columns,
++                float(first_md.scaley),
++            )
++        else:
++            res_w, res_h, res_d = heidelberg_resolutions_mm(
++                (float(first_md.posX1), float(first_md.posY1)),
++                (float(first_md.posX2), float(first_md.posY2)),
++                num_columns,
++                float(first_md.scaley),
++                first_start_fov=(
++                    float(first_md.posX1),
++                    float(first_md.posY1),
++                ),
++                last_start_fov=(
++                    float(last_md.posX1),
++                    float(last_md.posY1),
++                ),
++                num_slices=num_slices,
++            )
++        # OCTVolumeWithMetaData / e2e_image_geom expect [scalex, scaley, z]
++        pixel_spacing = [res_w, res_h, res_d if res_d else slice_thickness]
++    except Exception:
++        pixel_spacing = default_pixel_spacing
++
++    return scan_geometry, pixel_spacing
++
++
++def circle_reference_coordinates(
++    centre: tuple[float, float],
++    radius: float,
++    start_angle: float,
++    num_columns: int,
++) -> list[float]:
++    """Build DICOM ReferenceCoordinates for a circular B-scan.
++
++    Returns 2N floats as (row, col) pairs — DICOM order — for each OPT column.
++    Column 0 is at ``start_angle`` from +x; angle increases counterclockwise.
++    """
++    cx, cy = centre
++    coords: list[float] = []
++    if num_columns <= 0:
++        return coords
++    for i in range(num_columns):
++        theta = start_angle + (2 * math.pi * i / num_columns)
++        x = cx + radius * math.cos(theta)
++        y = cy + radius * math.sin(theta)
++        # DICOM: first of pair = row (vertical), second = column (horizontal)
++        coords.append(float(y))
++        coords.append(float(x))
++    return coords
++
++
++def start_angle_from_reference_coordinates(
++    reference_coordinates: t.Sequence[float],
++) -> float | None:
++    """Recover start_angle (radians) from NONLINEAR ReferenceCoordinates.
++
++    Fits a circle centre as the mean of the polyline points, then takes
++    atan2 of the vector from centre to the first sample.
++    """
++    if len(reference_coordinates) < 4:
++        return None
++    xs = []
++    ys = []
++    for i in range(0, len(reference_coordinates) - 1, 2):
++        row = float(reference_coordinates[i])
++        col = float(reference_coordinates[i + 1])
++        ys.append(row)
++        xs.append(col)
++    if not xs:
++        return None
++    cx = sum(xs) / len(xs)
++    cy = sum(ys) / len(ys)
++    angle = angle_from_origin((xs[0], ys[0]), (cx, cy))
++    # Treat 2π as 0 for numerical stability
++    if abs(angle - 2 * math.pi) < 1e-6:
++        return 0.0
++    return angle
++
++
++# CID 4272 OPT Scan Pattern Type
++SCAN_PATTERN_CUBE = ("DCM", "128279", "Cube B-scan pattern")
++SCAN_PATTERN_RASTER = ("DCM", "128280", "Raster B-scan pattern")
++SCAN_PATTERN_LINE = ("DCM", "128281", "Line B-scan pattern")
++SCAN_PATTERN_CIRCLE = ("DCM", "128284", "Circle B-scan pattern")
++
++
++def scan_pattern_code(geometry: ScanGeometry | None, num_frames: int) -> tuple[str, str, str]:
++    """Return (scheme, value, meaning) for ScanPatternTypeCodeSequence."""
++    if geometry is not None and geometry.is_circular:
++        return SCAN_PATTERN_CIRCLE
++    if geometry is not None and geometry.scan_type == "linear":
++        return SCAN_PATTERN_LINE
++    if num_frames > 1:
++        return SCAN_PATTERN_CUBE
++    return SCAN_PATTERN_LINE

@@ -1,0 +1,65 @@
+version = "1.0"
+
+[task]
+name = "default/ZhengPeng7__BiRefNet-196"
+description = "Handle non-RGB Pillow images"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "BiRefNet",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "ZhengPeng7/BiRefNet"
+ref = "a201306214321280b94b22e44dbeadcd25ea8c90"
+reference = "https://github.com/ZhengPeng7/BiRefNet/pull/196"
+source_access = "auto"
+built_at = "2026-11-14T07:05:01.990893+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:de919205f2ac14d26fc862a671e53f35f0cd53c1dc81a0611e67ff4486a825b1"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2025-03-11T05:40:51Z"
+diff_format = "unified"
+context_files = [
+    "tutorials/BiRefNet_inference-fp16.ipynb",
+    "tutorials/BiRefNet_inference.ipynb",
+    "tutorials/BiRefNet_inference_video.ipynb",
+    "tutorials/BiRefNet_pth2onnx.ipynb",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 6
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

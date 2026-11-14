@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/cornerstonejs__cornerstoneTools-1497"
+description = "fix(moveNewHandler): Avoid ghost annotations on fast mouse events"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "cornerstoneTools",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "cornerstonejs/cornerstoneTools"
+ref = "9ea015d9d8dbb2d1be43ca9c1f7d6bf61f153910"
+reference = "https://github.com/cornerstonejs/cornerstoneTools/pull/1497"
+source_access = "auto"
+built_at = "2026-11-14T07:09:40.176735+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:ad223e9a2f69a0368eb38cb9a6830439e0cdf186fb56ecd7e9ad4e3a75256632"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2022-08-10T12:08:35Z"
+diff_format = "unified"
+context_files = [
+    "src/eventDispatchers/mouseEventHandlers/addNewMeasurement.js",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 15
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

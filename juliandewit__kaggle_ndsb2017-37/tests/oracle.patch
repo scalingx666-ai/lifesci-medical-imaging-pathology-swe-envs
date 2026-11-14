@@ -1,0 +1,13 @@
+diff --git a/settings.py b/settings.py
+index 8a2720b..81cdb4d 100644
+--- a/settings.py
++++ b/settings.py
+@@ -6,7 +6,7 @@
+ 
+ TARGET_VOXEL_MM = 1.00
+ MEAN_PIXEL_VALUE_NODULE = 41
+-LUNA_SUBSET_START_INDEX = 1
++LUNA_SUBSET_START_INDEX = 0
+ SEGMENTER_IMG_SIZE = 320
+ 
+ BASE_DIR_SSD = "C:/werkdata/kaggle/ndsb3/"

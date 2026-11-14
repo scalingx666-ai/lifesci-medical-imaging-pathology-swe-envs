@@ -1,0 +1,63 @@
+version = "1.0"
+
+[task]
+name = "default/dcmjs-org__dcmjs-639"
+description = "fix(core): keep a private block whose creator holds a line break"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "dcmjs",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "dcmjs-org/dcmjs"
+ref = "d3e1bd286245b7db5f748a7fdee3a144b7ae46cb"
+reference = "https://github.com/dcmjs-org/dcmjs/pull/639"
+source_access = "auto"
+built_at = "2026-11-14T07:12:00.404944+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:1a614575a21a3baf81d8795217d4e314a7573ae4091474965e3845932b151899"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-12T14:16:44Z"
+diff_format = "unified"
+context_files = [
+    "packages/core/src/utilities/privateBlocks.js",
+    "test/core/privateBlocks.test.js",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 97
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

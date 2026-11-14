@@ -1,0 +1,9 @@
+diff --git a/rt_utils/_version.py b/rt_utils/_version.py
+index 5a5635b..76c4961 100644
+--- a/rt_utils/_version.py
++++ b/rt_utils/_version.py
+@@ -1,3 +1,3 @@
+ """RT-Utils package version."""
+ 
+-__version__ = "2.3.0"
++__version__ = "2.4.0"

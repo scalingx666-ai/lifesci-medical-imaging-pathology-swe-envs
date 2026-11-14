@@ -1,0 +1,70 @@
+version = "1.0"
+
+[task]
+name = "default/Aperivue__medsci-skills-707"
+description = "Release v6.2.0"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "medsci-skills",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "Aperivue/medsci-skills"
+ref = "90fd12bef031d6351d77bc968c3f67c5c1b86cc5"
+reference = "https://github.com/Aperivue/medsci-skills/pull/707"
+source_access = "auto"
+built_at = "2026-11-14T07:11:33.637630+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:634d7f8a30b5cde5909551f6f701790cd9530c690595e2ffaa76183e65b728c0"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-01T03:40:52Z"
+diff_format = "unified"
+context_files = [
+    "CHANGELOG.md",
+    "CITATION.cff",
+    "MIGRATION-v6.md",
+    "README.ko.md",
+    "README.md",
+    "README.zh-CN.md",
+    "docs/install.md",
+    "metadata/distribution_manifest.json",
+    "package.json",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 158
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,69 @@
+version = "1.0"
+
+[task]
+name = "default/CBICA__CaPTk-1490"
+description = "Add IBSI2 GUI, fix compatibility with CaPTk"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "CaPTk",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "CBICA/CaPTk"
+ref = "321a8b9853b41496830acd2be03d8f2a230791bf"
+reference = "https://github.com/CBICA/CaPTk/pull/1490"
+source_access = "auto"
+built_at = "2026-11-14T07:13:16.371175+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:bf66a935709a45ad8a3b8a81119f1fee12e0392c4122d1f67511028489448eee"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2022-04-13T21:56:22Z"
+diff_format = "unified"
+context_files = [
+    "3_HowToGuides.txt",
+    "docs/ht_FeatureExtraction.html",
+    "src/applications/FeatureExtraction/README.md",
+    "src/applications/FeatureExtraction/src/FeatureExtraction.h",
+    "src/applications/FeatureExtraction/src/FeatureExtraction.hxx",
+    "src/view/gui/fFeaturePanel.cpp",
+    "src/view/gui/fFeaturePanel.h",
+    "src/view/gui/ui_fFeaturePanel.h",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 65
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

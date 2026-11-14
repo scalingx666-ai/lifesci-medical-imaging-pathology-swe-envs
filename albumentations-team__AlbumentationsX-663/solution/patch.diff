@@ -1,0 +1,101 @@
+diff --git a/albumentations/augmentations/pixel/_functional_illumination.py b/albumentations/augmentations/pixel/_functional_illumination.py
+index b2ca25a6..1b76d098 100644
+--- a/albumentations/augmentations/pixel/_functional_illumination.py
++++ b/albumentations/augmentations/pixel/_functional_illumination.py
+@@ -82,27 +82,23 @@ def one_diamond_square_step(current_grid: np.ndarray, noise_scale: float) -> np.
+         next_height = (current_grid.shape[0] - 1) * 2 + 1
+         next_width = (current_grid.shape[1] - 1) * 2 + 1
+ 
+-        # Pre-allocate expanded grid
+-        expanded_grid = np.zeros((next_height, next_width), dtype=np.float32)
+-
+-        # Generate all noise at once for both steps (already scaled by noise_scale)
+-        all_noise = random_generator.uniform(-noise_scale, noise_scale, (next_height, next_width)).astype(np.float32)
+-
+-        # Copy existing points with noise
+-        expanded_grid[::2, ::2] = current_grid + all_noise[::2, ::2]
+-
+-        # Diamond step - keep separate for natural look
+-        diamond_interpolation = cv2.filter2D(expanded_grid, -1, DIAMOND_KERNEL, borderType=cv2.BORDER_CONSTANT)
+-        diamond_mask = diamond_interpolation > 0
+-        expanded_grid += (diamond_interpolation + all_noise) * diamond_mask
+-
+-        # Square step - keep separate for natural look
+-        square_interpolation = cv2.filter2D(expanded_grid, -1, SQUARE_KERNEL, borderType=cv2.BORDER_CONSTANT)
+-        square_mask = square_interpolation > 0
+-        expanded_grid += (square_interpolation + all_noise) * square_mask
+-
+-        # Normalize after each step to prevent value drift
+-        return _normalize_minmax_float32(expanded_grid)
++        grid_shape = (next_height, next_width)
++        expanded_grid = np.zeros(grid_shape, dtype=np.float32)
++        all_noise = random_generator.uniform(-noise_scale, noise_scale, grid_shape).astype(np.float32)
++        np.add(current_grid, all_noise[::2, ::2], out=expanded_grid[::2, ::2])
++
++        interpolation = np.empty_like(expanded_grid)
++        mask = np.empty_like(expanded_grid)
++        for kernel in (DIAMOND_KERNEL, SQUARE_KERNEL):
++            cv2.filter2D(expanded_grid, -1, kernel, dst=interpolation, borderType=cv2.BORDER_CONSTANT)
++            cv2.threshold(interpolation, 0, 1, cv2.THRESH_BINARY, dst=mask)
++            cv2.add(interpolation, all_noise, dst=interpolation)
++            cv2.multiply(interpolation, mask, dst=interpolation)
++            cv2.add(expanded_grid, interpolation, dst=expanded_grid)
++
++        # Normalize after each step to prevent value drift.
++        cv2.normalize(expanded_grid, expanded_grid, 0, 1, cv2.NORM_MINMAX, dtype=cv2.CV_32F)
++        return expanded_grid
+ 
+     # Pre-compute noise scales
+     max_dimension = max(target_shape)
+@@ -116,11 +112,8 @@ def one_diamond_square_step(current_grid: np.ndarray, noise_scale: float) -> np.
+     for noise_scale in noise_scales:
+         plasma_grid = one_diamond_square_step(plasma_grid, cast("float", noise_scale))
+ 
+-    return np.clip(
+-        _normalize_minmax_float32(plasma_grid[: target_shape[0], : target_shape[1]]),
+-        0,
+-        1,
+-    )
++    pattern = _normalize_minmax_float32(plasma_grid[: target_shape[0], : target_shape[1]])
++    return np.clip(pattern, 0, 1, out=pattern)
+ 
+ 
+ def apply_plasma_brightness_contrast(
+diff --git a/tests/functional/test_functional.py b/tests/functional/test_functional.py
+index 774b258a..46a0773b 100644
+--- a/tests/functional/test_functional.py
++++ b/tests/functional/test_functional.py
+@@ -1908,6 +1908,33 @@ def test_plasma_pattern_basic_properties(shape, roughness):
+     assert not np.allclose(pattern, pattern.mean())
+ 
+ 
++@pytest.mark.parametrize("shape", [(3, 3), (11, 17), (224, 224), (225, 331)])
++@pytest.mark.parametrize("roughness", [0.5, 3.0])
++def test_plasma_pattern_matches_original_diamond_square(shape, roughness):
++    reference_rng = np.random.default_rng(137)
++    actual_rng = np.random.default_rng(137)
++    reference = reference_rng.uniform(-1, 1, (3, 3)).astype(np.float32)
++    step_count = (max(shape) - 2).bit_length() - 1
++    for step in range(step_count):
++        side = 2 * reference.shape[0] - 1
++        noise_scale = np.float32(roughness**step)
++        noise = reference_rng.uniform(-noise_scale, noise_scale, (side, side)).astype(np.float32)
++        expanded = np.zeros_like(noise)
++        expanded[::2, ::2] = reference + noise[::2, ::2]
++        for kernel in (fpixel.DIAMOND_KERNEL, fpixel.SQUARE_KERNEL):
++            interpolation = cv2.filter2D(expanded, -1, kernel, borderType=cv2.BORDER_CONSTANT)
++            expanded += (interpolation + noise) * (interpolation > 0)
++        reference = cv2.normalize(expanded, None, 0, 1, cv2.NORM_MINMAX, dtype=cv2.CV_32F)
++    expected = cv2.normalize(reference[: shape[0], : shape[1]], None, 0, 1, cv2.NORM_MINMAX, dtype=cv2.CV_32F).clip(
++        0, 1
++    )
++
++    result = fpixel.generate_plasma_pattern(shape, roughness, actual_rng)
++
++    np.testing.assert_array_equal(result.view(np.uint32), expected.view(np.uint32), strict=True)
++    assert actual_rng.bit_generator.state == reference_rng.bit_generator.state
++
++
+ @pytest.mark.parametrize(
+     ["seed1", "seed2", "should_be_different"],
+     [

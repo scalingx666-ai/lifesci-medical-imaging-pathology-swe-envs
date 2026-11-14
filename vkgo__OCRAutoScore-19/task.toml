@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/vkgo__OCRAutoScore-19"
+description = "Fix get_score return indentation"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "OCRAutoScore",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "vkgo/OCRAutoScore"
+ref = "e6c1d71161eaf84551c5f17ee2f88d1977983509"
+reference = "https://github.com/vkgo/OCRAutoScore/pull/19"
+source_access = "auto"
+built_at = "2026-11-14T07:10:32.297145+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:329af67994e7ee27bc960540475ee66ffbc3e0d00c91fdade42cefca93b1fe08"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2025-09-16T05:15:40Z"
+diff_format = "unified"
+context_files = [
+    "score.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 2
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

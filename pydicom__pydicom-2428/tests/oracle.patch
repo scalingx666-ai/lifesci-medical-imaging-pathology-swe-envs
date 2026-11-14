@@ -1,0 +1,85 @@
+diff --git a/doc/release_notes/v3.1.0.rst b/doc/release_notes/v3.1.0.rst
+index 99a5bc8db4..2535ca7b6b 100644
+--- a/doc/release_notes/v3.1.0.rst
++++ b/doc/release_notes/v3.1.0.rst
+@@ -74,6 +74,9 @@ Fixes
+ * Fixed :attr:`Dataset.pixel_array<pydicom.dataset.Dataset.pixel_array>` raising
+   :class:`AttributeError` when :func:`~pydicom.config.future_behavior` is enabled
+   (:issue:`2354`).
++* Fixed :class:`~pydicom.valuerep.DSdecimal` not comparing ``NaN`` values as equal,
++  matching the behavior of :class:`~pydicom.valuerep.DSfloat` fixed in :issue:`2273`
++  (:issue:`2427`).
+ * Fixed :attr:`~pydicom.dataset.Dataset.pixel_array` raising a bare ``StopIteration`` when
+   encapsulated *Pixel Data* contains fewer frames than *Number of Frames* (:issue:`2371`).
+ 
+diff --git a/src/pydicom/valuerep.py b/src/pydicom/valuerep.py
+index 7f3b266928..23c8c319de 100644
+--- a/src/pydicom/valuerep.py
++++ b/src/pydicom/valuerep.py
+@@ -1232,6 +1232,13 @@ def __eq__(self, other: Any) -> bool:
+         """Override to allow string equality comparisons."""
+         if isinstance(other, str):
+             return str(self) == other
++        # ponytail: mirror DSfloat.__eq__'s NaN handling (see #2296/#2273) so
++        # 'DS' compares equal for NaN regardless of which DS backing class
++        # (DSfloat vs DSdecimal, selected via config.use_DS_decimal) is used.
++        if isinstance(other, float) and math.isnan(other):
++            return self.is_nan()
++        if isinstance(other, Decimal) and other.is_nan():
++            return self.is_nan()
+ 
+         return super().__eq__(other)
+ 
+diff --git a/tests/test_dataelem.py b/tests/test_dataelem.py
+index 38760fb85c..6e44732d02 100644
+--- a/tests/test_dataelem.py
++++ b/tests/test_dataelem.py
+@@ -10,6 +10,7 @@
+ import re
+ import struct
+ import tempfile
++from decimal import Decimal
+ 
+ import pytest
+ 
+@@ -214,6 +215,20 @@ def test_equality_standard_element(self):
+         ee = DataElement(0x00080018, "PN", "1.2.3.4")
+         assert not dd == ee
+ 
++    def test_equality_ds_decimal_nan(self):
++        """DataElement: NaN DS values compare equal when use_DS_decimal is set"""
++        original = config.use_DS_decimal
++        config.DS_decimal(True)
++        try:
++            dd = DataElement(0x00100010, "DS", Decimal("nan"))
++            ee = DataElement(0x00100010, "DS", Decimal("nan"))
++            assert dd == ee
++
++            ee = DataElement(0x00100010, "DS", Decimal("1.5"))
++            assert not dd == ee
++        finally:
++            config.DS_decimal(original)
++
+     def test_equality_private_element(self):
+         """DataElement: equality returns correct value for private elements"""
+         dd = DataElement(0x01110001, "PN", "ANON")
+diff --git a/tests/test_valuerep.py b/tests/test_valuerep.py
+index 6ea94ad9d3..b0e0a6f939 100644
+--- a/tests/test_valuerep.py
++++ b/tests/test_valuerep.py
+@@ -903,6 +903,15 @@ def test_comparison_operators(self, allow_ds_float):
+             with pytest.raises(TypeError, match="'>=' not supported"):
+                 val >= "1233"
+ 
++    def test_comparison_with_nan(self, disable_value_validation):
++        """DSdecimal NaN should compare equal, matching DSfloat (#2273)."""
++        nan_value = DSdecimal(Decimal("nan"))
++        assert nan_value == DSdecimal(Decimal("nan"))
++        assert nan_value == math.nan
++        assert nan_value == Decimal("nan")
++        assert nan_value != 1234.5
++        assert nan_value != "1234.5"
++
+     def test_hash(self, allow_ds_float, disable_value_validation):
+         """Test hash(DSdecimal)"""
+         assert hash(DSdecimal(1.2345)) == hash(Decimal(1.2345))

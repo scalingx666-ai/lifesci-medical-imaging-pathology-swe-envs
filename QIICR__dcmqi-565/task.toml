@@ -1,0 +1,74 @@
+version = "1.0"
+
+[task]
+name = "default/QIICR__dcmqi-565"
+description = "Use DCMTK for all CIELab/RGB color conversions."
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "dcmqi",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "QIICR/dcmqi"
+ref = "5571494a14416ad951a0979d2329cf15b8bba019"
+reference = "https://github.com/QIICR/dcmqi/pull/565"
+source_access = "auto"
+built_at = "2026-11-14T07:12:44.745657+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:aa5c6917a9dbd128c468fefd4a837aa0e0c192e3fbeec840f5e51c8245baa192"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-10-26T13:01:09Z"
+diff_format = "unified"
+context_files = [
+    "CMakeExternals/DCMTK.cmake",
+    "include/dcmqi/ColorUtilities.h",
+    "include/dcmqi/ConverterBase.h",
+    "libsrc/Bin2Label.cpp",
+    "libsrc/CMakeLists.txt",
+    "libsrc/ColorUtilities.cpp",
+    "libsrc/ConverterBase.cpp",
+    "libsrc/Dicom2ItkConverterBase.cpp",
+    "libsrc/Dicom2ItkConverterBin.cpp",
+    "libsrc/Dicom2ItkConverterLabel.cpp",
+    "libsrc/Itk2DicomConverter.cpp",
+    "util/ColorUtilities.java",
+    "util/TestColorConversions_SRGB_CIELabPCS.java",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 772
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

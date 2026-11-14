@@ -1,0 +1,81 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index f00427082..0e77562b4 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -624,11 +624,11 @@ if(HDF)
+     if(HDF_FOUND)
+         if(NETCDF)
+             set(CMAKE_REQUIRED_LIBRARIES ${HDF_EXTRA_LIBRARIES})
+-                        check_library_exists("${HDF_LIBRARIES};${RPC_LIBRARIES}" sd_nccreate "" SD_NCCREATE)
+-            if(NOT SD_NCCREATE)
++                        check_library_exists("${HDF_LIBRARIES};${RPC_LIBRARIES}" nccreate "" HDF_NCCREATE)
++            if(HDF_NCCREATE)
+                 message(FATAL_ERROR "HDF4 needs to be configured with the --disable-netcdf option "
+                 "in order to be used with the original netCDF library.")
+-            endif(NOT SD_NCCREATE)
++            endif(HDF_NCCREATE)
+             set(CMAKE_REQUIRED_LIBRARIES)
+         endif(NETCDF)
+         set(HDF_LIBRARIES ${HDF_LIBRARIES} ${HDF_EXTRA_LIBRARIES})
+diff --git a/src/hdf_pro.cpp b/src/hdf_pro.cpp
+index e36685e9f..187fe2ace 100644
+--- a/src/hdf_pro.cpp
++++ b/src/hdf_pro.cpp
+@@ -28,6 +28,7 @@
+ 
+ #include "mfhdf.h"
+ #include "hdf_pro.hpp"
++#include "hfile.h"
+ 
+ namespace lib {
+ 
+@@ -481,21 +482,36 @@ namespace lib {
+     e->AssureScalarPar<DLongGDL>( 0, vg_id);
+ 
+     if( e->WriteableKeywordPresent( 0)) {
++#if LIBVER_MAJOR == 4 && LIBVER_MINOR >= 4
++      size_t sz = sizeof(groupclass);
++      Vgetclass(vg_id, groupclass, &sz);
++#else
+       Vgetclass(vg_id, groupclass);
++#endif
+       BaseGDL** classKW = &e->GetTheKW( 0);
+       delete(*classKW);
+       *classKW = new DStringGDL( groupclass);
+     }
+ 
+     if( e->WriteableKeywordPresent( 1)) {
++#if LIBVER_MAJOR == 4 && LIBVER_MINOR >= 4
++      size_t sz = sizeof(groupname);
++      Vgetname(vg_id, groupname, &sz);
++#else
+       Vgetname(vg_id, groupname);
++#endif
+       BaseGDL** nameKW = &e->GetTheKW( 1);
+       delete(*nameKW);
+       *nameKW = new DStringGDL( groupname);
+     }
+ 
+     if( e->WriteableKeywordPresent( 2)) {
++#if LIBVER_MAJOR == 4 && LIBVER_MINOR >= 4
++      size_t sz = sizeof(groupname);
++      Vinquire(vg_id, &nentries, groupname, &sz);
++#else
+       Vinquire(vg_id, &nentries, groupname);
++#endif
+       BaseGDL** nentriesKW = &e->GetTheKW( 2);
+       GDLDelete((*nentriesKW)); 
+       *nentriesKW = new DLongGDL( nentries);
+@@ -545,7 +561,12 @@ namespace lib {
+     DLong vg_id;
+     e->AssureScalarPar<DLongGDL>( 0, vg_id);
+ 
++#if LIBVER_MAJOR == 4 && LIBVER_MINOR >= 4
++    size_t sz = sizeof(groupname);
++    Vinquire(vg_id, &nentries, groupname, &sz);
++#else
+     Vinquire(vg_id, &nentries, groupname);
++#endif
+ 
+     dimension dim((DLong *) &nentries, (SizeT) 1);
+ 

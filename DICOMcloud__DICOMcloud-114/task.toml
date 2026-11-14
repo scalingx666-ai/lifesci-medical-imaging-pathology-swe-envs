@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/DICOMcloud__DICOMcloud-114"
+description = "Bump log4net from 2.0.5 to 2.0.10 in /DICOMcloud.Wado.WebApi"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "DICOMcloud",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "DICOMcloud/DICOMcloud"
+ref = "c61b93d432bc8c4ded5f1042a4989783d4d9b83e"
+reference = "https://github.com/DICOMcloud/DICOMcloud/pull/114"
+source_access = "auto"
+built_at = "2026-11-14T07:13:10.609017+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:0adad7311135aad0e514e78056304f192a3c7a5b775d6acd4bdf197bb35fc78d"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2021-03-14T04:33:32Z"
+diff_format = "unified"
+context_files = [
+    "DICOMcloud.Wado.WebApi/packages.config",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 2
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,73 @@
+diff --git a/README.md b/README.md
+index 0cd25486..2437b6a9 100644
+--- a/README.md
++++ b/README.md
+@@ -26,6 +26,8 @@ year = {2020}
+ 
+ ## Updates !!!
+ 
++**(2021-May-5)** [**Gradio Web Demo**](https://gradio.app/hub/AK391/U-2-Net)
++
+ **(2021-Apr-29)** Thanks [**Jonathan Benavides Vallejo**](https://www.linkedin.com/in/jonathanbv/) for releasing his App [**LensOCR: Extract Text & Image**](https://apps.apple.com/ch/app/lensocr-extract-text-image/id1549961729?l=en&mt=12), which uses U^2-Net for extracting the image foreground.
+ 
+ ![LensOCR APP](figures/LensOCR.jpg)
+diff --git a/gradio/demo.py b/gradio/demo.py
+new file mode 100644
+index 00000000..2ad81ef2
+--- /dev/null
++++ b/gradio/demo.py
+@@ -0,0 +1,37 @@
++import cv2
++import paddlehub as hub
++import gradio as gr
++import torch
++
++# Images
++torch.hub.download_url_to_file('https://cdn.pixabay.com/photo/2018/08/12/16/59/ara-3601194_1280.jpg', 'parrot.jpg')
++torch.hub.download_url_to_file('https://cdn.pixabay.com/photo/2016/10/21/14/46/fox-1758183_1280.jpg', 'fox.jpg')
++
++model = hub.Module(name='U2Net')
++
++def infer(img):
++  result = model.Segmentation(
++      images=[cv2.imread(img.name)],
++      paths=None,
++      batch_size=1,
++      input_size=320,
++      output_dir='output',
++      visualization=True)
++  return result[0]['front'][:,:,::-1], result[0]['mask']
++
++inputs = gr.inputs.Image(type='file', label="Original Image")
++outputs = [
++           gr.outputs.Image(type="numpy",label="Front"),
++           gr.outputs.Image(type="numpy",label="Mask")
++           ]
++
++title = "U^2-Net"
++description = "demo for U^2-Net. To use it, simply upload your image, or click one of the examples to load them. Read more at the links below."
++article = "<p style='text-align: center'><a href='https://arxiv.org/abs/2005.09007'>U^2-Net: Going Deeper with Nested U-Structure for Salient Object Detection</a> | <a href='https://github.com/xuebinqin/U-2-Net'>Github Repo</a></p>"
++
++examples = [
++  ['fox.jpg'],
++  ['parrot.jpg']
++]
++
++gr.Interface(infer, inputs, outputs, title=title, description=description, article=article, examples=examples).launch()
+\ No newline at end of file
+diff --git a/requirements.txt b/requirements.txt
+index 85ccd0e4..0355a3e6 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -1,5 +1,9 @@
+ numpy==1.15.2
+ scikit-image==0.14.0
+-torch==0.4.1.post2
+-torchvision==0.2.1
++torch
++torchvision
+ pillow==7.2.0
++opencv-python
++paddlepaddle
++paddlehub
++gradio

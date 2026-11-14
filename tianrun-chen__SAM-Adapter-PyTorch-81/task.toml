@@ -1,0 +1,76 @@
+version = "1.0"
+
+[task]
+name = "default/tianrun-chen__SAM-Adapter-PyTorch-81"
+description = "SAM2-Adapter is live! Use More Powerful Segment Anything 2 (SAM2) as the backbone!"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "SAM-Adapter-PyTorch",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "tianrun-chen/SAM-Adapter-PyTorch"
+ref = "c9cda27f7538545b2cefcd3be69a8ed3f52f4925"
+reference = "https://github.com/tianrun-chen/SAM-Adapter-PyTorch/pull/81"
+source_access = "auto"
+built_at = "2026-11-14T07:06:07.705297+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:aab410f02f5c38dfb17a41cd9934d72cff6d58afc247d04a0551052de8cc18c7"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2024-08-07T18:53:50Z"
+diff_format = "unified"
+context_files = [
+    "README.md",
+    "configs/cod-sam-vit-b.yaml",
+    "configs/cod-sam-vit-l.yaml",
+    "configs/demo.yaml",
+    "datasets/__pycache__/__init__.cpython-311.pyc",
+    "datasets/__pycache__/datasets.cpython-311.pyc",
+    "datasets/__pycache__/image_folder.cpython-311.pyc",
+    "datasets/__pycache__/transform_custom.cpython-311.pyc",
+    "datasets/__pycache__/wrappers.cpython-311.pyc",
+    "datasets/transform_custom.py",
+    "datasets/wrappers.py",
+    "requirements.txt",
+    "test.py",
+    "train.py",
+    "utils.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 1375
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,63 @@
+version = "1.0"
+
+[task]
+name = "default/ImprintLab__Medical-SAM2-36"
+description = "fix: typo and reshaping func in 2d data"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "Medical-SAM2",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "ImprintLab/Medical-SAM2"
+ref = "ccc234ed578a41e80ab1cdb11632b544a2544a48"
+reference = "https://github.com/ImprintLab/Medical-SAM2/pull/36"
+source_access = "auto"
+built_at = "2026-11-14T07:07:33.533854+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:42555b999fdc5b20873d20890f5489d02f48e7d7478b3cf797e52921a9cfbf80"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2024-09-07T13:53:14Z"
+diff_format = "unified"
+context_files = [
+    "README.md",
+    "func_2d/function.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 8
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

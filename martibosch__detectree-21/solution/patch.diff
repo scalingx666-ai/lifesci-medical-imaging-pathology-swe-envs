@@ -1,0 +1,123 @@
+diff --git a/.pre-commit-config.yaml b/.pre-commit-config.yaml
+index 890e113..cfaed27 100644
+--- a/.pre-commit-config.yaml
++++ b/.pre-commit-config.yaml
+@@ -11,12 +11,12 @@ repos:
+       - id: check-yaml
+ 
+   - repo: https://github.com/commitizen-tools/commitizen
+-    rev: v3.15.0
++    rev: v3.21.3
+     hooks:
+       - id: commitizen
+ 
+   - repo: https://github.com/pre-commit/mirrors-prettier
+-    rev: v3.1.0
++    rev: v4.0.0-alpha.8
+     hooks:
+       - id: prettier
+         additional_dependencies: [prettier, prettier-plugin-toml, prettier-plugin-ini]
+@@ -38,17 +38,17 @@ repos:
+         args: ["-d relaxed"]
+ 
+   - repo: https://github.com/python-jsonschema/check-jsonschema
+-    rev: 0.28.0
++    rev: 0.28.1
+     hooks:
+       - id: check-github-workflows
+ 
+   - repo: https://github.com/asottile/pyupgrade
+-    rev: v3.15.0
++    rev: v3.15.2
+     hooks:
+       - id: pyupgrade
+ 
+   - repo: https://github.com/astral-sh/ruff-pre-commit
+-    rev: v0.2.2
++    rev: v0.3.5
+     hooks:
+       - id: ruff
+         args: [ --fix ]
+diff --git a/detectree/__init__.py b/detectree/__init__.py
+index 2b0b4b5..0e10b22 100644
+--- a/detectree/__init__.py
++++ b/detectree/__init__.py
+@@ -1,4 +1,5 @@
+ """detectree init."""
++
+ from .classifier import Classifier, ClassifierTrainer
+ from .lidar import LidarToCanopy, rasterize_lidar
+ from .train_test_split import TrainingSelector
+diff --git a/detectree/cli/main.py b/detectree/cli/main.py
+index ea3377f..5636387 100644
+--- a/detectree/cli/main.py
++++ b/detectree/cli/main.py
+@@ -1,4 +1,5 @@
+ """detectree CLI."""
++
+ import logging
+ from os import path
+ 
+diff --git a/detectree/image_descriptor.py b/detectree/image_descriptor.py
+index 3f426c3..5b6462e 100644
+--- a/detectree/image_descriptor.py
++++ b/detectree/image_descriptor.py
+@@ -1,4 +1,5 @@
+ """Compute image descriptors."""
++
+ import cv2
+ import numpy as np
+ from PIL import Image
+diff --git a/detectree/lidar.py b/detectree/lidar.py
+index 1db599d..90563d6 100644
+--- a/detectree/lidar.py
++++ b/detectree/lidar.py
+@@ -1,4 +1,5 @@
+ """Utilities to get canopy information from LiDAR data."""
++
+ import laspy
+ import numpy as np
+ import pandas as pd
+diff --git a/detectree/pixel_features.py b/detectree/pixel_features.py
+index 42910ca..c1f1b36 100644
+--- a/detectree/pixel_features.py
++++ b/detectree/pixel_features.py
+@@ -1,4 +1,5 @@
+ """Build pixel features."""
++
+ import glob
+ from os import path
+ 
+@@ -184,9 +185,9 @@ def build_features_from_arr(self, img_rgb):
+                     img_lab_l, ddepth=-1, kernel=oriented_kernel_arr
+                 )
+                 img_filtered_vec = img_filtered.flatten()
+-                X[
+-                    :, self.num_color_features + i * self.num_orientations + j
+-                ] = img_filtered_vec
++                X[:, self.num_color_features + i * self.num_orientations + j] = (
++                    img_filtered_vec
++                )
+ 
+         # entropy features
+         # tpf.compute_entropy_features(X_img[:, self.entropy_slice],
+diff --git a/detectree/pixel_response.py b/detectree/pixel_response.py
+index 4990028..5c4bb63 100644
+--- a/detectree/pixel_response.py
++++ b/detectree/pixel_response.py
+@@ -1,4 +1,5 @@
+ """Build pixel binary (tree/non-tree) responses."""
++
+ import glob
+ from os import path
+ 
+diff --git a/detectree/utils.py b/detectree/utils.py
+index 195a72d..2fe8ba3 100644
+--- a/detectree/utils.py
++++ b/detectree/utils.py
+@@ -1,4 +1,5 @@
+ """detectree general utility functions."""
++
+ import datetime as dt
+ import itertools
+ import logging as lg

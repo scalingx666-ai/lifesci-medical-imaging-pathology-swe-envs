@@ -1,0 +1,77 @@
+diff --git a/README.md b/README.md
+index 2b73e08..47bec4c 100644
+--- a/README.md
++++ b/README.md
+@@ -52,7 +52,7 @@ conda install conda-forge::lungmask
+ On Windows, depending on your setup, it may be necessary to install torch beforehand: https://pytorch.org
+ 
+ ## Runtime and GPU support
+-Runtime between CPU-only and GPU-supported inference varies greatly. Using the GPU, processing a volume takes only several seconds, while using CPU-only inference takes several minutes. To make use of the GPU, make sure that your torch installation has CUDA support. In case of CUDA out-of-memory errors, reduce the batchsize to 1 with the optional argument ```--batchsize 1```
++Runtime between CPU-only and GPU-supported inference varies greatly. Using the GPU, processing a volume takes only several seconds, while using CPU-only inference takes several minutes. To make use of the GPU, make sure that your torch installation has CUDA support. In case of CUDA out-of-memory errors, reduce the batch size to 1 with the optional argument ```--batchsize 1```
+ 
+ ## Usage
+ ### As a command line tool:
+@@ -91,7 +91,7 @@ Load an alternative model like so:
+ inferer = LMInferer(modelname="R231CovidWeb")
+ ```
+ 
+-To use the model fusing capability (e.g. LTRCLobes_R231), use:
++To use the model-fusion capability (e.g. LTRCLobes_R231), use:
+ ```
+ inferer = LMInferer(modelname='LTRCLobes', fillmodel='R231')
+ ```
+diff --git a/lungmask/mask.py b/lungmask/mask.py
+index a581166..1adabb8 100644
+--- a/lungmask/mask.py
++++ b/lungmask/mask.py
+@@ -84,12 +84,12 @@ def __init__(
+ 
+         Args:
+             modelname (str, optional): Model to be applied. Defaults to 'R231'.
+-            modelpath (str, optional): Path to modeleights. `modelname` parameter will be ignored if provided. Defaults to None.
++            modelpath (str, optional): Path to model weights. `modelname` parameter will be ignored if provided. Defaults to None.
+             fillmodel (Optional[str], optional): Fillmodel to be applied. Defaults to None.
+             fillmodel_path (Optional[str], optional): Path to weights for fillmodel. `fillmodel` parameter will be ignored if provided. Defaults to None.
+             force_cpu (bool, optional): Will not use GPU is `True`. Defaults to False.
+             batch_size (int, optional): Batch size. Defaults to 20.
+-            volume_postprocessing (bool, optional): If `Fales` will not perform postprocessing (connected component analysis). Defaults to True.
++            volume_postprocessing (bool, optional): If `False`, postprocessing will not be performed (connected component analysis). Defaults to True.
+             tqdm_disable (bool, optional): If `True`, will disable progress bar. Defaults to False.
+         """
+         assert (
+diff --git a/lungmask/utils.py b/lungmask/utils.py
+index 27e1839..e89a319 100644
+--- a/lungmask/utils.py
++++ b/lungmask/utils.py
+@@ -234,10 +234,10 @@ def read_dicoms(
+ 
+ 
+ def load_input_image(path: str, disable_tqdm=False, read_metadata=False) -> sitk.Image:
+-    """Loads image, if path points to a file, file will be loaded. If path points ot a folder, a DICOM series will be loaded. If multiple series are present, the largest series (higher number of slices) will be loaded.
++    """Loads image, if path points to a file, file will be loaded. If path points to a folder, a DICOM series will be loaded. If multiple series are present, the largest series (higher number of slices) will be loaded.
+ 
+     Args:
+-        path (str): File or folderpath to be loaded. If folder, DICOM series is expected
++        path (str): File or folder path to be loaded. If a folder, a DICOM series is expected
+         disable_tqdm (bool, optional): Disable tqdm progress bar. Defaults to False.
+         read_metadata (bool, optional): Read the metadata - including DICOM tags - from the input and store in the loaded image
+ 
+@@ -282,14 +282,14 @@ def postprocessing(
+     disable_tqdm: bool = False,
+     skip_below: int = 3,
+ ) -> np.ndarray:
+-    """some post-processing mapping small label patches to the neighbout whith which they share the
+-        largest border. Only largest connected components (CC) for each label will be kept. If a label is member of the spare list it will be mapped to neighboring labels and not present in the final labelling.
++    """Some post-processing, mapping small label patches to the neighbor with which they share the
++        largest border. Only the largest connected component (CC) for each label will be kept. If a label is a member of the spare list, it will be mapped to a neighboring label and will not be present in the final labeling.
+ 
+     Args:
+         label_image (np.ndarray): Label image (int) to be processed
+         spare (list, optional): Labels that are used for mapping to neighbors but not considered for final labelling. This is used for label fusion with a filling model. Defaults to [].
+-        disable_tqdm (bool, optional): If true, tqdm will be diabled. Defaults to False.
+-        skip_below (int, optional): If a CC is smaller than this value. It will not be merged but removed. This is for performance optimization.
++        disable_tqdm (bool, optional): If true, tqdm will be disabled. Defaults to False.
++        skip_below (int, optional): If a CC is smaller than this value, it will not be merged but removed. This is for performance optimization.
+ 
+     Returns:
+         np.ndarray: Postprocessed volume

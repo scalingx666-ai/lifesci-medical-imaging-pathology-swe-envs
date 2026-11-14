@@ -1,0 +1,214 @@
+diff --git a/3_HowToGuides.txt b/3_HowToGuides.txt
+index eebeb1275..42296a488 100644
+--- a/3_HowToGuides.txt
++++ b/3_HowToGuides.txt
+@@ -441,6 +441,7 @@ Multi-institutional Performance Evaluation of Deep Learning Methods and Robust M
+   -# An image or a set of co-registered images.
+   -# An ROI file containing various labels, for which features will be extracted.
+ 	-# NOTE: CaPTk can also extract COLLAGE features [1] using the [Python implementation](https://github.com/radxtools/collageradiomics/), but this functionality must be invoked from the separate "CollageFeatures" executable.
++        -# By contrast, IBSI-2 convolutional features based on the [CBICA Python implementation](https://github.com/CBICA/CaPTK_IBSI2) are fully available from the CLI and GUI.
+  
+ <b>USAGE:</b>
+   -# Once image(s) and an ROI file are loaded, go to the "Feature Extraction" panel.
+diff --git a/docs/ht_FeatureExtraction.html b/docs/ht_FeatureExtraction.html
+index c9eb4362a..c2a4d5ed2 100644
+--- a/docs/ht_FeatureExtraction.html
++++ b/docs/ht_FeatureExtraction.html
+@@ -64,7 +64,10 @@
+ <div class="textblock"><p><b>REQUIREMENTS:</b></p><ol type="1">
+ <li>An image or a set of co-registered images.</li>
+ <li>An ROI file containing various labels, for which features will be extracted.</li>
+-<li>NOTE: CaPTk can also extract COLLAGE features [1] using the <a href="https://github.com/radxtools/collageradiomics/">Python implementation</a>, but this functionality must be invoked from the separate "CollageFeatures" executable.</li>
++<li>NOTE: CaPTk can also extract COLLAGE features [1] using the <a href="https://github.com/radxtools/collageradiomics/">Python implementation</a>, but this functionality must be invoked from the separate "CollageFeatures" executable.<ol type="a">
++<li>By contrast, IBSI-2 convolutional features based on the <a href="https://github.com/CBICA/CaPTK_IBSI2">CBICA Python implementation</a> are fully available from the CLI and GUI.</li>
++</ol>
++</li>
+ </ol>
+ <p><b>USAGE:</b></p><ol type="1">
+ <li>Once image(s) and an ROI file are loaded, go to the "Feature Extraction" panel.</li>
+diff --git a/src/applications/FeatureExtraction/README.md b/src/applications/FeatureExtraction/README.md
+index 4c4e1884e..b13ad3944 100644
+--- a/src/applications/FeatureExtraction/README.md
++++ b/src/applications/FeatureExtraction/README.md
+@@ -105,6 +105,10 @@ This approach uses one single parameter file that is applied to all uploaded ima
+ 
+ Modality detection in the filenames relies on a known list of modality names. We detect some modalities by default (see the IPP page for details), but you can also specify custom modality names that will be detected in the "Filename Parsing" section.
+ 
++## IBSI-2 Features
++Feature Extraction offers extraction of IBSI-2 convolutional features. These features are not exportable to a .csv output and instead are in the form of multiple .nii.gz output images. These are created alongside the output .csv file.
++These features are created with the [CBICA IBSI-2 implementation.](https://github.com/CBICA/CaPTK_IBSI2)
++
+ ## Frequently Asked Questions
+ 
+ - What do the various parameters mean and how do I customize them?
+@@ -121,4 +125,4 @@ These would be NaNs and depending on how features have been extracted, these are
+ 
+ - Anything else?
+ 
+-Please [open a new issue](https://github.com/CBICA/CaPTk/issues/new?assignees=&labels=&template=bug-report.md&title=) 
+\ No newline at end of file
++Please [open a new issue](https://github.com/CBICA/CaPTk/issues/new?assignees=&labels=&template=bug-report.md&title=) 
+diff --git a/src/applications/FeatureExtraction/src/FeatureExtraction.h b/src/applications/FeatureExtraction/src/FeatureExtraction.h
+index 3d19a92e1..381681107 100644
+--- a/src/applications/FeatureExtraction/src/FeatureExtraction.h
++++ b/src/applications/FeatureExtraction/src/FeatureExtraction.h
+@@ -767,6 +767,7 @@ class FeatureExtraction
+   std::string m_outputFile; //! output file
+   std::string  m_outputPath, //! this is the output directory and can be used to save intermediate files, if required
+     m_outputIntermediatePath; //! store intermediate files (if any)
++  int m_currentImageIndex; //! stores the index to the image currently being selected, for use in feature family functions that need access (e.g. writing some other output file per-input) 
+   bool m_outputVerticallyConcatenated = false; //! flag to check how to write the output file (whether in individual fields or vertically concatenated), defaults to horizontal-concatenation
+   std::string m_finalOutputToWrite; //! this gets populated with the feature values to write at the end, TBD: needs to change when YML format is incorporated
+   bool m_cancel; //! unused right now but scope for extension in the future
+diff --git a/src/applications/FeatureExtraction/src/FeatureExtraction.hxx b/src/applications/FeatureExtraction/src/FeatureExtraction.hxx
+index dc752fee8..f0f99590b 100644
+--- a/src/applications/FeatureExtraction/src/FeatureExtraction.hxx
++++ b/src/applications/FeatureExtraction/src/FeatureExtraction.hxx
+@@ -459,8 +459,16 @@ void FeatureExtraction< TImage >::CalculateIBSI2(const typename TImage::Pointer
+   cbica::WriteImage< TImage >(itkImage, inputImage);
+   //cbica::WriteImage< TImage >(maskImage, inputMask);
+ 
++  // Use modality + patient information to construct subdirectory path
++  // required so that outputs from CaPTk_ExtraFeatures executable don't overwrite each other each time
++  std::string inputModality = m_modality[m_currentImageIndex];
++  std::string subjectName = m_patientID;
++  std::string path, ext, base;
++  cbica::splitFileName(m_outputFile, path, base, ext);
++  std::string modifiedOutputPath = path+base+"_IBSI2/"+subjectName+"/"+inputModality;
++  std::cout << "Creating IBSI-2 ouput directory: " << modifiedOutputPath << std::endl;
+   // construct the command and call it
+-  auto commandToRun = ibsi2_cli + " -i " + inputImage + " -o " + m_outputPath;
++  auto commandToRun = ibsi2_cli + " -i " + inputImage + " -o " + modifiedOutputPath;
+   if (std::system(commandToRun.c_str()) != 0)
+   {
+     std::cerr << "Something went wrong with IBSI2 Feature extraction.\n";
+@@ -1987,6 +1995,7 @@ void FeatureExtraction< TImage >::Update()
+         bool volumetricFeaturesExtracted = false, morphologicFeaturesExtracted = false;
+         for (size_t i = 0; i < m_inputImages.size(); i++)
+         {
++          m_currentImageIndex = i; // make sure we can reference properties by this index in feature family functions
+           auto writeFeatureMapsAndLattice = m_LatticeComputation && allROIs[j].latticeGridPoint;
+           // construct the mask and the non-zero image values for each iteration - saves a *lot* of memory
+           auto currentMask = cbica::CreateImage< TImage >(m_Mask), currentMask_patch = cbica::CreateImage< TImage >(m_Mask);
+diff --git a/src/view/gui/fFeaturePanel.cpp b/src/view/gui/fFeaturePanel.cpp
+index 1d86980a1..5b4173823 100644
+--- a/src/view/gui/fFeaturePanel.cpp
++++ b/src/view/gui/fFeaturePanel.cpp
+@@ -44,6 +44,10 @@ fFeaturePanel::fFeaturePanel(QWidget * parent) : QWidget(parent)
+   m_Collage->setChecked(false);
+   connect(m_Collage, SIGNAL(toggled(bool)), this, SLOT(onCollageToggled(bool)));
+ 
++  // Add info-message to IBSI2 to tell user about additional output file. (Also warns that 3D is required)
++  m_IBSI2->setChecked(false);
++  connect(m_IBSI2, SIGNAL(toggled(bool)), this, SLOT(onIBSI2Toggled(bool)));
++
+ }
+ 
+ void fFeaturePanel::helpClicked()
+@@ -162,6 +166,13 @@ void fFeaturePanel::computeFeature(int type)
+   std::vector< std::string >imagepaths;
+   std::vector<std::string> modality;
+ 
++  images = ((fMainWindow*)m_listener)->getLodedImages(imagepaths, modality);
++
++  if (images.size() == 0) // Do this first to prevent vector index exceptions with 0 images
++  {
++      ShowErrorMessage("No valid images selected!", this);
++      return;
++  }
+ 
+   if (m_listener != NULL)
+   {
+@@ -179,7 +190,6 @@ void fFeaturePanel::computeFeature(int type)
+     }
+     else
+     {
+-      images = ((fMainWindow*)m_listener)->getLodedImages(imagepaths, modality);
+       if (imagepaths.size() < 1)
+       {
+         ShowErrorMessage("No valid images selected!", this);
+@@ -207,10 +217,9 @@ void fFeaturePanel::computeFeature(int type)
+     ShowErrorMessage("No valid images selected!", this);
+     return;
+   }
+-  else
+-  {
+-    ((fMainWindow*)m_listener)->updateProgress(5, "Initializing Feature Extraction Module");
+-  }
++
++  ((fMainWindow*)m_listener)->updateProgress(5, "Initializing Feature Extraction Module");
++
+ 
+   std::string featureFileName = m_txtSaveFileName->text().toStdString();
+ 
+@@ -415,4 +424,19 @@ void fFeaturePanel::onCollageToggled(bool checked)
+         m_Collage->setChecked(false);
+         msgbox.exec();
+     }
++}
++
++void fFeaturePanel::onIBSI2Toggled(bool checked)
++{
++    if (checked)
++    {
++        QMessageBox msgbox;
++        QString msg;
++        msg = "You have selected IBSI-2 convolutional features.\n";
++        msg += "As these features are not currently exportable to a .csv format, an additional output directory will be created alongside the output csv file, with the suffix '_IBSI2'.\n\n";
++        msg += "Please note that these features are currently only defined for 3D images.\n\n";
++        msg += "Processing of these features may take between 1-4 minutes per input image on a typical desktop machine.";
++        msgbox.setText(msg);
++        msgbox.exec();
++    }
+ }
+\ No newline at end of file
+diff --git a/src/view/gui/fFeaturePanel.h b/src/view/gui/fFeaturePanel.h
+index 60a460c64..0fdf66b42 100644
+--- a/src/view/gui/fFeaturePanel.h
++++ b/src/view/gui/fFeaturePanel.h
+@@ -70,6 +70,7 @@ class fFeaturePanel : public QWidget, private Ui::fFeaturePanel
+   void advancedButtonClicked();
+   void helpClicked();
+   void onCollageToggled(bool checked);
++  void onIBSI2Toggled(bool checked);
+   std::map< std::string, bool > getEnabledFeatures();
+ 
+ private:
+diff --git a/src/view/gui/ui_fFeaturePanel.h b/src/view/gui/ui_fFeaturePanel.h
+index 34cde04cd..570e09b04 100644
+--- a/src/view/gui/ui_fFeaturePanel.h
++++ b/src/view/gui/ui_fFeaturePanel.h
+@@ -64,6 +64,7 @@ class Ui_fFeaturePanel
+   QCheckBox* m_GLCM;
+   QCheckBox* m_LBP;
+   QCheckBox* m_Collage;
++  QCheckBox* m_IBSI2;
+   QCheckBox* m_NGTDM;
+   QCheckBox* m_NGLDM;
+   QCheckBox* m_GLSZM;
+@@ -102,6 +103,7 @@ class Ui_fFeaturePanel
+     m_featureCheckBoxMap["GLCM"] = m_GLCM;
+     m_featureCheckBoxMap["LBP"] = m_LBP;
+     m_featureCheckBoxMap["Collage"] = m_Collage;
++    m_featureCheckBoxMap["IBSI2"] = m_IBSI2;
+     m_featureCheckBoxMap["NGTDM"] = m_NGTDM;
+     m_featureCheckBoxMap["NGLDM"] = m_NGLDM;
+     m_featureCheckBoxMap["GLSZM"] = m_GLSZM;
+@@ -185,6 +187,9 @@ class Ui_fFeaturePanel
+     m_Collage->setToolTip(QString("Calculates Collag Features [from CWRU] for image and given mask."));
+     m_Collage->setCheckState(Qt::CheckState::Unchecked);
+     m_Collage->setEnabled(false);
++    m_IBSI2 = new QCheckBox("IBSI-2 (Convolutional Filters)");
++    m_IBSI2->setToolTip(QString("Calculates IBSI-2 features (convolutional filters) for image and given mask."));
++    m_IBSI2->setCheckState(Qt::CheckState::Unchecked);
+     m_NGTDM = new QCheckBox("NGTDM (Tone Difference)");
+     m_NGTDM->setToolTip(QString("Calculates Neighborhood Gray-Tone Difference Matrix."));
+     m_NGLDM = new QCheckBox("NGLDM (Level Dependence)");
+@@ -239,6 +244,7 @@ class Ui_fFeaturePanel
+     featureLayout4->addWidget(m_NGLDM);
+     featureLayout4->addWidget(m_LBP);
+     featureLayout4->addWidget(m_Collage);
++    featureLayout4->addWidget(m_IBSI2);
+     featureLayout4->addStretch();
+ 
+     featureLayout5->addWidget(m_Laws);

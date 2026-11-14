@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/bowang-lab__MedSAM2-6"
+description = "add support to detect device of apple sillicon (mps) or cuda or cpu"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "MedSAM2",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "bowang-lab/MedSAM2"
+ref = "bd9ce76569ff8d28dc01cfc8b810b1f688a875f6"
+reference = "https://github.com/bowang-lab/MedSAM2/pull/6"
+source_access = "auto"
+built_at = "2026-11-14T07:08:42.061136+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:ede2f9fcd732a7c3fd88a132e782f208a443a1c160673b253fd23f56a569ba40"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2025-04-16T18:48:53Z"
+diff_format = "unified"
+context_files = [
+    "sam2/build_sam.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 30
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,70 @@
+version = "1.0"
+
+[task]
+name = "default/pymedphys__pymedphys-2602"
+description = "Check the pixel options on public floating-point Parametric Maps"
+
+[metadata]
+difficulty = "large"
+category = "bugfix"
+keywords = [
+    "pymedphys",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "pymedphys/pymedphys"
+ref = "395d0605d111bdb8aa8539605fed4b17932b716a"
+reference = "https://github.com/pymedphys/pymedphys/pull/2602"
+source_access = "auto"
+built_at = "2026-11-14T07:11:49.614269+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:7ba90c04b0759af6a316b3bac291e1cffa00cdc2e935fe7dd6510223982601d6"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-11-10T02:27:56Z"
+diff_format = "unified"
+context_files = [
+    ".github/scripts/test_workflow_contracts.py",
+    ".github/text-evaluation/requirements.txt",
+    ".github/workflows/parametric-map-check-idc.yml",
+    ".github/workflows/unit-tests.yml",
+    "lib/pymedphys/_dicom/deidentify/parametric_map_check.py",
+    "lib/pymedphys/_dicom/deidentify/text_evaluation_idc.py",
+    "lib/pymedphys/docs/contrib/info/deidentification-design.md",
+    "lib/pymedphys/docs/contrib/info/workflows.md",
+    "lib/pymedphys/tests/dicom/test_deidentify_parametric_map_check.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 1027
+difficulty = "large"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

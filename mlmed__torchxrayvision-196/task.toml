@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/mlmed__torchxrayvision-196"
+description = "Document official PhysioNet VinDr-CXR files in VinDr_Dataset docstring"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "torchxrayvision",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "mlmed/torchxrayvision"
+ref = "bd41a6ce24c4f69fd6e7fd6c8b263166a6bbd737"
+reference = "https://github.com/mlmed/torchxrayvision/pull/196"
+source_access = "auto"
+built_at = "2026-11-14T07:06:57.661040+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:3183a524001401cac5b64a94d67a71927c304be0431fda3779dc7b04047ebc26"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-10-15T02:08:34Z"
+diff_format = "unified"
+context_files = [
+    "torchxrayvision/datasets.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 15
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/ellisdg__3DUnetCNN-343"
+description = "FIX: sets default prefetch factor to 1"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "3DUnetCNN",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "ellisdg/3DUnetCNN"
+ref = "9b76f9c91f24c7e80192f720d0e360b91c75aa6c"
+reference = "https://github.com/ellisdg/3DUnetCNN/pull/343"
+source_access = "auto"
+built_at = "2026-11-14T07:05:31.309352+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:87a2749408b0b4e63a1d14afa377af0d16f7f927e9a0c0ae7bd95ba0b4bcc433"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2024-06-27T20:50:56Z"
+diff_format = "unified"
+context_files = [
+    "unet3d/scripts/script_utils.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 2
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

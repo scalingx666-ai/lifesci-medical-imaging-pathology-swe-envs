@@ -1,0 +1,63 @@
+version = "1.0"
+
+[task]
+name = "default/Enet4__dicom-rs-847"
+description = "Update implementation class UID and version name for 0.10.1"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "dicom-rs",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "Enet4/dicom-rs"
+ref = "b232df36c66d128530f91e307fab3b1d6e320409"
+reference = "https://github.com/Enet4/dicom-rs/pull/847"
+source_access = "auto"
+built_at = "2026-11-14T07:09:54.617475+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:f917d8ace831481a2456a2e7012bdbd3ed95f4d163448ef6580fc7a769d8d56a"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-10-27T08:44:17Z"
+diff_format = "unified"
+context_files = [
+    "object/src/lib.rs",
+    "ul/src/lib.rs",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 8
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

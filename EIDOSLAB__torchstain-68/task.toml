@@ -1,0 +1,67 @@
+version = "1.0"
+
+[task]
+name = "default/EIDOSLAB__torchstain-68"
+description = "Use torch.cov instead of custom function"
+
+[metadata]
+difficulty = "medium"
+category = "bugfix"
+keywords = [
+    "torchstain",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "EIDOSLAB/torchstain"
+ref = "d439a8bf044e6a371606e148c2f0063f5e9f438f"
+reference = "https://github.com/EIDOSLAB/torchstain/pull/68"
+source_access = "auto"
+built_at = "2026-11-14T07:13:22.542717+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:a819e31bf50718917e4a2995a83fe92415dd9552d7231fe37176e73ddc49a78c"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2025-11-13T14:55:02Z"
+diff_format = "unified"
+context_files = [
+    "tests/test_torch.py",
+    "torchstain/torch/augmentors/macenko.py",
+    "torchstain/torch/normalizers/macenko.py",
+    "torchstain/torch/normalizers/multitarget.py",
+    "torchstain/torch/utils/__init__.py",
+    "torchstain/torch/utils/cov.py",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 35
+difficulty = "medium"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

@@ -1,0 +1,62 @@
+version = "1.0"
+
+[task]
+name = "default/MITK__MITK-315"
+description = "fix: crash on removing a DataNode from the DataManager due to missing…"
+
+[metadata]
+difficulty = "easy"
+category = "bugfix"
+keywords = [
+    "MITK",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "MITK/MITK"
+ref = "499a58d960b3bff8a462c8f004e3bf7caa565681"
+reference = "https://github.com/MITK/MITK/pull/315"
+source_access = "auto"
+built_at = "2026-11-14T07:08:09.195154+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:4b51f71b71c7c621f0fa7e8b46ae8341cadd479a7c0aa4fdb27653e39db7766b"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2026-04-09T09:02:42Z"
+diff_format = "unified"
+context_files = [
+    "Modules/QtWidgets/src/QmitkDataStorageSimpleTreeModel.cpp",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 4
+difficulty = "trivial"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0

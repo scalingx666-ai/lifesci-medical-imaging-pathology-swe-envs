@@ -1,0 +1,69 @@
+version = "1.0"
+
+[task]
+name = "default/rexcardan__Evil-DICOM-98"
+description = "Adding support for Halcyon RT Plans"
+
+[metadata]
+difficulty = "small"
+category = "bugfix"
+keywords = [
+    "Evil-DICOM",
+    "pr_diff",
+]
+
+[metadata.repo2env]
+pipeline = "pr_diff"
+pipeline_version = "0.3.0"
+repo = "rexcardan/Evil-DICOM"
+ref = "8f4144db75c5fe3270cae40fee40b1fab8f1c0c8"
+reference = "https://github.com/rexcardan/Evil-DICOM/pull/98"
+source_access = "auto"
+built_at = "2026-11-14T07:13:24.435044+00:00"
+reward_kinds = [
+    "diff_similarity",
+]
+spec_version = "0.2.0"
+content_hash = "sha256:ff6b96b891fff70ce1320aabc3b32fe32a426965cc3aecbbfdb554195c2d57a6"
+
+[metadata.repo2env.pr_diff]
+pr_merged_at = "2022-10-03T14:20:47Z"
+diff_format = "unified"
+context_files = [
+    "EvilDICOM/EvilDICOM/Anonymization/Anonymizers/StudyIdAnonymizer.cs",
+    "EvilDICOM/EvilDICOM/Core/Extensions/IDICOMElementExtensions.cs",
+    "EvilDICOM/EvilDICOM/Core/Helpers/AbstractSyntax.cs",
+    "EvilDICOM/EvilDICOM/Core/Helpers/SOPClassUID.cs",
+    "EvilDICOM/EvilDICOM/Core/IO/Data/DataComposer.cs",
+    "EvilDICOM_CodeGen/CodeGenerator/CodeGenerator/Enums/SOPClass.cs",
+    "EvilDICOM_CodeGen/CodeGenerator/CodeGenerator/Helpers/AbstractSyntax.cs",
+    "EvilDICOM_CodeGen/CodeGenerator/CodeGenerator/Helpers/SOPClassHelper.cs",
+]
+
+[metadata.repo2env.reward_calibration]
+baseline_reward = 0.0
+loc_changed = 11
+difficulty = "small"
+
+[metadata.repo2env.evaluation]
+schema_version = "1"
+status = "unverified"
+stage = "generation"
+reason_codes = [
+    "validation_not_run",
+]
+detail = "Generated task; validation has not been established."
+provenance = "unknown"
+evidence = []
+
+[metadata.repo2env.reproducibility]
+mode = "local_only"
+image_ref = "python:3.12-slim"
+image_tag = "python:3.12-slim"
+image_visibility = "private"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 300.0
